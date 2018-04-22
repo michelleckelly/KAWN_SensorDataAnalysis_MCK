@@ -1,27 +1,26 @@
 ---
-title: "KAWN RAPID: Working .Rmd File for Sensor Data Analysis"
+title: 'KAWN RAPID: Sensor Data Analysis'
 author: "Michelle Catherine Kelly"
 date: "22 April 2018"
-output: 
-  html_notebook:
-    toc: TRUE
+output:
+  html_document:
     theme: united
+    df_print: paged
+    toc: yes
+    number_sections: true
+    highlight: tango
+  html_notebook:
+    theme: united
+    toc: yes
+    number_sections: true
+    highlight: tango
 ---
-This script contains:  
-1. .xml to .csv conversion of raw Nitratax files  
-2. data cleanup of Nitratax files  
-3. data loading from miniDOT files  
-4. data pull from USGS server  
-5. basic plotting of nitrate+nitrite, dissolved oxygen, and temperature data for each site  
 
-Editing notes for future:
-1. setup script so nitratax .csvs, neon data is saved in a nested folder
-
-Setting up .Rmd environment and loading packages for script  
-```{r setup, include=TRUE, warning=FALSE, message=FALSE}
-knitr::opts_chunk$set(fig.height = 8, fig.width = 10, 
+```{r setup, echo = FALSE, warning=FALSE, error=FALSE, message=FALSE}
+knitr::opts_chunk$set(fig.height = 8, 
+                      fig.width = 10, 
                       cache=TRUE, # enable caching globally
-                      echo = TRUE) # all code will print to screen
+                      echo=TRUE) # all code will print to screen
 
 library("XML")
 library(lubridate)
@@ -36,8 +35,18 @@ library(zoo)
 library(neonUtilities)
 ```
 
-.xml to .csv conversion function  
-```{r Nitratax_XMLtoCSV, include=TRUE}
+***  
+
+# Overview
+
+This is a **working document** for analyzing sensor data from the NSF RAPID Kansas River Nitrogen Cycling Project
+
+***  
+
+# Nitratax Data
+
+**Nitratax_XMLtoCSV:** Function to convert raw-from-sensor .xml file to more convenient .csv file  
+```{r Nitratax_XMLtoCSV}
 # Function name:
       # Nitratax_XMLtoCSV
 # Function description:
@@ -50,31 +59,44 @@ library(neonUtilities)
       # .csv file titled "KansasR_Nitratax_<sensor>.csv"
 
 Nitratax_XMLtoCSV <- function(filename, sensor, deployDate){
+  
   xmlData <- XML::xmlParse(file = filename)
   xmlData <- XML::xmlToDataFrame(xmlData, homogeneous = F, stringsAsFactors = F)
   xmlData <- xmlData[-(1:6),] # taking out text at top of dataframe
+  
   for (count in 1:length(xmlData)){
     names(xmlData)[count] <- as.character(xmlData[1,count])
   }
+  
   xmlData <- xmlData[-1,] # taking out character rows
   xmlData <- xmlData[,-1] # taking out first blank column
-  xmlData$`  TIME  ` <- lubridate::as_datetime(xmlData$`  TIME  `, tz = "America/Chicago", format = "%m/%d/%Y %H:%M:%S")
+  
+  xmlData$`  TIME  ` <- lubridate::as_datetime(xmlData$`  TIME  `, 
+                                               tz = "America/Chicago", 
+                                               format = "%m/%d/%Y %H:%M:%S")
   xmlData$`  NITRATE CONC.  ` <- as.numeric(xmlData$`  NITRATE CONC.  `)
   xmlData$`  ER  ` <- as.numeric(xmlData$`  ER  `)
   xmlData$`  EM  ` <- as.numeric(xmlData$`  EM  `)
-  xml_trunkated <- xmlData[xmlData$`  TIME  `>ymd(deployDate),]
-  xml_trunkated <- data.frame(xml_trunkated$`  TIME  `, xml_trunkated$`  NITRATE CONC.  `)
+  
+  xml_trunkated <- xmlData[xmlData$`  TIME  `>ymd(deployDate),] # subset only data from deploy onwards
+  
+  xml_trunkated <- data.frame(xml_trunkated$`  TIME  `, 
+                              xml_trunkated$`  NITRATE CONC.  `)
   names(xml_trunkated) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
-  CSV_filename <- paste("KansasR_Nitratax_", sensor, ".csv", sep = "")
+  CSV_filename <- paste("KansasR_Nitratax_", 
+                        sensor, 
+                        ".csv", sep = "")
+  
   write.table(xml_trunkated, 
               file = CSV_filename,
               sep = ",", row.names = FALSE)
   return(xml_trunkated)
+  
 }
 ```
 
-Import of Nitratax data  
-```{r NitrataxLoading, include=TRUE}
+Import of Nitratax data into R environment
+```{r NitrataxLoading}
 # Variable descriptions:    
       # loadfromCSV = logical vector, if TRUE data will be loaded from .csv files
                                     # if FALSE data will be converted from .xml to .csv
@@ -86,50 +108,68 @@ Import of Nitratax data
 loadfromCSV <- TRUE 
 
 if (loadfromCSV == TRUE){
-  bowersock_N <- read.csv(file = "KansasR_Nitratax_Bowersock.csv", header = TRUE,
-                         colClasses = c("POSIXct", "numeric"))
-  eric_N <- read.csv(file = "KansasR_Nitratax_Eric.csv", header = TRUE,
-                         colClasses = c("POSIXct", "numeric"))
-  steve_N <- read.csv(file = "KansasR_Nitratax_Steve.csv", header = TRUE,
-                         colClasses = c("POSIXct", "numeric"))
+  
+  bowersock_N <- read.csv(file = "KansasR_Nitratax_Bowersock.csv", 
+                          header = TRUE,
+                          colClasses = c("POSIXct", "numeric"))
+  eric_N <- read.csv(file = "KansasR_Nitratax_Eric.csv", 
+                     header = TRUE,
+                     colClasses = c("POSIXct", "numeric"))
+  steve_N <- read.csv(file = "KansasR_Nitratax_Steve.csv", 
+                      header = TRUE,
+                      colClasses = c("POSIXct", "numeric"))
   
   names(bowersock_N) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
   names(eric_N) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
   names(steve_N) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
   
   cat("data loaded from .csv file")
+  
 }
 if (loadfromCSV == FALSE) {
+  
   bowersock_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Bowersock_Pulled04-13-2018.xml", 
-                                 sensor = "Bowersock", deployDate = "2018-01-13")
+                                   sensor = "Bowersock", 
+                                   deployDate = "2018-01-13")
   eric_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Eric_Pulled04-13-2018.xml", 
-                            sensor = "Eric", deployDate = "2018-02-19")
+                              sensor = "Eric", 
+                              deployDate = "2018-02-19")
   steve_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Steve_Pulled04-20-2018.xml", 
-                             sensor = "Steve", deployDate = "2018-01-31")
+                               sensor = "Steve", 
+                               deployDate = "2018-01-31")
   
   cat("data loaded from .xml file")
+  
 }
 ```
 
-Cleanup of Nitratax data files  
-```{r NitrataxCleanup, include=TRUE}
+Cleanup of Nitratax data files
+```{r NitrataxCleanup}
 if (loadfromCSV == FALSE){
+  
   # Eric sensor was buried under sediment from 05-Mar to 15-Mar, setting these measurements to NA
-dateSedimentStartEric <- lubridate::as_datetime("2018-03-05 11:00:00")
-dateSedimentEndEric <- lubridate::as_datetime("2018-03-15 00:00:00")
-eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` >= dateSedimentStartEric & 
-                                        eric_N$`Date and time` <= dateSedimentEndEric] <- NA
+  dateSedimentStartEric <- lubridate::as_datetime("2018-03-05 11:00:00")
+  dateSedimentEndEric <- lubridate::as_datetime("2018-03-15 00:00:00")
+  eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` >= dateSedimentStartEric 
+                                          & 
+                                            eric_N$`Date and time` <= dateSedimentEndEric] <- NA
 
-# Setting Steve to NA for all measurements of "0", due to sediment issues
-steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Nitrate plus nitrite as mg-N/L` <= 0] <- NA
+  # Setting Steve to NA for all measurements of "0", due to sediment issues
+  steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Nitrate plus nitrite as mg-N/L` <= 0] <- NA
 
-# Setting Steve to NA during time period of sediment burial
-dateSedimentStartSteve <- lubridate::as_datetime("2018-03-12 15:00:00")
-dateSedimentEndSteve <- lubridate::as_datetime("2018-03-27 11:30:00")
-steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time`>=dateSedimentStartSteve &
-                                         steve_N$`Date and time`<=dateSedimentEndSteve] <- NA
+  # Setting Steve to NA during time period of sediment burial
+  dateSedimentStartSteve <- lubridate::as_datetime("2018-03-12 15:00:00")
+  dateSedimentEndSteve <- lubridate::as_datetime("2018-03-27 11:30:00")
+  steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time`>=dateSedimentStartSteve 
+                                           & 
+                                             steve_N$`Date and time`<=dateSedimentEndSteve] <- NA
+
 }
 ```
+
+***  
+
+# miniDOT Data  
 
 Loading miniDOT sensor files: dissolved oxygen and temperature data  
 ```{r DOloading, include=TRUE}
@@ -147,6 +187,12 @@ eric_DO <- read.table(file = "miniDOT_Eric_Pulled04-04-2018.txt", header = TRUE,
                        col.names = c("unixTimestamp", "time_UTC", "time_CST", "battery_V",
                                      "temp_C", "DO_mgL", "DO_sat", "Q"))
 ```
+
+***
+
+# USGS Data  
+
+## Data Pull  
 
 Pulling data from USGS server for sensor at Desoto KS (fourth core site)  
 ```{r DesotoPull, include=TRUE, warning=FALSE}
@@ -167,7 +213,18 @@ desoto <- readNWISuv(siteNumbers = siteNoDesoto, parameterCd = pCode,
                      startDate = pullBegin, endDate = pullEnd, tz = "America/Chicago") 
 ```
 
-Data cleanup from USGS server: rename columns, convert to SI units
+Pulling data from USGS stream gauge at Lawrence, for finding water balance
+```{r LawrencePull, include=TRUE, warning=FALSE}
+siteNoLawrence <- "06891080"
+pCodesLawrence <- c("00060","00065")
+
+lawrence <- readNWISuv(siteNumbers = siteNoLawrence, parameterCd = pCodesLawrence, 
+                       startDate = pullBegin, endDate = pullEnd, tz = "America/Chicago") 
+```
+
+## Data Cleanup  
+
+Desoto data cleanup
 ```{r DesotoCleanup, include=TRUE}
 # Rename columns from codes to parameter names
 desoto <- renameNWISColumns(desoto)
@@ -192,15 +249,6 @@ desoto$Flow_Inst <- ft3s_Ls(desoto$Flow_Inst)
 desoto$GH_Inst <- ft_m(desoto$GH_Inst)
 ```
 
-Pulling data from USGS stream gauge at Lawrence, for finding water balance
-```{r LawrencePull, include=TRUE, warning=FALSE}
-siteNoLawrence <- "06891080"
-pCodesLawrence <- c("00060","00065")
-
-lawrence <- readNWISuv(siteNumbers = siteNoLawrence, parameterCd = pCodesLawrence, 
-                       startDate = pullBegin, endDate = pullEnd, tz = "America/Chicago") 
-```
-
 Lawrence data cleanup
 ```{r LawrenceCleanup, include=TRUE}
 # Rename columns from codes to parameter names
@@ -208,19 +256,65 @@ lawrence <- renameNWISColumns(lawrence)
 
 # convert from american to SI units
 lawrence$Flow_Inst <- ft3s_Ls(lawrence$Flow_Inst)
-lawrence$.Downstream.of.Bowersock.Dam._GH_Inst <-
-  ft_m(lawrence$.Downstream.of.Bowersock.Dam._GH_Inst)
-lawrence$.Upstream.of.Bowersock.Dam._GH_Inst <-
-  ft_m(lawrence$.Upstream.of.Bowersock.Dam._GH_Inst)
+lawrence$.Downstream.of.Bowersock.Dam._GH_Inst <- ft_m(lawrence$.Downstream.of.Bowersock.Dam._GH_Inst)
+lawrence$.Upstream.of.Bowersock.Dam._GH_Inst <- ft_m(lawrence$.Upstream.of.Bowersock.Dam._GH_Inst)
 ```
 
-Water balance: downstream - upstream discharge
-```{r waterBalance, include=TRUE}
-#plotting difference of flow between upstream and downstream
-ggplot() +
-  geom_line(data = desoto, aes(x = dateTime, y = Flow_Inst, color = "Desoto")) +
-  geom_line(data = lawrence, aes(x = dateTime, y = Flow_Inst, color = "Lawrence"))
+***  
 
+# City of Lawrence Pumping Logs  
+
+## Loading Data  
+
+Data code         |   Meaning
+----------------- |----------
+NA                |no sample was taken on this date
+BDL_NitrateNitrite|sample concentration was less than 0.25 mg-N/L
+BDL_Ammonia       |sample concentration was less than 0.30 mg-N/L
+
+```{r FarmlandLogsLoading, include=TRUE}
+FarmlandPumpingLogs <- read.csv(file = "FarmlandDailyReport_MCKformatted.csv", 
+                                header = TRUE, sep = ",")
+```
+
+## Data Cleanup  
+```{r FarmlandLogsCleanup, include=TRUE}
+# conversion from american to metric units
+# million gallons to liters
+MG_L <- function(MG){
+  L <- MG*3.78541*10^6
+  return(L)
+}
+
+FarmlandPumpingLogs$VolumePumped_MG <- MG_L(FarmlandPumpingLogs$VolumePumped_MG)
+names(FarmlandPumpingLogs)[names(FarmlandPumpingLogs) == "VolumePumped_MG"] <- "VolumePumped_L"
+
+# gallons per minute to liters per second
+gpm_Ls <- function(gpm){
+  Ls <- gpm*0.06309
+  return(Ls)
+}
+
+FarmlandPumpingLogs$flowRate_Outfall001A_gpm <- gpm_Ls(FarmlandPumpingLogs$flowRate_Outfall001A_gpm)
+names(FarmlandPumpingLogs)[names(FarmlandPumpingLogs) == "flowRate_Outfall001A_gpm"] <-
+  "flowRate_Outfall001A_L.s"
+
+FarmlandPumpingLogs$flowRate_AveragePump_gpm <- gpm_Ls(FarmlandPumpingLogs$flowRate_AveragePump_gpm)
+names(FarmlandPumpingLogs)[names(FarmlandPumpingLogs) == "flowRate_AveragePump_gpm"] <- 
+  "flowRate_AveragePump_L.s"
+
+# Reformatting column data types
+FarmlandPumpingLogs$Date <- mdy(FarmlandPumpingLogs$Date)
+FarmlandPumpingLogs$Notes <- as.character(FarmlandPumpingLogs$Notes)
+```
+
+***  
+
+# Water Balance  
+
+## Computation  
+
+```{r waterBalanceComputation, include=TRUE}
 #subset data frames
 desoto_sub <- data.frame(desoto$dateTime, desoto$Flow_Inst)
 names(desoto_sub) <- c("dateTime", "Flow_Inst")
@@ -234,8 +328,17 @@ lawrence_sub$dateTime <- ymd_hms(lawrence_sub$dateTime)
 waterBal <- merge(desoto_sub, lawrence_sub, 
                   by = "dateTime", suffixes = c(".desoto", ".lawrence"))
 
-#calculate difference between downstream and upstream gauge
+#calculate difference between downstream and upstream gauge (balance = downstream discharge - upstream)
 waterBal$difference <- waterBal$Flow_Inst.desoto - waterBal$Flow_Inst.lawrence
+```
+
+## Plotting  
+
+```{r waterBalancePlotting, include=TRUE}
+# plotting flow at upstream and downstream locations on same time series graph
+ggplot() +
+  geom_line(data = desoto, aes(x = dateTime, y = Flow_Inst, color = "Desoto")) +
+  geom_line(data = lawrence, aes(x = dateTime, y = Flow_Inst, color = "Lawrence"))
 
 # plot the water balance graph centered on 0: 
       # positive values = gaining stream
@@ -248,61 +351,22 @@ waterBal_plot <- ggplot() +
   geom_hline(aes(yintercept = mean(na.omit(waterBal$difference))),
              color = wes_palette(n=5, name="Zissou")[5],
              linetype = "dashed", size = 1.5) +
-    coord_cartesian(xlim = c(pullBegin, pullEnd), 
-                    ylim = c(-30000, 50000)) +
-    labs(y = "Difference between downstream flow gauge and upstream flow gauge, L/s",
-         x = "Date", 
-         title = "Water balance of study reach") +
-    theme_classic()
+  coord_cartesian(xlim = c(pullBegin, pullEnd), 
+                  ylim = c(-30000, 50000)) +
+  labs(y = "Difference between downstream flow gauge and upstream flow gauge, L/s",
+       x = "Date", 
+       title = "Water balance of study reach") +
+  theme_classic()
+
 waterBal_plot
 ```
 
-Loading data from City Report
-NA: no sample was taken on this date
-BDL_NitrateNitrite: sample concentration was less than 0.25 mg-N/L
-BDL_Ammonia: sample concentration was less than 0.30 mg-N/L
-```{r FarmlandLogsLoading, include=TRUE}
-FarmlandPumpingLogs <- read.csv(file = "FarmlandDailyReport_MCKformatted.csv", 
-                                header = TRUE, sep = ",")
-```
+***  
 
-Data cleanup from City Report: conversion to metric
-```{r FarmlandLogsCleanup, include=TRUE}
-# conversion from american to metric units
+# NEON Data (In development)  
 
-# million gallons to liters
-MG_L <- function(MG){
-  L <- MG*3.78541*10^6
-  return(L)
-}
+## Data Pull (In development)  
 
-FarmlandPumpingLogs$VolumePumped_MG <- 
-  MG_L(FarmlandPumpingLogs$VolumePumped_MG)
-names(FarmlandPumpingLogs)[names(FarmlandPumpingLogs) == "VolumePumped_MG"] <-
-  "VolumePumped_L"
-
-# gallons per minute to liters per second
-gpm_Ls <- function(gpm){
-  Ls <- gpm*0.06309
-  return(Ls)
-}
-
-FarmlandPumpingLogs$flowRate_Outfall001A_gpm <-
-  gpm_Ls(FarmlandPumpingLogs$flowRate_Outfall001A_gpm)
-names(FarmlandPumpingLogs)[names(FarmlandPumpingLogs) == "flowRate_Outfall001A_gpm"] <- 
-  "flowRate_Outfall001A_L.s"
-
-FarmlandPumpingLogs$flowRate_AveragePump_gpm <- 
-  gpm_Ls(FarmlandPumpingLogs$flowRate_AveragePump_gpm)
-names(FarmlandPumpingLogs)[names(FarmlandPumpingLogs) == "flowRate_AveragePump_gpm"] <- 
-  "flowRate_AveragePump_L.s"
-
-# Reformatting column data types
-FarmlandPumpingLogs$Date <- mdy(FarmlandPumpingLogs$Date)
-FarmlandPumpingLogs$Notes <- as.character(FarmlandPumpingLogs$Notes)
-```
-
-IN DEVELOPMENT (NEON server pull)
 ```{r NEONpull, include=TRUE, eval=FALSE}
 # Pull PAR data for March
 getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
@@ -315,7 +379,12 @@ stackByTable(dpID = "DP1.00024.001", filepath = "~/KAW_N/R/NEON.D06.UKFS.DP1.000
 get
 ```
 
-N data from all core sites on one plot  
+***  
+
+# Data Visualizations  
+
+## All Sites: Nitrate plus Nitrite Plot  
+
 ```{r NmergedPlot, include=TRUE, warning=FALSE}
 nitrataxMergedPlot <- ggplot(NULL) +
   geom_point(data = bowersock_N, aes(x = `Date and time`, 
@@ -335,8 +404,11 @@ nitrataxMergedPlot <- ggplot(NULL) +
   theme_classic() +
   theme(legend.position = "right", legend.direction = "vertical") +
   scale_color_manual(values=wes_palette(n=4, name="Darjeeling"))
+
 nitrataxMergedPlot
 ```
+
+## Individual Sites: DO, Temp, N Plots  
 
 Function setup for individual, simple plots for each site  
 ```{r simplePlotFunction, include=TRUE}
@@ -358,8 +430,7 @@ Function setup for individual, simple plots for each site
 # Outputs:
       # time series plot
 
-simplePlot <- function(dataset, xAxis, yAxis, plotBegin, plotEnd, 
-                       yMin, yMax, xLabel, yLabel, title){
+simplePlot <- function(dataset, xAxis, yAxis, plotBegin, plotEnd, yMin, yMax, xLabel, yLabel, title){
   ggplot(NULL) + 
     geom_point(data = dataset, aes(x = xAxis, y = yAxis, color = title), 
                show.legend = FALSE, size = 1) +
@@ -370,8 +441,9 @@ simplePlot <- function(dataset, xAxis, yAxis, plotBegin, plotEnd,
 }
 ```
 
-Plot Bowersock data (Upstream site)
-```{r bowersockPlots, include=TRUE, warning=FALSE}
+### Bowersock (Upstream)  
+
+```{r bowersockPlots, include=TRUE, warning=FALSE, fig.height=3, fig.width=10}
 bowersockPlot_N <- simplePlot(dataset = bowersock_N, 
                               xAxis = bowersock_N$`Date and time`, 
                               yAxis = bowersock_N$`Nitrate plus nitrite as mg-N/L`,
@@ -381,13 +453,12 @@ bowersockPlot_N <- simplePlot(dataset = bowersock_N,
                               title = "Upstream") +
   scale_color_manual(values=wes_palette(n=5, name="Darjeeling")[1])
 
-print(bowersockPlot_N)
-ggsave("bowersockPlot_N.png", width = 10, height = 3, dpi = 120)
+bowersockPlot_N
 ```
 
+### Farmland Logs (Pipe outflow)  
 
-Plot data fromFarmland pumping logs (at discharge pipe)
-```{r FarmlandPumpLogsPlots, include=TRUE, warning=FALSE}
+```{r FarmlandPumpLogsPlots, include=TRUE, warning=FALSE, fig.height=3, fig.width=10}
 LogDateStart <- min(FarmlandPumpingLogs$Date) 
 LogDateEnd <- max(FarmlandPumpingLogs$Date)
 
@@ -400,7 +471,7 @@ FarmlandPump_DrainageDitch_NitratePlot <- ggplot(data = FarmlandPumpingLogs,
               color = wes_palette(n=5, name="Royal2")[5]) +
     coord_cartesian(xlim = c(LogDateStart, LogDateEnd), ylim = c(0, 700)) +
     labs(y = "Nitrate plus nitrite [mg-N/L]", x = "Date", 
-         title = "Farmland discharge ditch") +
+         title = "Farmland pipe outflow") +
     theme_classic() + scale_color_manual(values=wes_palette(n=5, name="Darjeeling")[1])
 
 FarmlandPump_DrainageDitch_NitratePlot
@@ -411,13 +482,14 @@ FarmlandPump_DrainageDitch_NitratePlot_zoom <- ggplot(data = FarmlandPumpingLogs
               color = wes_palette(n=5, name="Royal2")[5]) +
     coord_cartesian(xlim = c(pullBegin1, pullEnd1), ylim = c(0, 700)) +
     labs(y = "Nitrate plus nitrite [mg-N/L]", x = "Date", 
-         title = "Farmland discharge ditch") +
+         title = "Farmland pipe outflow") +
     theme_classic() + scale_color_manual(values=wes_palette(n=5, name="Darjeeling")[1])
 
 FarmlandPump_DrainageDitch_NitratePlot_zoom
 ```
 
-Plot Eric data
+### Eric (Discharge point)  
+
 ```{r ericPlots, include=TRUE, warning=FALSE}
 ericPlot_N <- simplePlot(dataset = eric_N, 
                          xAxis = eric_N$`Date and time`,
@@ -444,12 +516,10 @@ ericPlot_temp <- simplePlot(dataset = eric_DO,
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[3])
 
 grid.arrange(ericPlot_N, ericPlot_DO, ericPlot_temp, ncol = 1, nrow = 3)
-ggsave("ericPlot_N_DO_Temp.png", 
-       plot = grid.arrange(ericPlot_N, ericPlot_DO, ericPlot_temp, ncol = 1, nrow = 3),
-       width = 10, height = 8, dpi = 120)
 ```
 
-Plot Steve data (5 km Downstream)
+### Steve (5 km Downstream)  
+
 ```{r stevePlots, include=TRUE, warning=FALSE}
 # Steve (downstream)
 stevePlot_N <- simplePlot(dataset = steve_N, 
@@ -482,7 +552,8 @@ ggsave("stevePlot_N_DO_Temp.png",
        width = 10, height = 8, dpi = 120)
 ```
 
-Plot Desoto data (30 km Downstream)
+### Desoto (30 km Downstream)  
+
 ```{r desotoPlots, include=TRUE, warning=FALSE}
 desotoPlot_N <- simplePlot(dataset = desoto, 
                            xAxis = desoto$dateTime,

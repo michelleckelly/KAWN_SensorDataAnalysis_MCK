@@ -1,0 +1,109 @@
+Date,Upstream_BurchamPark_NitrateNitrite_mgN/L,Downstream_1625RdDitch_NitrateNitrite_mgN/L,OutflowWier_Farmland001A1_NitrateNitrite_mgN/L,Upstream_BurchamPark_Ammonia_mgN/L,Downstream_1625RdDitch_Ammonia_mgN/L,OutflowWier_Farmland001A1_Ammonia_mgN/L,VolumePumped_MG,flowRate_Outfall001A_gpm,flowRate_AveragePump_gpm,Notes
+11/14/2017,NA,NA,NA,NA,NA,NA,0.36,285,342,BDL_NitrateNitrite: sample concentration less than 0.25 mg-N/L
+11/15/2017,0.316,113,216,BDL_Ammonia,31,60.9,0.432,223,307,BDL_Ammonia: sample concentration less than 0.30 mg-N/L
+11/16/2017,BDL_NitrateNitrite,182,269,BDL_Ammonia,52,76.3,0.432,213,306,
+11/17/2017,0.296,229,339,BDL_Ammonia,58,76.6,0.425,261,313,Pumping is off for the weekend
+11/20/2017,BDL_NitrateNitrite,82,82.3,BDL_Ammonia,21.1,23.6,0.138,221,310,
+11/21/2017,BDL_NitrateNitrite,396,350,BDL_Ammonia,101,116,0.414,191,298,
+11/22/2017,BDL_NitrateNitrite,371,423,0.358,108,103,0.433,169,299,Pumping is off for the weekend
+11/27/2017,BDL_NitrateNitrite,50,28,BDL_Ammonia,10.8,13.7,0.109,192,275,
+11/28/2017,BDL_NitrateNitrite,387,362,BDL_Ammonia,104,108,0.158,265,250,Note - pump was off this morning from approx 8:00am until 10:28am so the suction hose could be cleaned out and set deeper in the pond.
+11/29/2017,0.408,455,428,BDL_Ammonia,111,122,0.076,217,307,
+11/30/2017,0.301,386,426,BDL_Ammonia,108,112,0.472,192,295,
+12/1/2017,0.336,386,388,BDL_Ammonia,102,105,0.298,202,298,Pumping is off for the weekend
+12/4/2017,0.343,126,137,BDL_Ammonia,25.6,38.8,0.234,204,290,
+12/5/2017,0.339,411,424,BDL_Ammonia,88.6,93.8,NA,186,298,
+12/6/2017,0.37,402,408,BDL_Ammonia,100,106,0.185,207,300,Pumping interrupted at approx 9:30pm due to mechanical failure
+12/7/2017,NA,NA,NA,NA,NA,NA,0.163,16,300,"Average Pump Flow Rate Estimated Based on Pump Failure at 9:30pm. Pumping was off, no sampling was completed."
+12/13/2017,1.15,45.2,37.6,BDL_Ammonia,25.8,25.3,0.434,339,442,
+12/14/2017,1.26,290,362,BDL_Ammonia,124,178,0.443,296,330,
+12/15/2017,1.15,538,500,BDL_Ammonia,228,230,0.045,230,331,
+12/16/2017,1.22,485,508,BDL_Ammonia,222,225,0.453,303,408,Pump failed overnight
+12/17/2017,1.12,354,432,BDL_Ammonia,163,199,0.476,367,461,Due to meter damage volume and average pump flow rate based on run time and previous days average pump flow rate.
+12/18/2017,NA,NA,NA,NA,NA,NA,0.456,NA,NA,No pumping or sampling
+12/19/2017,1.263,218,327,BDL_Ammonia,80,127,NA,416,480,
+12/20/2017,1.2,360,461,BDL_Ammonia,167,217,NA,294,380,Started 24 hour pumping
+12/21/2017,1.09,479,512,BDL_Ammonia,221,217,NA,253,293,note: average flow was recalculated
+12/22/2017,1.16,507,489,BDL_Ammonia,197,204,NA,303,317,
+12/26/2017,0.527,137,161,BDL_Ammonia,52.1,63.9,NA,246,333,Pumping resumed at 13:24. Samples were taken late in the afternoon and preserved for analysis tomorrow
+12/27/2017,0.605,357,451,BDL_Ammonia,136,170,0.44,254,325,
+12/28/2017,0.691,541,535,BDL_Ammonia,223,212,0.502,306,325,
+12/29/2017,0.659,532,555,BDL_Ammonia,222,227,NA,320,324,pumping was shut down for the holiday weekend
+12/30/2017,NA,NA,NA,NA,NA,NA,NA,NA,NA,
+12/31/2017,NA,NA,NA,NA,NA,NA,NA,NA,NA,
+1/1/2018,NA,NA,NA,NA,NA,NA,0.499,NA,NA,
+1/2/2018,NA,NA,NA,NA,NA,NA,0.423,NA,NA,"mechanical issues and frozen pond, no pumping or sampling"
+1/3/2018,NA,NA,NA,NA,NA,NA,0.455,NA,NA,pumping resumed at 2:15 PM
+1/4/2018,0.75,478,535,BDL_Ammonia,215,247,0.461,206,307,
+1/5/2018,0.652,528,580,BDL_Ammonia,250,250,0.108,198,352,pumping shut off for the weekend
+1/6/2018,NA,NA,NA,NA,NA,NA,0.452,NA,NA,
+1/7/2018,NA,NA,NA,NA,NA,NA,0.452,NA,NA,
+1/8/2018,NA,NA,NA,NA,NA,NA,0.467,NA,NA,
+1/9/2018,0.628,434,512,BDL_Ammonia,217,244,0.115,178,306,
+1/10/2018,0.786,458,465,BDL_Ammonia,209,225,0.473,244,296,
+1/11/2018,0.696,431,492,BDL_Ammonia,188,217,0.471,324,317,
+1/12/2018,0.748,420,372,BDL_Ammonia,193,187,0.456,NA,304,Pump shut off during the weekend
+1/16/2018,0.629,101,75.5,BDL_Ammonia,44.1,32,0.484,137,323,
+1/17/2018,0.687,456,465,BDL_Ammonia,245,252,0.11,129,309,
+1/18/2018,0.679,506,448,BDL_Ammonia,247,237,0.48,117,322,
+1/19/2018,0.622,520,508,BDL_Ammonia,252,256,0.471,159,323,Pumping shut off for the weekend
+1/22/2018,0.403,55.7,40.8,BDL_Ammonia,11.3,10.8,0.466,728,326,Outfall flowrate influenced by rainfall
+1/23/2018,0.393,349,362,BDL_Ammonia,160,165,0.442,319,338,
+1/24/2018,0.637,419,440,BDL_Ammonia,201,213,0.057,192,324,
+1/25/2018,0.672,460,423,BDL_Ammonia,217,214,0.438,257,320,
+1/26/2018,0.558,464,467,BDL_Ammonia,223,222,0.394,228,330,Pumping shut off for the weekend
+1/29/2018,0.612,169,192,BDL_Ammonia,74,79,0.324,216,329,Lab issues. Sampling results will be reported tomorrow
+1/30/2018,0.677,475,488,BDL_Ammonia,257,258,0.157,223,336,
+1/31/2018,0.663,496,474,BDL_Ammonia,249,260,0.484,133,329,
+2/1/2018,0.618,476,484,BDL_Ammonia,241,240,0.439,212,320,
+2/2/2018,0.847,537,543,BDL_Ammonia,250,263,0.404,203,300,
+2/5/2018,0.446,208,235,BDL_Ammonia,116,163,0.414,111,306,"Pumping started late in the day, samples were collected and will be analyzed with tomorrow's"
+2/6/2018,0.527,544,636,BDL_Ammonia,295,327,0.425,226,306,
+2/7/2018,0.572,627,601,BDL_Ammonia,332,328,0.432,189,299,
+2/8/2018,0.439,602,615,BDL_Ammonia,317,316,0.306,115,243,
+2/9/2018,0.422,486,476,BDL_Ammonia,227,235,0.126,407,197,
+2/10/2018,NA,NA,NA,NA,NA,NA,NA,266,313,"pumped through weekend, no samples collected"
+2/11/2018,NA,NA,NA,NA,NA,NA,NA,191,303,"pumped through weekend, no samples collected"
+2/12/2018,0.458,552,569,BDL_Ammonia,296,307,0.39,357,307,
+2/13/2018,0.428,566,569,BDL_Ammonia,323,312,0.447,229,293,
+2/14/2018,0.572,571,578,BDL_Ammonia,307,304,0.487,251,300,
+2/15/2018,0.745,591,572,BDL_Ammonia,284,290,0.487,269,306,
+2/16/2018,0.602,513,554,BDL_Ammonia,285,280,0.425,183,231,Pump shut off during weekend 
+2/20/2018,0.675,152,172,BDL_Ammonia,74.4,103,0.424,431,315,
+2/21/2018,0.729,419,435,BDL_Ammonia,231,240,0.444,343,309,
+2/22/2018,0.579,198,165,BDL_Ammonia,52.6,32.2,0.392,370,315,
+2/23/2018,0.526,154,158,BDL_Ammonia,17.2,16.9,0.454,361,323,
+2/24/2018,NA,NA,NA,NA,NA,NA,0.197,783,338,"pumped through weekend, no samples collected"
+2/25/2018,NA,NA,NA,NA,NA,NA,0.469,367,308,"pumped through weekend, no samples collected"
+2/26/2018,0.365,117,121,BDL_Ammonia,12.7,12.6,0.465,332,296,
+2/27/2018,0.36,126,128,BDL_Ammonia,8.7,8.3,0.461,361,324,
+2/28/2018,0.308,130,118,BDL_Ammonia,7,7,0.475,339,289,
+3/1/2018,BDL_NitrateNitrite,129,133,BDL_Ammonia,6.3,6,0.455,240,310,
+3/2/2018,BDL_NitrateNitrite,128,120,BDL_Ammonia,11.4,8.6,0.366,33,216,
+3/3/2018,NA,NA,NA,NA,NA,NA,NA,256,325,"pumped through weekend, no samples collected"
+3/4/2018,NA,NA,NA,NA,NA,NA,NA,266,323,"pumped through weekend, no samples collected"
+3/5/2018,BDL_NitrateNitrite,595,582,BDL_Ammonia,312,290,0.363,229,325,
+3/6/2018,BDL_NitrateNitrite,597,565,BDL_Ammonia,311,308,0.387,273,325,
+3/7/2018,BDL_NitrateNitrite,629,619,BDL_Ammonia,316,313,0.336,283,316,
+3/8/2018,BDL_NitrateNitrite,596,611,BDL_Ammonia,316,310,0.341,139,251,
+3/9/2018,BDL_NitrateNitrite,530,557,BDL_Ammonia,309,295,0.353,300,250,
+3/10/2018,NA,NA,NA,NA,NA,NA,NA,179,249,"pumped through weekend, no samples collected"
+3/11/2018,NA,NA,NA,NA,NA,NA,NA,191,243,"pumped through weekend, no samples collected"
+3/12/2018,BDL_NitrateNitrite,622,628,BDL_Ammonia,278,288,0.359,142,248,
+3/13/2018,BDL_NitrateNitrite,567,576,BDL_Ammonia,323,304,0.433,137,248,
+3/14/2018,BDL_NitrateNitrite,540,506,BDL_Ammonia,288,357,0.442,197,255,
+3/15/2018,BDL_NitrateNitrite,514,550,BDL_Ammonia,285,297,0.43,167,303,
+3/16/2018,BDL_NitrateNitrite,NA,521,BDL_Ammonia,NA,270,0.435,257,303,1625/1550 was inaccessible due to weather
+3/17/2018,NA,NA,NA,NA,NA,NA,NA,199,303,"pumped through weekend, no samples collected"
+3/18/2018,NA,NA,NA,NA,NA,NA,NA,240,301,"pumped through weekend, no samples collected"
+3/19/2018,BDL_NitrateNitrite,162,359,BDL_Ammonia,87.9,190,0.431,NA,300,"001A1 outfall flooded due to rain, no reading from flowmeter"
+3/20/2018,BDL_NitrateNitrite,121,123,BDL_Ammonia,59,57.5,0.421,787,295,001A1 flows still elevated due to rain
+3/21/2018,BDL_NitrateNitrite,302,293,BDL_Ammonia,146,134,0.44,315,303,
+3/22/2018,BDL_NitrateNitrite,343,423,BDL_Ammonia,217,221,0.432,247,300,
+3/23/2018,BDL_NitrateNitrite,509,495,BDL_Ammonia,252,255,0.429,263,298,
+3/24/2018,NA,NA,NA,NA,NA,NA,0.419,249,291,"pumped through weekend, no samples collected"
+3/25/2018,NA,NA,NA,NA,NA,NA,0.415,190,289,"pumped through weekend, no samples collected"
+3/26/2018,BDL_NitrateNitrite,NA,398,BDL_Ammonia,NA,223,0.424,1338,294,
+3/27/2018,BDL_NitrateNitrite,248,254,BDL_Ammonia,117,118,0.435,574,297,
+3/28/2018,BDL_NitrateNitrite,390,422,BDL_Ammonia,189,189,0.408,406,294,
+3/29/2018,BDL_NitrateNitrite,409,430,BDL_Ammonia,209,205,0.335,227,263,Overflow pond emptied - pump moved back to Rundown

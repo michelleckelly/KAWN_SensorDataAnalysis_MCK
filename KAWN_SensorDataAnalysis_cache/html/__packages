@@ -1,0 +1,10 @@
+base
+XML
+lubridate
+ggplot2
+gridExtra
+dataRetrieval
+wesanderson
+zoo
+neonUtilities
+bindrcpp
