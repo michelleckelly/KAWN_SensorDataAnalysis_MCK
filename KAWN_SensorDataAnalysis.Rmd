@@ -4,11 +4,10 @@ author: "Michelle Catherine Kelly"
 date: "22 April 2018"
 output:
   html_document:
-    theme: minty
+    theme: yeti
     df_print: paged
     toc: yes
     number_sections: true
-    highlight: tango
 ---
 
 ```{r setup, echo = FALSE, warning=FALSE, error=FALSE, message=FALSE}
@@ -305,6 +304,24 @@ FarmlandPumpingLogs$Notes <- as.character(FarmlandPumpingLogs$Notes)
 
 ***  
 
+# NEON Data (In development)  
+
+## Data Pull (In development)  
+
+```{r NEONpull, include=TRUE, eval=FALSE}
+# Pull PAR data for March
+getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
+           year_month = "2018-03", package = "basic",
+           savepath = getwd())
+# Join months of PAR data into one .csv file
+stackByTable(dpID = "DP1.00024.001", filepath = "~/KAW_N/R/NEON.D06.UKFS.DP1.00024.001.2018-03.basic.20180409T182009Z.zip", savepath = getwd(), 
+             package = "basic")
+#UKFS_PAR_March18 <- read.table(unz(description = ))
+get
+```
+
+***  
+
 # Water Balance  
 
 ## Computation  
@@ -329,7 +346,7 @@ waterBal$difference <- waterBal$Flow_Inst.desoto - waterBal$Flow_Inst.lawrence
 
 ## Plotting  
 
-```{r waterBalancePlotting, include=TRUE}
+```{r waterBalancePlotting, include=TRUE, fig.height=3, fig.width=10, warning=FALSE}
 # plotting flow at upstream and downstream locations on same time series graph
 ggplot() +
   geom_line(data = desoto, aes(x = dateTime, y = Flow_Inst, color = "Desoto")) +
@@ -341,14 +358,15 @@ ggplot() +
 waterBal_plot <- ggplot() +
   geom_line(data = waterBal, 
             aes(x = dateTime, y = difference, color = "difference"),
-            show.legend = FALSE, size = 1.5, 
+            show.legend = FALSE, size = 1, 
             color = wes_palette(n=5, name="Zissou")[1]) +
   geom_hline(aes(yintercept = mean(na.omit(waterBal$difference))),
              color = wes_palette(n=5, name="Zissou")[5],
-             linetype = "dashed", size = 1.5) +
+             linetype = "dashed", size = 1) +
   coord_cartesian(xlim = c(pullBegin, pullEnd), 
                   ylim = c(-30000, 50000)) +
-  labs(y = "Difference between downstream flow gauge and upstream flow gauge, L/s",
+  labs(y = "Difference between downstream 
+       flow gauge and upstream flow gauge, L/s",
        x = "Date", 
        title = "Water balance of study reach") +
   theme_classic()
@@ -358,29 +376,11 @@ waterBal_plot
 
 ***  
 
-# NEON Data (In development)  
-
-## Data Pull (In development)  
-
-```{r NEONpull, include=TRUE, eval=FALSE}
-# Pull PAR data for March
-getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
-           year_month = "2018-03", package = "basic",
-           savepath = getwd())
-# Join months of PAR data into one .csv file
-stackByTable(dpID = "DP1.00024.001", filepath = "~/KAW_N/R/NEON.D06.UKFS.DP1.00024.001.2018-03.basic.20180409T182009Z.zip", savepath = getwd(), 
-             package = "basic")
-#UKFS_PAR_March18 <- read.table(unz(description = ))
-get
-```
-
-***  
-
 # Data Visualizations  
 
 ## All Sites: Nitrate plus Nitrite Plot  
 
-```{r NmergedPlot, include=TRUE, warning=FALSE}
+```{r NmergedPlot, include=TRUE, warning=FALSE, fig.height=6, fig.width=10}
 nitrataxMergedPlot <- ggplot(NULL) +
   geom_point(data = bowersock_N, aes(x = `Date and time`, 
                                    y = `Nitrate plus nitrite as mg-N/L`, 
@@ -579,3 +579,15 @@ desotoPlot_temp <- simplePlot(dataset = desoto,
 
 grid.arrange(desotoPlot_N, desotoPlot_DO, desotoPlot_temp, ncol = 1, nrow = 3)
 ```
+
+## Time period plots  
+
+### Period 1:  Feb 3-6  
+
+### Period 2:  Feb 15-25  
+
+### Period 3:  Mar 20-25  
+
+### Period 4:  Apr 3-6  
+
+### Period 5:  Apr 11-13  
