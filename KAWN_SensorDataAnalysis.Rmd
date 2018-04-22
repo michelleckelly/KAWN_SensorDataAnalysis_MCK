@@ -4,13 +4,8 @@ author: "Michelle Catherine Kelly"
 date: "22 April 2018"
 output:
   html_document:
-    theme: united
+    theme: minty
     df_print: paged
-    toc: yes
-    number_sections: true
-    highlight: tango
-  html_notebook:
-    theme: united
     toc: yes
     number_sections: true
     highlight: tango
@@ -173,7 +168,7 @@ if (loadfromCSV == FALSE){
 
 Loading miniDOT sensor files: dissolved oxygen and temperature data  
 ```{r DOloading, include=TRUE}
-steve_DO <- read.table(file = "miniDOT_Steve_Pulled03-30-2018.txt", header = TRUE,
+steve_DO <- read.table(file = "miniDOT_Steve_Pulled04-20-2018.txt", header = TRUE,
                        sep = ",", skip = 8, stringsAsFactors = FALSE,
                        colClasses = c("numeric", "POSIXct", "POSIXct", "numeric",
                                       "numeric", "numeric", "numeric", "numeric"),
@@ -206,7 +201,7 @@ pCode <- c("99133", "00060", "00065", "00300", "00301","00010")
     # 00301 = dissolved oxygen [% saturation]
     # 00010 = water temperature [C]
 pullBegin <- as.POSIXct("2018-02-01", format = "%Y-%m-%d") # Date for start of data pull
-pullEnd <- as.POSIXct("2018-04-08", format = "%Y-%m-%d") # Date for end of data pull
+pullEnd <- as.POSIXct("2018-04-22", format = "%Y-%m-%d") # Date for end of data pull
 
 # USGS data pull
 desoto <- readNWISuv(siteNumbers = siteNoDesoto, parameterCd = pCode, 
@@ -494,7 +489,7 @@ FarmlandPump_DrainageDitch_NitratePlot_zoom
 ericPlot_N <- simplePlot(dataset = eric_N, 
                          xAxis = eric_N$`Date and time`,
                          yAxis = eric_N$`Nitrate plus nitrite as mg-N/L`,
-                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
+                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NA,
                          yMin = 0, yMax = 20, yLabel = "Nitrate plus nitrite [mg-N/L]",
                          title = "Discharge point") +
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[1])
@@ -502,9 +497,10 @@ ericPlot_N <- simplePlot(dataset = eric_N,
 ericPlot_DO <- simplePlot(dataset = eric_DO, 
                          xAxis = eric_DO$time_CST,
                          yAxis = eric_DO$DO_mgL,
-                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
+                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NA,
                          yMin = 0, yMax = 20, yLabel = "Dissolved oxygen [mg/L]",
                          title = "Discharge point") +
+  theme(plot.title = element_blank()) +
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[2])
 
 ericPlot_temp <- simplePlot(dataset = eric_DO, 
@@ -513,6 +509,7 @@ ericPlot_temp <- simplePlot(dataset = eric_DO,
                          plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
                          yMin = -5, yMax = 25, yLabel = "Temperature [C]",
                          title = "Discharge point") +
+  theme(plot.title = element_blank()) +
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[3])
 
 grid.arrange(ericPlot_N, ericPlot_DO, ericPlot_temp, ncol = 1, nrow = 3)
@@ -525,7 +522,7 @@ grid.arrange(ericPlot_N, ericPlot_DO, ericPlot_temp, ncol = 1, nrow = 3)
 stevePlot_N <- simplePlot(dataset = steve_N, 
                           xAxis = steve_N$`Date and time`,
                           yAxis = steve_N$`Nitrate plus nitrite as mg-N/L`,
-                          plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
+                          plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NULL,
                           yMin = 0, yMax = 1.5, yLabel = "Nitrate plus nitrite [mg-N/L]",
                           title = "Downstream (5 km)") + 
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[1])
@@ -533,9 +530,10 @@ stevePlot_N <- simplePlot(dataset = steve_N,
 stevePlot_DO <- simplePlot(dataset = steve_DO, 
                          xAxis = steve_DO$time_CST,
                          yAxis = steve_DO$DO_mgL,
-                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
+                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NULL,
                          yMin = 0, yMax = 20, yLabel = "Dissolved oxygen [mg/L]",
                          title = "Downstream (5 km)") +
+  theme(plot.title = element_blank()) +
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[2])
 
 stevePlot_temp <- ericPlot_temp <- simplePlot(dataset = steve_DO, 
@@ -544,12 +542,10 @@ stevePlot_temp <- ericPlot_temp <- simplePlot(dataset = steve_DO,
                          plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
                          yMin = -5, yMax = 25, yLabel = "Temperature [C]",
                          title = "Downstream (5 km)") +
+  theme(plot.title = element_blank()) +
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[3])
 
 grid.arrange(stevePlot_N, stevePlot_DO, stevePlot_temp, ncol = 1, nrow = 3)
-ggsave("stevePlot_N_DO_Temp.png", 
-       plot = grid.arrange(stevePlot_N, stevePlot_DO, stevePlot_temp, ncol = 1, nrow = 3),
-       width = 10, height = 8, dpi = 120)
 ```
 
 ### Desoto (30 km Downstream)  
@@ -558,7 +554,7 @@ ggsave("stevePlot_N_DO_Temp.png",
 desotoPlot_N <- simplePlot(dataset = desoto, 
                            xAxis = desoto$dateTime,
                            yAxis = desoto$nitrateNitrite,
-                           plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
+                           plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NULL,
                            yMin = 0, yMax = 1.5, yLabel = "Nitrate plus nitrite [mg-N/L]",
                            title = "Far downstream (30 km)") +
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[1])
@@ -566,9 +562,10 @@ desotoPlot_N <- simplePlot(dataset = desoto,
 desotoPlot_DO <- simplePlot(dataset = desoto, 
                            xAxis = desoto$dateTime,
                            yAxis = desoto$DO_Inst,
-                           plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
+                           plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NULL,
                            yMin = 0, yMax = 20, yLabel = "Dissolved oxygen [mg/L]",
                            title = "Far downstream (30 km)") +
+  theme(plot.title = element_blank()) +
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[2])
 
 desotoPlot_temp <- simplePlot(dataset = desoto, 
@@ -577,11 +574,8 @@ desotoPlot_temp <- simplePlot(dataset = desoto,
                               plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
                               yMin = -5, yMax = 25, yLabel = "Temperature [C]",
                               title = "Far downstream (30 km)") +
+  theme(plot.title = element_blank()) +
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[3])
 
 grid.arrange(desotoPlot_N, desotoPlot_DO, desotoPlot_temp, ncol = 1, nrow = 3)
-ggsave("desotoPlot_N_DO_Temp.png", 
-       plot = grid.arrange(desotoPlot_N, desotoPlot_DO, desotoPlot_temp, 
-                           ncol = 1, nrow = 3),
-       width = 10, height = 8, dpi = 120)
 ```
