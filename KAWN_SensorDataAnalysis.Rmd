@@ -490,7 +490,7 @@ FarmlandPump_DrainageDitch_NitratePlot_zoom
 ericPlot_N <- simplePlot(dataset = eric_N, 
                          xAxis = eric_N$`Date and time`,
                          yAxis = eric_N$`Nitrate plus nitrite as mg-N/L`,
-                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NA,
+                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NULL,
                          yMin = 0, yMax = 20, yLabel = "Nitrate plus nitrite [mg-N/L]",
                          title = "Discharge point") +
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[1])
@@ -498,7 +498,7 @@ ericPlot_N <- simplePlot(dataset = eric_N,
 ericPlot_DO <- simplePlot(dataset = eric_DO, 
                          xAxis = eric_DO$time_CST,
                          yAxis = eric_DO$DO_mgL,
-                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NA,
+                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NULL,
                          yMin = 0, yMax = 20, yLabel = "Dissolved oxygen [mg/L]",
                          title = "Discharge point") +
   theme(plot.title = element_blank()) +
@@ -590,9 +590,10 @@ Period1Start <- mdy_hms("02-03-2018 12:00:00")
 Period1End <- mdy_hms("02-06-2018 12:00:00")
 
 # Grid arrange bowersock for time period #1
-grid.arrange(
+bowersockPlot_Period1 <- grid.arrange(
   bowersockPlot_N +
-    coord_cartesian(xlim = c(Period1Start,Period1End)),
+    coord_cartesian(xlim = c(Period1Start,Period1End),
+                    ylim = c(0,1.25)),
   ggplot(NULL),
   ggplot(NULL),
   ncol = 1,
@@ -600,52 +601,74 @@ grid.arrange(
 )
 
 # Grid arrange Eric for time period #1
-grid.arrange(
+ericPlot_Period1 <- grid.arrange(
   ericPlot_N +
-    coord_cartesian(xlim = c(Period1Start,Period1End)),
+    coord_cartesian(xlim = c(Period1Start,Period1End),
+                    ylim = c(0,1.25)),
   ericPlot_DO +
-    coord_cartesian(xlim = c(Period1Start,Period1End)),
+    coord_cartesian(xlim = c(Period1Start,Period1End),
+                    ylim = c(0,30)),
   ericPlot_temp +
-    coord_cartesian(xlim = c(Period1Start,Period1End)),
+    coord_cartesian(xlim = c(Period1Start,Period1End),
+                    ylim = c(0,20)),
   ncol = 1,
   nrow = 3
 )
 
 # Grid arrange Steve for time period #1
-grid.arrange(
+stevePlot_Period1 <- grid.arrange(
   stevePlot_N +
-    coord_cartesian(xlim = c(Period1Start,Period1End)),
+    coord_cartesian(xlim = c(Period1Start,Period1End),
+                    ylim = c(0,1.25)),
   stevePlot_DO +
-    coord_cartesian(xlim = c(Period1Start,Period1End)),
+    coord_cartesian(xlim = c(Period1Start,Period1End),
+                    ylim = c(0,30)),
   stevePlot_temp +
-    coord_cartesian(xlim = c(Period1Start,Period1End)),
+    coord_cartesian(xlim = c(Period1Start,Period1End),
+                    ylim = c(0,20)),
   ncol = 1,
   nrow = 3
 )
 
 # Grid arrange Desoto for time period #1
-grid.arrange(
+desotoPlot_Period1 <- grid.arrange(
   desotoPlot_N +
-    coord_cartesian(xlim = c(Period1Start,Period1End)),
+    coord_cartesian(xlim = c(Period1Start,Period1End),
+                    ylim = c(0,1.25)),
   desotoPlot_DO +
-    coord_cartesian(xlim = c(Period1Start,Period1End)),
+    coord_cartesian(xlim = c(Period1Start,Period1End),
+                    ylim = c(0,30)),
   desotoPlot_temp +
-    coord_cartesian(xlim = c(Period1Start,Period1End)),
+    coord_cartesian(xlim = c(Period1Start,Period1End),
+                    ylim = c(0,20)),
   ncol = 1,
   nrow = 3
 )
 ```
 
-### Period 2:  Feb 20-25  
+```{r Period1ComboPlot, include=TRUE, fig.height=9, fig.width=15}
+grid.arrange(bowersockPlot_Period1,
+             ericPlot_Period1,
+             stevePlot_Period1,
+             desotoPlot_Period1,
+             ncol = 4,
+             nrow = 1,
+             widths = c(1,1,1,1),
+             top = "Time Period 1: Feb 3-6"
+)
+```
+
+### Period 2:  Feb 20-22  
 
 ```{r Period2Plot, include=TRUE, fig.height=9, fig.width=5}
 Period2Start <- mdy_hms("02-20-2018 12:00:00")
 Period2End <- mdy_hms("02-22-2018 12:00:00")
 
 # Grid arrange bowersock for time period #2
-grid.arrange(
+bowersockPlot_Period2 <- grid.arrange(
   bowersockPlot_N +
-    coord_cartesian(xlim = c(Period2Start,Period2End)),
+    coord_cartesian(xlim = c(Period2Start,Period2End),
+                    ylim = c(0,1.5)),
   ggplot(NULL),
   ggplot(NULL),
   ncol = 1,
@@ -653,50 +676,71 @@ grid.arrange(
 )
 
 # Grid arrange Eric for time period #2
-grid.arrange(
+ericPlot_Period2 <- grid.arrange(
   ericPlot_N +
-    coord_cartesian(xlim = c(Period2Start,Period2End)),
+    coord_cartesian(xlim = c(Period2Start,Period2End),
+                    ylim = c(0,7)),
   ericPlot_DO +
-    coord_cartesian(xlim = c(Period2Start,Period2End)),
+    coord_cartesian(xlim = c(Period2Start,Period2End),
+                    ylim = c(0,30)),
   ericPlot_temp +
-    coord_cartesian(xlim = c(Period2Start,Period2End)),
+    coord_cartesian(xlim = c(Period2Start,Period2End),
+                    ylim = c(0,20)),
   ncol = 1,
   nrow = 3
 )
 
 # Grid arrange Steve for time period #2
-grid.arrange(
+stevePlot_Period2 <- grid.arrange(
   stevePlot_N +
-    coord_cartesian(xlim = c(Period2Start,Period2End)),
+    coord_cartesian(xlim = c(Period2Start,Period2End),
+                    ylim = c(0,1.5)),
   stevePlot_DO +
-    coord_cartesian(xlim = c(Period2Start,Period2End)),
+    coord_cartesian(xlim = c(Period2Start,Period2End),
+                    ylim = c(0,30)),
   stevePlot_temp +
-    coord_cartesian(xlim = c(Period2Start,Period2End)),
+    coord_cartesian(xlim = c(Period2Start,Period2End),
+                    ylim = c(0,20)),
   ncol = 1,
   nrow = 3
 )
 
 # Grid arrange Desoto for time period #2
-grid.arrange(
+desotoPlot_Period2 <- grid.arrange(
   desotoPlot_N +
-    coord_cartesian(xlim = c(Period2Start,Period2End)),
+    coord_cartesian(xlim = c(Period2Start,Period2End),
+                    ylim = c(0,1.5)),
   desotoPlot_DO +
-    coord_cartesian(xlim = c(Period2Start,Period2End)),
+    coord_cartesian(xlim = c(Period2Start,Period2End),
+                    ylim = c(0,30)),
   desotoPlot_temp +
-    coord_cartesian(xlim = c(Period2Start,Period2End)),
+    coord_cartesian(xlim = c(Period2Start,Period2End),
+                    ylim = c(0,20)),
   ncol = 1,
   nrow = 3
 )
 ```
 
-### Period 3:  Mar 20-25  
+```{r Period2ComboPlot, include=TRUE, fig.height=9, fig.width=15}
+grid.arrange(bowersockPlot_Period2,
+             ericPlot_Period2,
+             stevePlot_Period2,
+             desotoPlot_Period2,
+             ncol = 4,
+             nrow = 1,
+             widths = c(1,1,1,1),
+             top = "Time Period 2: Feb 20-22"
+)
+```
+
+### Period 3:  Mar 22-25  
 
 ```{r Period3Plot, include=TRUE, fig.height=9, fig.width=5}
 Period3Start <- mdy_hms("03-22-2018 12:00:00")
 Period3End <- mdy_hms("03-25-2018 12:00:00")
 
 # Grid arrange bowersock for time period #3
-grid.arrange(
+bowersockPlot_Period3 <- grid.arrange(
   bowersockPlot_N +
     coord_cartesian(xlim = c(Period3Start,Period3End)),
   ggplot(NULL),
@@ -706,7 +750,7 @@ grid.arrange(
 )
 
 # Grid arrange Eric for time period #3
-grid.arrange(
+ericPlot_Period3 <- grid.arrange(
   ericPlot_N +
     coord_cartesian(xlim = c(Period3Start,Period3End)),
   ericPlot_DO +
@@ -718,7 +762,7 @@ grid.arrange(
 )
 
 # Grid arrange Steve for time period #3
-grid.arrange(
+stevePlot_Period3 <- grid.arrange(
   stevePlot_N +
     coord_cartesian(xlim = c(Period3Start,Period3End)),
   stevePlot_DO +
@@ -730,7 +774,7 @@ grid.arrange(
 )
 
 # Grid arrange Desoto for time period #3
-grid.arrange(
+desotoPlot_Period3 <- grid.arrange(
   desotoPlot_N +
     coord_cartesian(xlim = c(Period3Start,Period3End)),
   desotoPlot_DO +
@@ -739,6 +783,18 @@ grid.arrange(
     coord_cartesian(xlim = c(Period3Start,Period3End)),
   ncol = 1,
   nrow = 3
+)
+```
+
+```{r Period3ComboPlot, include=TRUE, fig.height=9, fig.width=15}
+grid.arrange(bowersockPlot_Period3,
+             ericPlot_Period3,
+             stevePlot_Period3,
+             desotoPlot_Period3,
+             ncol = 4,
+             nrow = 1,
+             widths = c(1,1,1,1),
+             top = "Time Period 3: March 22-25"
 )
 ```
 
