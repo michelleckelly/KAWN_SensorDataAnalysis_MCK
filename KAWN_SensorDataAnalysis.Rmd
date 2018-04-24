@@ -27,7 +27,7 @@ library(zoo)
 #library(devtools)
 #install_github("NEONScience/NEON-utilities/neonUtilities", dependencies = TRUE)
 library(neonUtilities)
-library(TTR)
+library(streamMetabolizer)
 ```
 
 ***  
@@ -181,6 +181,7 @@ eric_DO <- read.table(file = "miniDOT_Eric_Pulled04-04-2018.txt", header = TRUE,
                                       "numeric", "numeric", "numeric", "numeric"),
                        col.names = c("unixTimestamp", "time_UTC", "time_CST", "battery_V",
                                      "temp_C", "DO_mgL", "DO_sat", "Q"))
+
 ```
 
 ***
@@ -305,20 +306,38 @@ FarmlandPumpingLogs$Notes <- as.character(FarmlandPumpingLogs$Notes)
 
 ***  
 
-# NEON Data (In development)  
+# NEON Data   
 
-## Data Pull (In development)  
+## Data Pull  
 
-```{r NEONpull, include=FALSE, eval=FALSE}
-# Pull PAR data for March
-getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
+```{r NEONpull_cleanup, include=FALSE, eval=TRUE}
+downloadNEONfiles <- FALSE
+
+if (downloadNEONfiles == TRUE){
+  dir.create(paste0(getwd(), "/NEONfiles"))
+  
+  getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
+           year_month = "2018-02", package = "basic",
+           savepath = paste(getwd(), "NEONfiles", sep = "/")) # Feb at KU field station
+  getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
            year_month = "2018-03", package = "basic",
-           savepath = getwd())
-# Join months of PAR data into one .csv file
-stackByTable(dpID = "DP1.00024.001", filepath = "~/KAW_N/R/NEON.D06.UKFS.DP1.00024.001.2018-03.basic.20180409T182009Z.zip", savepath = getwd(), 
-             package = "basic")
-#UKFS_PAR_March18 <- read.table(unz(description = ))
-get
+           savepath = paste(getwd(), "NEONfiles", sep = "/")) # March at KU field station
+  #getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
+           #year_month = "2018-04", package = "basic",
+           #savepath = getwd()) # April at KU field station - wont be released until end of april
+  stackByTable(dpID = "DP1.00024.001", 
+               filepath = paste0(getwd(), "/NEONfiles"), 
+               savepath = paste0(getwd(), "/NEONfiles"), 
+               folder = TRUE)
+}
+
+PAR <- read.csv(file = paste0(getwd(), "/NEONfiles", "/stackedFiles", 
+                              "/PARPAR_30min.csv"), header = TRUE)
+
+# data cleanup
+PAR <- PAR[,-c(1:4, 6, 11:22)] #drop unneccess columns
+PAR$startDateTime <- ymd_hms(PAR$startDateTime)
+tz(PAR$startDateTime) <- "America/Chicago"
 ```
 
 ***  
@@ -865,7 +884,7 @@ grid.arrange(bowersockPlot_Period4,
 
 ### Period 5:  Apr 11-13  
 
-```{r Period5Plot, echo=FALSE, fig.height=9, fig.width=5}
+```{r Period5Plot, include=FALSE, fig.height=9, fig.width=5}
 Period5Start <- mdy_hms("04-11-2018 12:00:00")
 Period5End <- mdy_hms("04-13-2018 12:00:00")
 
@@ -926,5 +945,21 @@ grid.arrange(bowersockPlot_Period5,
              widths = c(1,1,1,1),
              top = "Time Period 4: April 3-6"
 )
+```
+
+# Metabolism modeling
+
+```{r MetabolismSetup}
+#need: convert to solar time, DO saturation, depth of site, light
+metab_inputs("mle", "data")
+
+# start with desoto
+desoto_longitude <- -94.964616
+PAR$dateTime_solar <- calc_solar_time(PAR$startDateTime, longitude = desoto_longitude)
+desoto$dateTime_solar <- calc_solar_time(desoto$dateTime, longitude = desoto_longitude)
+
+sum(PAR$dateTime_solar==desoto$dateTime_solar)
+
+
 ```
 

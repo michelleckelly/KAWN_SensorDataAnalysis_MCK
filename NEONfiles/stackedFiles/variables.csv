@@ -1,0 +1,145 @@
+table,fieldName,description,dataType,units,downloadPkg
+PARPAR_30min,startDateTime,"Date and time at which a sampling is initiated",dateTime,NA,basic
+PARPAR_30min,endDateTime,"Date and time at which a sampling is completed",dateTime,NA,basic
+PARPAR_30min,PARMean,"Arithmetic mean of photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_30min,PARMinimum,"Minimum photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_30min,PARMaximum,"Maximum photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_30min,PARVariance,"Variance in photosynthetically active radiation",real,micromolesPerSquareMeterPerSecondSquared,basic
+PARPAR_30min,PARNumPts,"Number of points used to calculate the arithmetic mean of photosynthetically active radiation",real,number,basic
+PARPAR_30min,PARExpUncert,"Expanded uncertainty for photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_30min,PARStdErMean,"Standard error of the mean for photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_30min,PARRangeFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the range test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARRangePassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the range test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARRangeNAQM,"Photosynthetically active radiation quality metric that summarizes when the range test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARPersistenceFailQM,"Photosynthetically active radiation quality metric that summarizes  the failed outcomes of the persistence test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARPersistencePassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the persistence test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARPersistenceNAQM,"Photosynthetically active radiation quality metric that summarizes when the persistence test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARStepFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the step test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARStepPassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the step test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARStepNAQM,"Photosynthetically active radiation quality metric that summarizes when the step test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARNullFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the null test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARNullPassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the null test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARNullNAQM,"Photosynthetically active radiation quality metric that summarizes when the null test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARGapFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the gap test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARGapPassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the gap test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARGapNAQM,"Photosynthetically active radiation quality metric that summarizes when the gap test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARSpikeFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the spike test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARSpikePassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the spike test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARSpikeNAQM,"Photosynthetically active radiation quality metric that summarizes when the spike test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARConsistencyFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the consistency test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARConsistencyPassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the consistency test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARConsistencyNAQM,"Photosynthetically active radiation quality metric that summarizes when the consistency test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARValidCalFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the valid calibration check over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARValidCalPassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the valid calibration check over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARValidCalNAQM,"Photosynthetically active radiation quality metric that summarizes when the valid calibration check could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,PARAlphaQM,"Photosynthetically active radiation quality metric detailing the outcomes of the alpha quality flag over the averaging period, as a percent and detailed in NEON.DOC.001113",real,percent,expanded
+PARPAR_30min,PARBetaQM,"Photosynthetically active radiation quality metric detailing the outcomes of the beta quality flag over the averaging period, as a percent and detailed in NEON.DOC.001113",real,percent,expanded
+PARPAR_30min,PARFinalQF,"Photosynthetically active radiation quality flag indicating whether a data product has passed or failed an overall assessment of its quality, detailed in NEON.DOC.001113 (1=fail, 0=pass)",unsigned integer,NA,basic
+PARPAR_30min,PARFinalQFSciRvw,"Photosynthetically active radiation quality flag indicating whether a data product has failed a science review of its quality, detailed in NEON.DOC.001113 (1=fail, 0=pass/not-reviewed)",unsigned integer,NA,expanded
+PARPAR_30min,outPARMean,"Arithmetic mean of outgoing photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_30min,outPARMinimum,"Minimum outgoing photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_30min,outPARMaximum,"Maximum outgoing photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_30min,outPARVariance,"Variance in outgoing photosynthetically active radiation",real,micromolesPerSquareMeterPerSecondSquared,basic
+PARPAR_30min,outPARNumPts,"Number of points used to calculate the arithmetic mean of outgoing photosynthetically active radiation",real,NA,basic
+PARPAR_30min,outPARExpUncert,"Expanded uncertainty for outgoing photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_30min,outPARStdErMean,"Standard error of the mean for outgoing photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_30min,outPARRangeFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the range test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARRangePassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the range test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARRangeNAQM,"Outgoing photosynthetically active radiation quality metric that summarizes when the range test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARPersistenceFailQM,"Outgoing PAR quality metric that summarizes  the failed outcomes of the persistence test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARPersistencePassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the persistence test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARPersistenceNAQM,"Outgoing PAR quality metric that summarizes when the persistence test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARStepFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the step test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARStepPassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the step test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARStepNAQM,"Outgoing PAR quality metric that summarizes when the step test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARNullFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the null test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARNullPassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the null test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARNullNAQM,"Outgoing PAR quality metric that summarizes when the null test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARGapFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the gap test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARGapPassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the gap test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARGapNAQM,"Outgoing PAR quality metric that summarizes when the gap test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARSpikeFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the spike test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARSpikePassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the spike test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARSpikeNAQM,"Outgoing PAR quality metric that summarizes when the spike test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARConsistencyFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the consistency test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARConsistencyPassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the consistency test over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARConsistencyNAQM,"Outgoing PAR quality metric that summarizes when the consistency test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARValidCalFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the valid calibration check over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARValidCalPassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the valid calibration check over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARValidCalNAQM,"Outgoing PAR quality metric that summarizes when the valid calibration check could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_30min,outPARAlphaQM,"Outgoing PAR quality metric detailing the outcomes of the alpha quality flag over the averaging period, as a percent and detailed in NEON.DOC.001113",real,percent,expanded
+PARPAR_30min,outPARBetaQM,"Outgoing PAR quality metric detailing the outcomes of the beta quality flag over the averaging period, as a percent and detailed in NEON.DOC.001113",real,percent,expanded
+PARPAR_30min,outPARFinalQF,"Outgoing PAR quality flag indicating whether a data product has passed or failed an overall assessment of its quality, detailed in NEON.DOC.001113 (1=fail, 0=pass)",unsigned integer,NA,basic
+PARPAR_30min,outPARFinalQFSciRvw,"Outgoing PAR quality flag indicating whether a data product has failed a science review of its quality, detailed in NEON.DOC.001113 (1=fail, 0=pass/not-reviewed)",unsigned integer,NA,expanded
+PARPAR_1min,startDateTime,"Date and time at which a sampling is initiated",dateTime,NA,basic
+PARPAR_1min,endDateTime,"Date and time at which a sampling is completed",dateTime,NA,basic
+PARPAR_1min,PARMean,"Arithmetic mean of photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_1min,PARMinimum,"Minimum photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_1min,PARMaximum,"Maximum photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_1min,PARVariance,"Variance in photosynthetically active radiation",real,micromolesPerSquareMeterPerSecondSquared,basic
+PARPAR_1min,PARNumPts,"Number of points used to calculate the arithmetic mean of photosynthetically active radiation",real,number,basic
+PARPAR_1min,PARExpUncert,"Expanded uncertainty for photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_1min,PARStdErMean,"Standard error of the mean for photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_1min,PARRangeFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the range test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARRangePassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the range test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARRangeNAQM,"Photosynthetically active radiation quality metric that summarizes when the range test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARPersistenceFailQM,"Photosynthetically active radiation quality metric that summarizes  the failed outcomes of the persistence test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARPersistencePassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the persistence test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARPersistenceNAQM,"Photosynthetically active radiation quality metric that summarizes when the persistence test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARStepFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the step test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARStepPassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the step test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARStepNAQM,"Photosynthetically active radiation quality metric that summarizes when the step test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARNullFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the null test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARNullPassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the null test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARNullNAQM,"Photosynthetically active radiation quality metric that summarizes when the null test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARGapFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the gap test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARGapPassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the gap test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARGapNAQM,"Photosynthetically active radiation quality metric that summarizes when the gap test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARSpikeFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the spike test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARSpikePassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the spike test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARSpikeNAQM,"Photosynthetically active radiation quality metric that summarizes when the spike test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARConsistencyFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the consistency test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARConsistencyPassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the consistency test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARConsistencyNAQM,"Photosynthetically active radiation quality metric that summarizes when the consistency test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARValidCalFailQM,"Photosynthetically active radiation quality metric that summarizes the failed outcomes of the valid calibration check over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARValidCalPassQM,"Photosynthetically active radiation quality metric that summarizes the passed outcomes of the valid calibration check over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARValidCalNAQM,"Photosynthetically active radiation quality metric that summarizes when the valid calibration check could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,PARAlphaQM,"Photosynthetically active radiation quality metric detailing the outcomes of the alpha quality flag over the averaging period, as a percent and detailed in NEON.DOC.001113",real,percent,expanded
+PARPAR_1min,PARBetaQM,"Photosynthetically active radiation quality metric detailing the outcomes of the beta quality flag over the averaging period, as a percent and detailed in NEON.DOC.001113",real,percent,expanded
+PARPAR_1min,PARFinalQF,"Photosynthetically active radiation quality flag indicating whether a data product has passed or failed an overall assessment of its quality, detailed in NEON.DOC.001113 (1=fail, 0=pass)",unsigned integer,NA,basic
+PARPAR_1min,PARFinalQFSciRvw,"Photosynthetically active radiation quality flag indicating whether a data product has failed a science review of its quality, detailed in NEON.DOC.001113 (1=fail, 0=pass/not-reviewed)",unsigned integer,NA,expanded
+PARPAR_1min,outPARMean,"Arithmetic mean of outgoing photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_1min,outPARMinimum,"Minimum outgoing photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_1min,outPARMaximum,"Maximum outgoing photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_1min,outPARVariance,"Variance in outgoing photosynthetically active radiation",real,micromolesPerSquareMeterPerSecondSquared,basic
+PARPAR_1min,outPARNumPts,"Number of points used to calculate the arithmetic mean of outgoing photosynthetically active radiation",real,NA,basic
+PARPAR_1min,outPARExpUncert,"Expanded uncertainty for outgoing photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_1min,outPARStdErMean,"Standard error of the mean for outgoing photosynthetically active radiation",real,micromolesPerSquareMeterPerSecond,basic
+PARPAR_1min,outPARRangeFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the range test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARRangePassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the range test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARRangeNAQM,"Outgoing photosynthetically active radiation quality metric that summarizes when the range test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARPersistenceFailQM,"Outgoing PAR quality metric that summarizes  the failed outcomes of the persistence test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARPersistencePassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the persistence test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARPersistenceNAQM,"Outgoing PAR quality metric that summarizes when the persistence test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARStepFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the step test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARStepPassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the step test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARStepNAQM,"Outgoing PAR quality metric that summarizes when the step test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARNullFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the null test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARNullPassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the null test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARNullNAQM,"Outgoing PAR quality metric that summarizes when the null test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARGapFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the gap test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARGapPassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the gap test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARGapNAQM,"Outgoing PAR quality metric that summarizes when the gap test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARSpikeFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the spike test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARSpikePassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the spike test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARSpikeNAQM,"Outgoing PAR quality metric that summarizes when the spike test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARConsistencyFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the consistency test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARConsistencyPassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the consistency test over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARConsistencyNAQM,"Outgoing PAR quality metric that summarizes when the consistency test could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARValidCalFailQM,"Outgoing PAR quality metric that summarizes the failed outcomes of the valid calibration check over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARValidCalPassQM,"Outgoing PAR quality metric that summarizes the passed outcomes of the valid calibration check over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARValidCalNAQM,"Outgoing PAR quality metric that summarizes when the valid calibration check could not be run over the averaging period, as a percent",real,percent,expanded
+PARPAR_1min,outPARAlphaQM,"Outgoing PAR quality metric detailing the outcomes of the alpha quality flag over the averaging period, as a percent and detailed in NEON.DOC.001113",real,percent,expanded
+PARPAR_1min,outPARBetaQM,"Outgoing PAR quality metric detailing the outcomes of the beta quality flag over the averaging period, as a percent and detailed in NEON.DOC.001113",real,percent,expanded
+PARPAR_1min,outPARFinalQF,"Outgoing PAR quality flag indicating whether a data product has passed or failed an overall assessment of its quality, detailed in NEON.DOC.001113 (1=fail, 0=pass)",unsigned integer,NA,basic
+PARPAR_1min,outPARFinalQFSciRvw,"Outgoing PAR quality flag indicating whether a data product has failed a science review of its quality, detailed in NEON.DOC.001113 (1=fail, 0=pass/not-reviewed)",unsigned integer,NA,expanded
