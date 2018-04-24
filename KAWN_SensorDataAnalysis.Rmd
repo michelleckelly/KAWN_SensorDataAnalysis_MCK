@@ -41,7 +41,7 @@ This is a **working document** for analyzing sensor data from the NSF RAPID Kans
 # Nitratax Data
 
 **Nitratax_XMLtoCSV:** Function to convert raw-from-sensor .xml file to more convenient .csv file  
-```{r Nitratax_XMLtoCSV}
+```{r Nitratax_XMLtoCSV, include=FALSE}
 # Function name:
       # Nitratax_XMLtoCSV
 # Function description:
@@ -91,7 +91,7 @@ Nitratax_XMLtoCSV <- function(filename, sensor, deployDate){
 ```
 
 Import of Nitratax data into R environment
-```{r NitrataxLoading}
+```{r NitrataxLoading, include=FALSE}
 # Variable descriptions:    
       # loadfromCSV = logical vector, if TRUE data will be loaded from .csv files
                                     # if FALSE data will be converted from .xml to .csv
@@ -139,7 +139,7 @@ if (loadfromCSV == FALSE) {
 ```
 
 Cleanup of Nitratax data files
-```{r NitrataxCleanup}
+```{r NitrataxCleanup, include=FALSE}
 if (loadfromCSV == FALSE){
   
   # Eric sensor was buried under sediment from 05-Mar to 15-Mar, setting these measurements to NA
@@ -167,7 +167,7 @@ if (loadfromCSV == FALSE){
 # miniDOT Data  
 
 Loading miniDOT sensor files: dissolved oxygen and temperature data  
-```{r DOloading, include=TRUE}
+```{r DOloading, include=FALSE}
 steve_DO <- read.table(file = "miniDOT_Steve_Pulled04-20-2018.txt", header = TRUE,
                        sep = ",", skip = 8, stringsAsFactors = FALSE,
                        colClasses = c("numeric", "POSIXct", "POSIXct", "numeric",
@@ -190,7 +190,7 @@ eric_DO <- read.table(file = "miniDOT_Eric_Pulled04-04-2018.txt", header = TRUE,
 ## Data Pull  
 
 Pulling data from USGS server for sensor at Desoto KS (fourth core site)  
-```{r DesotoPull, include=TRUE, warning=FALSE}
+```{r DesotoPull, include=FALSE, warning=FALSE}
 siteNoDesoto <- "06892350" # USGS code for Kansas River site at Desoto, KS
 pCode <- c("99133", "00060", "00065", "00300", "00301","00010") 
   # USGS parameter codes:
@@ -209,7 +209,7 @@ desoto <- readNWISuv(siteNumbers = siteNoDesoto, parameterCd = pCode,
 ```
 
 Pulling data from USGS stream gauge at Lawrence, for finding water balance
-```{r LawrencePull, include=TRUE, warning=FALSE}
+```{r LawrencePull, include=FALSE, warning=FALSE}
 siteNoLawrence <- "06891080"
 pCodesLawrence <- c("00060","00065")
 
@@ -267,7 +267,7 @@ NA                |no sample was taken on this date
 BDL_NitrateNitrite|sample concentration was less than 0.25 mg-N/L
 BDL_Ammonia       |sample concentration was less than 0.30 mg-N/L
 
-```{r FarmlandLogsLoading, include=TRUE}
+```{r FarmlandLogsLoading, include=FALSE}
 FarmlandPumpingLogs <- read.csv(file = "FarmlandDailyReport_MCKformatted.csv", 
                                 header = TRUE, sep = ",")
 ```
@@ -309,7 +309,7 @@ FarmlandPumpingLogs$Notes <- as.character(FarmlandPumpingLogs$Notes)
 
 ## Data Pull (In development)  
 
-```{r NEONpull, include=TRUE, eval=FALSE}
+```{r NEONpull, include=FALSE, eval=FALSE}
 # Pull PAR data for March
 getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
            year_month = "2018-03", package = "basic",
@@ -347,7 +347,7 @@ waterBal$difference <- waterBal$Flow_Inst.desoto - waterBal$Flow_Inst.lawrence
 
 ## Plotting  
 
-```{r waterBalancePlotting, include=TRUE, fig.height=3, fig.width=10, warning=FALSE}
+```{r waterBalancePlotting, echo=FALSE, fig.height=3, fig.width=10, warning=FALSE}
 # plotting flow at upstream and downstream locations on same time series graph
 ggplot() +
   geom_line(data = desoto, aes(x = dateTime, y = Flow_Inst, color = "Desoto")) +
@@ -381,7 +381,7 @@ waterBal_plot
 
 ## All Sites: Nitrate plus Nitrite Plot  
 
-```{r NmergedPlot, include=TRUE, warning=FALSE, fig.height=6, fig.width=10}
+```{r NmergedPlot, echo=FALSE, warning=FALSE, fig.height=6, fig.width=10}
 nitrataxMergedPlot <- ggplot(NULL) +
   geom_point(data = bowersock_N, aes(x = `Date and time`, 
                                    y = `Nitrate plus nitrite as mg-N/L`, 
@@ -407,7 +407,7 @@ nitrataxMergedPlot
 ## Individual Sites: DO, Temp, N Plots  
 
 Function setup for individual, simple plots for each site  
-```{r simplePlotFunction, include=TRUE}
+```{r simplePlotFunction, include=FALSE}
 # Function name:
       # simplePlot
 # Function description:
@@ -439,7 +439,7 @@ simplePlot <- function(dataset, xAxis, yAxis, plotBegin, plotEnd, yMin, yMax, xL
 
 ### Bowersock (Upstream)  
 
-```{r bowersockPlots, include=TRUE, warning=FALSE, fig.height=3, fig.width=10}
+```{r bowersockPlots, echo=FALSE, warning=FALSE, fig.height=3, fig.width=10}
 bowersockPlot_N <- simplePlot(dataset = bowersock_N, 
                               xAxis = bowersock_N$`Date and time`, 
                               yAxis = bowersock_N$`Nitrate plus nitrite as mg-N/L`,
@@ -454,7 +454,7 @@ bowersockPlot_N
 
 ### Farmland Logs (Pipe outflow)  
 
-```{r FarmlandPumpLogsPlots, include=TRUE, warning=FALSE, fig.height=3, fig.width=10}
+```{r FarmlandPumpLogsPlots, echo=FALSE, warning=FALSE, fig.height=3, fig.width=10}
 LogDateStart <- min(FarmlandPumpingLogs$Date) 
 LogDateEnd <- max(FarmlandPumpingLogs$Date)
 
@@ -486,7 +486,7 @@ FarmlandPump_DrainageDitch_NitratePlot_zoom
 
 ### Eric (Discharge point)  
 
-```{r ericPlots, include=TRUE, warning=FALSE}
+```{r ericPlots, echo=FALSE, warning=FALSE}
 ericPlot_N <- simplePlot(dataset = eric_N, 
                          xAxis = eric_N$`Date and time`,
                          yAxis = eric_N$`Nitrate plus nitrite as mg-N/L`,
@@ -518,7 +518,7 @@ grid.arrange(ericPlot_N, ericPlot_DO, ericPlot_temp, ncol = 1, nrow = 3)
 
 ### Steve (5 km Downstream)  
 
-```{r stevePlots, include=TRUE, warning=FALSE}
+```{r stevePlots, echo=FALSE, warning=FALSE}
 # Steve (downstream)
 stevePlot_N <- simplePlot(dataset = steve_N, 
                           xAxis = steve_N$`Date and time`,
@@ -551,7 +551,7 @@ grid.arrange(stevePlot_N, stevePlot_DO, stevePlot_temp, ncol = 1, nrow = 3)
 
 ### Desoto (30 km Downstream)  
 
-```{r desotoPlots, include=TRUE, warning=FALSE}
+```{r desotoPlots, echo=FALSE, warning=FALSE}
 desotoPlot_N <- simplePlot(dataset = desoto, 
                            xAxis = desoto$dateTime,
                            yAxis = desoto$nitrateNitrite,
@@ -585,7 +585,7 @@ grid.arrange(desotoPlot_N, desotoPlot_DO, desotoPlot_temp, ncol = 1, nrow = 3)
 
 ### Period 1:  Feb 3-6  
 
-```{r Period1Plot, include=TRUE, fig.height=9, fig.width=5}
+```{r Period1Plot, include=FALSE, fig.height=9, fig.width=5}
 Period1Start <- mdy_hms("02-03-2018 12:00:00")
 Period1End <- mdy_hms("02-06-2018 12:00:00")
 
@@ -646,7 +646,7 @@ desotoPlot_Period1 <- grid.arrange(
 )
 ```
 
-```{r Period1ComboPlot, include=TRUE, fig.height=9, fig.width=15}
+```{r Period1ComboPlot, echo=FALSE, fig.height=9, fig.width=15}
 grid.arrange(bowersockPlot_Period1,
              ericPlot_Period1,
              stevePlot_Period1,
@@ -660,7 +660,7 @@ grid.arrange(bowersockPlot_Period1,
 
 ### Period 2:  Feb 20-22  
 
-```{r Period2Plot, include=TRUE, fig.height=9, fig.width=5}
+```{r Period2Plot, include=FALSE, fig.height=9, fig.width=5}
 Period2Start <- mdy_hms("02-20-2018 12:00:00")
 Period2End <- mdy_hms("02-22-2018 12:00:00")
 
@@ -721,7 +721,7 @@ desotoPlot_Period2 <- grid.arrange(
 )
 ```
 
-```{r Period2ComboPlot, include=TRUE, fig.height=9, fig.width=15}
+```{r Period2ComboPlot, echo=FALSE, fig.height=9, fig.width=15}
 grid.arrange(bowersockPlot_Period2,
              ericPlot_Period2,
              stevePlot_Period2,
@@ -735,7 +735,7 @@ grid.arrange(bowersockPlot_Period2,
 
 ### Period 3:  Mar 22-25  
 
-```{r Period3Plot, include=TRUE, fig.height=9, fig.width=5}
+```{r Period3Plot, include=FALSE, fig.height=9, fig.width=5}
 Period3Start <- mdy_hms("03-22-2018 12:00:00")
 Period3End <- mdy_hms("03-25-2018 12:00:00")
 
@@ -786,7 +786,7 @@ desotoPlot_Period3 <- grid.arrange(
 )
 ```
 
-```{r Period3ComboPlot, include=TRUE, fig.height=9, fig.width=15}
+```{r Period3ComboPlot, echo=FALSE, fig.height=9, fig.width=15}
 grid.arrange(bowersockPlot_Period3,
              ericPlot_Period3,
              stevePlot_Period3,
@@ -800,12 +800,12 @@ grid.arrange(bowersockPlot_Period3,
 
 ### Period 4:  Apr 3-6  
 
-```{r Period4Plot, include=TRUE, fig.height=9, fig.width=5}
+```{r Period4Plot, include=FALSE, fig.height=9, fig.width=5}
 Period4Start <- mdy_hms("04-03-2018 12:00:00")
 Period4End <- mdy_hms("04-06-2018 12:00:00")
 
 # Grid arrange bowersock for time period #4
-grid.arrange(
+bowersockPlot_Period4 <- grid.arrange(
   bowersockPlot_N +
     coord_cartesian(xlim = c(Period4Start,Period4End)),
   ggplot(NULL),
@@ -815,7 +815,7 @@ grid.arrange(
 )
 
 # Grid arrange Eric for time period #4
-grid.arrange(
+ericPlot_Period4 <- grid.arrange(
   ericPlot_N +
     coord_cartesian(xlim = c(Period4Start,Period4End)),
   ericPlot_DO +
@@ -827,7 +827,7 @@ grid.arrange(
 )
 
 # Grid arrange Steve for time period #4
-grid.arrange(
+stevePlot_Period4 <- grid.arrange(
   stevePlot_N +
     coord_cartesian(xlim = c(Period4Start,Period4End)),
   stevePlot_DO +
@@ -839,7 +839,7 @@ grid.arrange(
 )
 
 # Grid arrange Desoto for time period #4
-grid.arrange(
+desotoPlot_Period4 <- grid.arrange(
   desotoPlot_N +
     coord_cartesian(xlim = c(Period4Start,Period4End)),
   desotoPlot_DO +
@@ -851,14 +851,26 @@ grid.arrange(
 )
 ```
 
+```{r Period4ComboPlot, echo=FALSE, fig.height=9, fig.width=15}
+grid.arrange(bowersockPlot_Period4,
+             ericPlot_Period4,
+             stevePlot_Period4,
+             desotoPlot_Period4,
+             ncol = 4,
+             nrow = 1,
+             widths = c(1,1,1,1),
+             top = "Time Period 4: April 3-6"
+)
+```
+
 ### Period 5:  Apr 11-13  
 
-```{r Period5Plot, include=TRUE, fig.height=9, fig.width=5}
+```{r Period5Plot, echo=FALSE, fig.height=9, fig.width=5}
 Period5Start <- mdy_hms("04-11-2018 12:00:00")
 Period5End <- mdy_hms("04-13-2018 12:00:00")
 
 # Grid arrange bowersock for time period #5
-grid.arrange(
+bowersockPlot_Period5 <- grid.arrange(
   bowersockPlot_N +
     coord_cartesian(xlim = c(Period5Start,Period5End)),
   ggplot(NULL),
@@ -868,7 +880,7 @@ grid.arrange(
 )
 
 # Grid arrange Eric for time period #5
-grid.arrange(
+ericPlot_Period5 <- grid.arrange(
   ericPlot_N +
     coord_cartesian(xlim = c(Period5Start,Period5End)),
   ericPlot_DO +
@@ -880,7 +892,7 @@ grid.arrange(
 )
 
 # Grid arrange Steve for time period #5
-grid.arrange(
+stevePlot_Period5 <- grid.arrange(
   stevePlot_N +
     coord_cartesian(xlim = c(Period5Start,Period5End)),
   stevePlot_DO +
@@ -892,7 +904,7 @@ grid.arrange(
 )
 
 # Grid arrange Desoto for time period #5
-grid.arrange(
+desotoPlot_Period5 <- grid.arrange(
   desotoPlot_N +
     coord_cartesian(xlim = c(Period5Start,Period5End)),
   desotoPlot_DO +
@@ -901,6 +913,18 @@ grid.arrange(
     coord_cartesian(xlim = c(Period5Start,Period5End)),
   ncol = 1,
   nrow = 3
+)
+```
+
+```{r Period5ComboPlot, echo=FALSE, fig.height=9, fig.width=15}
+grid.arrange(bowersockPlot_Period5,
+             ericPlot_Period5,
+             stevePlot_Period5,
+             desotoPlot_Period5,
+             ncol = 4,
+             nrow = 1,
+             widths = c(1,1,1,1),
+             top = "Time Period 4: April 3-6"
 )
 ```
 
