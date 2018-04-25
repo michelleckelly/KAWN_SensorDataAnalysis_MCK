@@ -232,16 +232,16 @@ names(desoto)[names(desoto)=="99133_Inst_cd"] <- "nitrateNitrite_cd"
 
 # Convert from American to SI units
 # cubic foot per second to liters per second
-ft3s_Ls <- function(ft3s){
-  Ls <- ft3s*28.3168
-  return(Ls)
+ft3s_m3s <- function(ft3s){
+  m3s <- ft3s*0.0283168
+  return(m3s)
 }
 # foot to meters
 ft_m <- function(ft){
   m <- 0.3048*ft
   return(m)
 }
-desoto$Flow_Inst <- ft3s_Ls(desoto$Flow_Inst)
+desoto$Flow_Inst <- ft3s_m3s(desoto$Flow_Inst)
 desoto$GH_Inst <- ft_m(desoto$GH_Inst)
 ```
 
@@ -251,8 +251,10 @@ Lawrence data cleanup
 lawrence <- renameNWISColumns(lawrence)
 
 # convert from american to SI units
-lawrence$Flow_Inst <- ft3s_Ls(lawrence$Flow_Inst)
+lawrence$Flow_Inst <- ft3s_m3s(lawrence$Flow_Inst)
+
 lawrence$.Downstream.of.Bowersock.Dam._GH_Inst <- ft_m(lawrence$.Downstream.of.Bowersock.Dam._GH_Inst)
+
 lawrence$.Upstream.of.Bowersock.Dam._GH_Inst <- ft_m(lawrence$.Upstream.of.Bowersock.Dam._GH_Inst)
 ```
 
@@ -286,18 +288,18 @@ FarmlandPumpingLogs$VolumePumped_MG <- MG_L(FarmlandPumpingLogs$VolumePumped_MG)
 names(FarmlandPumpingLogs)[names(FarmlandPumpingLogs) == "VolumePumped_MG"] <- "VolumePumped_L"
 
 # gallons per minute to liters per second
-gpm_Ls <- function(gpm){
-  Ls <- gpm*0.06309
-  return(Ls)
+gpm_m3s <- function(gpm){
+  m3s <- gpm*6.309E-5
+  return(m3s)
 }
 
-FarmlandPumpingLogs$flowRate_Outfall001A_gpm <- gpm_Ls(FarmlandPumpingLogs$flowRate_Outfall001A_gpm)
+FarmlandPumpingLogs$flowRate_Outfall001A_gpm <- gpm_m3s(FarmlandPumpingLogs$flowRate_Outfall001A_gpm)
 names(FarmlandPumpingLogs)[names(FarmlandPumpingLogs) == "flowRate_Outfall001A_gpm"] <-
-  "flowRate_Outfall001A_L.s"
+  "flowRate_Outfall001A_m3.s"
 
-FarmlandPumpingLogs$flowRate_AveragePump_gpm <- gpm_Ls(FarmlandPumpingLogs$flowRate_AveragePump_gpm)
+FarmlandPumpingLogs$flowRate_AveragePump_gpm <- gpm_m3s(FarmlandPumpingLogs$flowRate_AveragePump_gpm)
 names(FarmlandPumpingLogs)[names(FarmlandPumpingLogs) == "flowRate_AveragePump_gpm"] <- 
-  "flowRate_AveragePump_L.s"
+  "flowRate_AveragePump_m3.s"
 
 # Reformatting column data types
 FarmlandPumpingLogs$Date <- mdy(FarmlandPumpingLogs$Date)
@@ -384,9 +386,10 @@ waterBal_plot <- ggplot() +
              color = wes_palette(n=5, name="Zissou")[5],
              linetype = "dashed", size = 1) +
   coord_cartesian(xlim = c(pullBegin, pullEnd), 
-                  ylim = c(-30000, 50000)) +
+                  ylim = c(-50, 50)) +
   labs(y = "Difference between downstream 
-       flow gauge and upstream flow gauge, L/s",
+       flow gauge and upstream 
+       flow gauge, m3/s",
        x = "Date", 
        title = "Water balance of study reach") +
   theme_classic()
@@ -966,7 +969,7 @@ sum(PAR$dateTime_solar==desoto$dateTime_solar)
       # c = 0.409 m, f = 0.294 **verify if these are representative of Kaw
 
 desoto$depth <- calc_depth(desoto$Flow_Inst)
-  # this gives us ~10m depth!! WRONG! is gage height more representative of actual depth?? ask USGS
+  # this gives us close the the GH readings for depth
 
 # fitting a bayesian model (better for multiple days of data b/c it can pool k600 values)
 model_name <- mm_name(type = "bayes", pool_K600 = "none",
@@ -974,15 +977,28 @@ model_name <- mm_name(type = "bayes", pool_K600 = "none",
 bayes_specs <- specs(model_name)
 bayes_specs # displays specifications of model
 
-metab_inputs("bayes", "data")
+metab_inputs("bayes", "data") # list of required inputs
 
-head(intersect(desoto$dateTime_solar, PAR$dateTime_solar))
+#assemble data frame of data needed for metabolism model
+desoto_MetabData <- merge.data.frame(desoto, PAR, 
+                                     by = intersect(names(desoto), names(PAR)),
+                                     incomparables = NULL)
+desoto_MetabData <- desoto_MetabData[-c(2:4, 6, 8, 10, 12, 14:17, 19, 21:23)]
 
-head(merge.data.frame(desoto, PAR, 
-                      by = intersect(desoto$dateTime_solar, PAR$dateTime_solar),
-                      incomparables = NULL))
+# comparison between using gage height and estimated depth
+# using USGS measured gage height
+desoto_MetabData_GH <- desoto_MetabData[-7]
+names(desoto_MetabData_GH) <- c("solar.time", "temp.water", "discharge",
+                                "depth", "DO.obs", "DO.sat", "light")
+desoto_MetabData_GH <- desoto_MetabData_GH[-3]
+metab_bayes(specs = bayes_specs, data = desoto_MetabData_GH)
 
-data.frame(c())
 
+# using calculated depth
+desoto_MetabData_calcDepth <- desoto_MetabData[-4]
+names(desoto_MetabData_calcDepth) <- c("solar.time", "temp.water", "discharge",
+                                       "DO.obs", "DO.sat", "depth", "light")
+
+ 
 ```
 
