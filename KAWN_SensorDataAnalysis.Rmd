@@ -960,6 +960,29 @@ desoto$dateTime_solar <- calc_solar_time(desoto$dateTime, longitude = desoto_lon
 
 sum(PAR$dateTime_solar==desoto$dateTime_solar)
 
+# estimate stream depth from discharge data
+  # using d = c*Q^f Leopold and Maddock 1953
+  # default values for c and f as suggested in Raymond et al 2012
+      # c = 0.409 m, f = 0.294 **verify if these are representative of Kaw
+
+desoto$depth <- calc_depth(desoto$Flow_Inst)
+  # this gives us ~10m depth!! WRONG! is gage height more representative of actual depth?? ask USGS
+
+# fitting a bayesian model (better for multiple days of data b/c it can pool k600 values)
+model_name <- mm_name(type = "bayes", pool_K600 = "none",
+                      err_obs_iid = TRUE, err_proc_iid = TRUE)
+bayes_specs <- specs(model_name)
+bayes_specs # displays specifications of model
+
+metab_inputs("bayes", "data")
+
+head(intersect(desoto$dateTime_solar, PAR$dateTime_solar))
+
+head(merge.data.frame(desoto, PAR, 
+                      by = intersect(desoto$dateTime_solar, PAR$dateTime_solar),
+                      incomparables = NULL))
+
+data.frame(c())
 
 ```
 
