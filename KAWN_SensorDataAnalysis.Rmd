@@ -981,8 +981,7 @@ metab_inputs("bayes", "data") # list of required inputs
 
 #assemble data frame of data needed for metabolism model
 desoto_MetabData <- merge.data.frame(desoto, PAR, 
-                                     by = intersect(names(desoto), names(PAR)),
-                                     incomparables = NULL)
+                                     by = intersect(names(desoto), names(PAR)))
 desoto_MetabData <- desoto_MetabData[-c(2:4, 6, 8, 10, 12, 14:17, 19, 21:23)]
 
 # comparison between using gage height and estimated depth
