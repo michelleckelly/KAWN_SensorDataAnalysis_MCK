@@ -990,7 +990,7 @@ desoto_MetabData_GH <- desoto_MetabData[-7]
 names(desoto_MetabData_GH) <- c("solar.time", "temp.water", "discharge",
                                 "depth", "DO.obs", "DO.sat", "light")
 desoto_MetabData_GH <- desoto_MetabData_GH[-3]
-metab_bayes(specs = bayes_specs, data = desoto_MetabData_GH)
+#metab_bayes(specs = bayes_specs, data = desoto_MetabData_GH)
 
 
 # using calculated depth
