@@ -43,7 +43,12 @@ This is a **working document** for analyzing sensor data from the NSF RAPID Kans
 
 This section contains all data loading and cleanup chunks  
 
+Data pull = data is taken from an online host (USGS, NEON)
+Data load = data is taken from local file
+
 ## Nitratax Data  
+
+### Data pull  
 
 **Nitratax_XMLtoCSV:** Function to convert raw-from-sensor .xml file to more convenient .csv file  
 ```{r Nitratax_XMLtoCSV, include=FALSE}
@@ -94,8 +99,6 @@ Nitratax_XMLtoCSV <- function(filename, sensor, deployDate){
   
 }
 ```
-
-### Data pull  
 
 Import of Nitratax data into R environment
 ```{r NitrataxLoading, include=FALSE}
@@ -271,7 +274,7 @@ lawrence$.Upstream.of.Bowersock.Dam._GH_Inst <- ft_m(lawrence$.Upstream.of.Bower
 
 ## City of Lawrence Pumping Logs  
 
-### Loading Data  
+### Data load  
 
 Data code         |   Meaning
 ----------------- |----------
@@ -350,75 +353,21 @@ PAR <- read.csv(file = paste0(getwd(), "/NEONfiles", "/stackedFiles",
 
 ```{r NEONcleanup, include=FALSE, eval=TRUE}
 # data cleanup
+PAR <- subset(PAR, subset = PAR$verticalPosition == 10) # take measurements that are closest to ground
+
 PAR <- PAR[,-c(1:4, 6, 11:22)] #drop unneccess columns
 PAR$startDateTime <- ymd_hms(PAR$startDateTime)
 tz(PAR$startDateTime) <- "America/Chicago"
 
-plot(PAR$PARMean)
+# PAR units are micromoles per m^2 per second
 ```
 
 ***  
 
-# Water Balance  
+# Raw data visualizations  
 
-## Computation  
-
-```{r waterBalanceComputation, include=TRUE}
-#subset data frames
-desoto_sub <- data.frame(desoto$dateTime, desoto$Flow_Inst)
-names(desoto_sub) <- c("dateTime", "Flow_Inst")
-desoto_sub$dateTime <- ymd_hms(desoto_sub$dateTime)
-
-lawrence_sub <- data.frame(lawrence$dateTime, lawrence$Flow_Inst)
-names(lawrence_sub) <- c("dateTime", "Flow_Inst")
-lawrence_sub$dateTime <- ymd_hms(lawrence_sub$dateTime)
-
-# combine data frames
-waterBal <- merge(desoto_sub, lawrence_sub, 
-                  by = "dateTime", suffixes = c(".desoto", ".lawrence"))
-
-#calculate difference between downstream and upstream gauge (balance = downstream discharge - upstream)
-waterBal$difference <- waterBal$Flow_Inst.desoto - waterBal$Flow_Inst.lawrence
-```
-
-## Plotting  
-
-```{r waterBalancePlotting, echo=FALSE, fig.height=3, fig.width=10, warning=FALSE}
-# plotting flow at upstream and downstream locations on same time series graph
-ggplot() +
-  geom_line(data = desoto, aes(x = dateTime, y = Flow_Inst, color = "Desoto")) +
-  geom_line(data = lawrence, aes(x = dateTime, y = Flow_Inst, color = "Lawrence"))
-
-# plot the water balance graph centered on 0: 
-      # positive values = gaining stream
-      # negative values = losing stream
-waterBal_plot <- ggplot() +
-  geom_line(data = waterBal, 
-            aes(x = dateTime, y = difference, color = "difference"),
-            show.legend = FALSE, size = 1, 
-            color = wes_palette(n=5, name="Zissou")[1]) +
-  geom_hline(aes(yintercept = mean(na.omit(waterBal$difference))),
-             color = wes_palette(n=5, name="Zissou")[5],
-             linetype = "dashed", size = 1) +
-  coord_cartesian(xlim = c(pullBegin, pullEnd), 
-                  ylim = c(-50, 50)) +
-  labs(y = "Difference between downstream 
-       flow gauge and upstream 
-       flow gauge, m3/s",
-       x = "Date", 
-       title = "Water balance of study reach") +
-  theme_classic()
-
-waterBal_plot
-```
-
-***  
-
-# Data Visualizations  
-
-## All Sites: Nitrate plus Nitrite Plot  
-
-```{r NmergedPlot, echo=FALSE, warning=FALSE, fig.height=6, fig.width=10}
+```{r NmergedPlot, include = FALSE, echo=FALSE, warning=FALSE, fig.height=6, fig.width=10}
+#combined plot of all N data on one axis
 nitrataxMergedPlot <- ggplot(NULL) +
   geom_point(data = bowersock_N, aes(x = `Date and time`, 
                                    y = `Nitrate plus nitrite as mg-N/L`, 
@@ -441,7 +390,7 @@ nitrataxMergedPlot <- ggplot(NULL) +
 nitrataxMergedPlot
 ```
 
-## Individual Sites: DO, Temp, N Plots  
+## Individual raw plots: DO, Temp, N Plots  
 
 Function setup for individual, simple plots for each site  
 ```{r simplePlotFunction, include=FALSE}
@@ -616,6 +565,64 @@ desotoPlot_temp <- simplePlot(dataset = desoto,
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[3])
 
 grid.arrange(desotoPlot_N, desotoPlot_DO, desotoPlot_temp, ncol = 1, nrow = 3)
+```
+
+## Stacked raw N data plot (include in talk)  
+
+```{r StackedNPlot, fig.height=9, fig.width=9}
+colorBlindPalette <- c("#56B4E9", "#E69F00", "#CC79A7", "#000000")
+
+stackedNPlot <- 
+  grid.arrange(
+    bowersockPlot_N +
+      coord_cartesian(xlim = c(pullBegin, pullEnd),
+                      ylim = c(0, 1.5)) +
+      xlab(NULL) +
+      ylab(NULL) +
+      ggtitle(NULL) +
+      theme(axis.text = element_text(size = 14),
+            axis.text.x = element_blank()) +
+      scale_color_manual(values = colorBlindPalette[1]),
+  
+    ericPlot_N +
+      coord_cartesian(xlim = c(pullBegin, pullEnd),
+                      ylim = c(0, 25)) +
+      xlab(NULL) +
+      ylab(NULL) +
+      ggtitle(NULL) +
+      theme(axis.text = element_text(size = 14),
+            axis.text.x = element_blank()) +
+      scale_color_manual(values = colorBlindPalette[2]),
+  
+    stevePlot_N +
+      coord_cartesian(xlim = c(pullBegin, pullEnd),
+                      ylim = c(0, 1.5)) +
+      xlab(NULL) +
+      ylab(NULL) +
+      ggtitle(NULL) +
+      theme(axis.text = element_text(size = 14),
+            axis.text.x = element_blank()) +
+      scale_color_manual(values = colorBlindPalette[3]),
+  
+    desotoPlot_N +
+      coord_cartesian(xlim = c(pullBegin, pullEnd),
+                      ylim = c(0, 1.5)) +
+      xlab(NULL) +
+      ylab(NULL) +
+      ggtitle(NULL) +
+      theme(axis.text = element_text(size = 14)) +
+      scale_color_manual(values = colorBlindPalette[4]),
+  
+    nrow = 4,
+    ncol = 1
+)
+
+ggsave(filename = "StackedNPlot.png", plot = stackedNPlot, dpi = 500)
+```
+
+## Combined temperature plot
+```{r comboTemp}
+
 ```
 
 ## Time period plots  
@@ -964,6 +971,197 @@ grid.arrange(bowersockPlot_Period5,
              top = "Time Period 4: April 3-6"
 )
 ```
+
+## Diel cutaway plots for SFS powerpoint  
+```{r dielCutaway, fig.height=2, fig.width=2}
+# diel cutaway plot for powerpoint
+ericPlot_N_dielCutaway <- 
+  ericPlot_N +
+      coord_cartesian(xlim = c(Period3Start,Period3End)) +
+      xlab(NULL) +
+      ylab(NULL) +
+      ggtitle(NULL) +
+      theme(axis.text = element_text(size = 14),
+            axis.text.x = element_blank()) +
+        scale_color_manual(values = colorBlindPalette[2])
+
+ggsave(filename = "Site2_dielCutaway.png", plot = ericPlot_N_dielCutaway, dpi = 500,
+       width = 2, height = 2, units = "in")
+
+desotoPlot_N_dielCutaway <- 
+  desotoPlot_N +
+      coord_cartesian(xlim = c(Period3Start,Period3End)) +
+      xlab(NULL) +
+      ylab(NULL) +
+      ggtitle(NULL) +
+      theme(axis.text = element_text(size = 14),
+            axis.text.x = element_blank()) +
+        scale_color_manual(values = colorBlindPalette[4])
+
+ggsave(filename = "Site4_dielCutaway.png", plot = desotoPlot_N_dielCutaway, dpi = 500,
+       width = 2, height = 2, units = "in")
+
+stevePlot_N_dielCutaway <- 
+  stevePlot_N +
+      coord_cartesian(xlim = c(Period4Start,Period4End),
+                      ylim = c(0,1.5)) +
+      xlab(NULL) +
+      ylab(NULL) +
+      ggtitle(NULL) +
+      theme(axis.text = element_text(size = 14),
+            axis.text.x = element_blank()) +
+        scale_color_manual(values = colorBlindPalette[3])
+
+ggsave(filename = "Site3_dielCutaway.png", plot = stevePlot_N_dielCutaway, dpi = 500,
+       width = 2, height = 2, units = "in")
+
+```
+
+## PAR plot
+```{r PARplotting, fig.height=3, fig.width=9}
+# calculate sum of PAR mean values
+PAR$PARMean_sum <- cumsum(PAR$PARMean)
+
+# convert PAR units (from umol m^-2 s^-1 to mol m^-2 d^-1)
+umolm2s_to_molm2d <- function(umol_m2_s){
+  mol_m2_s <- umol_m2_s*1.0E-6
+  mol_m2_d <- mol_m2_s*86400
+  return(mol_m2_d)
+}
+
+PAR$PARMean_sum_molm2d <- umolm2s_to_molm2d(PAR$PARMean_sum)
+
+#convert PAR units (from umol m^-2 s^-1 to mol m^-2 s^-1)
+umol_mol <- function(umol){
+  mol <- umol*1.0E-6
+  return(mol)
+}
+
+PAR$PARMean_sum_molm2s <- umol_mol(PAR$PARMean_sum)
+
+#ok our raw values are on the same magnitide as the Lupon paper, but the converted values are not similar at all, wth
+
+PAR_rawPlot <- 
+  ggplot(NULL) + 
+    geom_line(data = PAR, aes(x = startDateTime, y = PARMean), 
+               show.legend = FALSE, size = 1) +
+    coord_cartesian(xlim = c(pullBegin, pullEnd)) +
+    labs(y = "PAR, 
+         umol m^-2 s^-1", 
+         x = "Date") +
+    theme_classic() +
+    theme(axis.text = element_text(size = 14),
+          axis.title = element_text(size = 14))
+
+PAR_sumPlot <- 
+  ggplot(NULL) + 
+    geom_area(data = PAR, aes(x = startDateTime, y = PARMean_sum), 
+               show.legend = FALSE, size = 1) +
+    coord_cartesian(xlim = c(pullBegin, pullEnd)) +
+    labs(y = "Sum PAR, 
+         umol m^-2 s^-1", 
+         x = "Date") +
+    theme_classic() +
+    theme(axis.text = element_text(size = 14),
+          axis.title = element_text(size = 14))
+
+PAR_sumPlot_convertunits_molday <- 
+  ggplot(NULL) + 
+    geom_area(data = PAR, aes(x = startDateTime, y = PARMean_sum_molm2d), 
+               show.legend = FALSE, size = 1) +
+    coord_cartesian(xlim = c(pullBegin, pullEnd)) +
+    labs(y = "Sum PAR, 
+         mol m^-2 d^-1", 
+         x = "Date") +
+    theme_classic() +
+    theme(axis.text = element_text(size = 14),
+          axis.title = element_text(size = 14))
+
+PAR_sumPlot_convertunits_mol <- 
+  ggplot(NULL) + 
+    geom_area(data = PAR, aes(x = startDateTime, y = PARMean_sum_molm2s), 
+               show.legend = FALSE, size = 1) +
+    coord_cartesian(xlim = c(pullBegin, pullEnd)) +
+    labs(y = "Sum PAR, 
+         mol m^-2 s^-1", 
+         x = "Date") +
+    theme_classic() +
+    theme(axis.text = element_text(size = 14),
+          axis.title = element_text(size = 14))
+
+PAR_rawPlot
+PAR_sumPlot
+PAR_sumPlot_convertunits_mol
+PAR_sumPlot_convertunits_molday
+
+ggsave(filename = "PAR_rawPlot.png", plot = PAR_rawPlot, dpi = 500,
+       width = 10, height = 3, units = "in")
+ggsave(filename = "PAR_sumPlot.png", plot = PAR_sumPlot, dpi = 500,
+       width = 10, height = 3)
+ggsave(filename = "PAR_sumPlot_molm2sec.png", plot = PAR_sumPlot_convertunits_mol, dpi = 500,
+       width = 10, height = 3)
+ggsave(filename = "PAR_sumPlot_molm2day.png", plot = PAR_sumPlot_convertunits_molday, dpi = 500,
+       width = 10, height = 3)
+```
+
+# Water Balance  
+
+## Computation  
+
+```{r waterBalanceComputation, include=TRUE}
+#subset data frames
+desoto_sub <- data.frame(desoto$dateTime, desoto$Flow_Inst)
+names(desoto_sub) <- c("dateTime", "Flow_Inst")
+desoto_sub$dateTime <- ymd_hms(desoto_sub$dateTime)
+
+lawrence_sub <- data.frame(lawrence$dateTime, lawrence$Flow_Inst)
+names(lawrence_sub) <- c("dateTime", "Flow_Inst")
+lawrence_sub$dateTime <- ymd_hms(lawrence_sub$dateTime)
+
+# combine data frames
+waterBal <- merge(desoto_sub, lawrence_sub, 
+                  by = "dateTime", suffixes = c(".desoto", ".lawrence"))
+
+#calculate difference between downstream and upstream gauge (balance = downstream discharge - upstream)
+waterBal$difference <- waterBal$Flow_Inst.desoto - waterBal$Flow_Inst.lawrence
+```
+
+## Plotting  
+
+```{r waterBalancePlotting, echo=FALSE, fig.height=3, fig.width=10, warning=FALSE}
+# plotting flow at upstream and downstream locations on same time series graph
+ggplot() +
+  geom_line(data = desoto, aes(x = dateTime, y = Flow_Inst, color = "Desoto")) +
+  geom_line(data = lawrence, aes(x = dateTime, y = Flow_Inst, color = "Lawrence"))
+
+# plot the water balance graph centered on 0: 
+      # positive values = gaining stream
+      # negative values = losing stream
+waterBal_plot <- ggplot() +
+  geom_line(data = waterBal, 
+            aes(x = dateTime, y = difference, color = "difference"),
+            show.legend = FALSE, 
+            color = colorBlindPalette[4]) +
+  geom_hline(aes(yintercept = mean(na.omit(waterBal$difference))),
+             color = "grey",
+             linetype = "solid") +
+  coord_cartesian(xlim = c(pullBegin, pullEnd), 
+                  ylim = c(-50, 50)) +
+  labs(y = "Difference between 
+downstream and 
+upstream flow, m3/s",
+       x = "Date", 
+       title = "Water balance of study reach") +
+  theme_classic() +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14))
+
+ggsave(filename = "waterBal_plot.png", plot = waterBal_plot, dpi = 500,
+       width = 10, height = 3, units = "in")
+```
+
+***  
 
 # Metabolism modeling
 
