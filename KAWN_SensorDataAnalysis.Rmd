@@ -620,9 +620,33 @@ stackedNPlot <-
 ggsave(filename = "StackedNPlot.png", plot = stackedNPlot, dpi = 500)
 ```
 
+## Difference in N with time (include in talk)
+```{r Nderiv}
+plot(diff(bowersock_N$`Nitrate plus nitrite as mg-N/L`, lag = 1, differences = 1,
+     object = bowersock_N$`Date and time`))
+```
 ## Combined temperature plot
-```{r comboTemp}
+```{r comboTemp, fig.width=9, fig.height=3}
+comboTemp <- 
+ggplot() +
+  geom_point(data = desoto, aes(x = dateTime, y = Wtemp_Inst, color = "site 4"),
+             show.legend = FALSE) +
+  geom_point(data = steve_DO, aes(x = time_CST, y = temp_C, color = "site 2"),
+             show.legend = FALSE) +
+  geom_point(data = eric_DO, aes(x = time_CST, y = temp_C, color = "site 3"),
+             show.legend = FALSE) +
+  coord_cartesian(xlim = c(pullBegin, pullEnd), 
+                  ylim = c(-5, 25)) +
+  theme_classic() +
+  scale_color_manual(values = colorBlindPalette[2:4]) +
+  ylab("Water temperature, deg C") +
+  xlab(NULL) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14),
+        )
 
+ggsave(filename = "temp_comboplot.png", plot = comboTemp, dpi = 500,
+       width = 10, height = 3, units = "in")
 ```
 
 ## Time period plots  
