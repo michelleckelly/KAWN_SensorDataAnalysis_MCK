@@ -28,6 +28,7 @@ library(zoo)
 #install_github("NEONScience/NEON-utilities/neonUtilities", dependencies = TRUE)
 library(neonUtilities)
 library(streamMetabolizer)
+library(leaflet)
 ```
 
 ***  
@@ -38,7 +39,11 @@ This is a **working document** for analyzing sensor data from the NSF RAPID Kans
 
 ***  
 
-# Nitratax Data
+# Data Import  
+
+This section contains all data loading and cleanup chunks  
+
+## Nitratax Data  
 
 **Nitratax_XMLtoCSV:** Function to convert raw-from-sensor .xml file to more convenient .csv file  
 ```{r Nitratax_XMLtoCSV, include=FALSE}
@@ -90,6 +95,8 @@ Nitratax_XMLtoCSV <- function(filename, sensor, deployDate){
 }
 ```
 
+### Data pull  
+
 Import of Nitratax data into R environment
 ```{r NitrataxLoading, include=FALSE}
 # Variable descriptions:    
@@ -138,6 +145,8 @@ if (loadfromCSV == FALSE) {
 }
 ```
 
+### Data cleanup  
+
 Cleanup of Nitratax data files
 ```{r NitrataxCleanup, include=FALSE}
 if (loadfromCSV == FALSE){
@@ -164,7 +173,7 @@ if (loadfromCSV == FALSE){
 
 ***  
 
-# miniDOT Data  
+## miniDOT Data  
 
 Loading miniDOT sensor files: dissolved oxygen and temperature data  
 ```{r DOloading, include=FALSE}
@@ -186,9 +195,9 @@ eric_DO <- read.table(file = "miniDOT_Eric_Pulled04-04-2018.txt", header = TRUE,
 
 ***
 
-# USGS Data  
+## USGS Data  
 
-## Data Pull  
+### Data pull  
 
 Pulling data from USGS server for sensor at Desoto KS (fourth core site)  
 ```{r DesotoPull, include=FALSE, warning=FALSE}
@@ -218,7 +227,7 @@ lawrence <- readNWISuv(siteNumbers = siteNoLawrence, parameterCd = pCodesLawrenc
                        startDate = pullBegin, endDate = pullEnd, tz = "America/Chicago") 
 ```
 
-## Data Cleanup  
+### Data cleanup  
 
 Desoto data cleanup
 ```{r DesotoCleanup, include=TRUE}
@@ -260,9 +269,9 @@ lawrence$.Upstream.of.Bowersock.Dam._GH_Inst <- ft_m(lawrence$.Upstream.of.Bower
 
 ***  
 
-# City of Lawrence Pumping Logs  
+## City of Lawrence Pumping Logs  
 
-## Loading Data  
+### Loading Data  
 
 Data code         |   Meaning
 ----------------- |----------
@@ -275,7 +284,7 @@ FarmlandPumpingLogs <- read.csv(file = "FarmlandDailyReport_MCKformatted.csv",
                                 header = TRUE, sep = ",")
 ```
 
-## Data Cleanup  
+### Data cleanup  
 ```{r FarmlandLogsCleanup, include=TRUE}
 # conversion from american to metric units
 # million gallons to liters
@@ -308,11 +317,11 @@ FarmlandPumpingLogs$Notes <- as.character(FarmlandPumpingLogs$Notes)
 
 ***  
 
-# NEON Data   
+## NEON Data   
 
-## Data Pull  
+### Data pull  
 
-```{r NEONpull_cleanup, include=FALSE, eval=TRUE}
+```{r NEONpull, include=FALSE, eval=TRUE}
 downloadNEONfiles <- FALSE
 
 if (downloadNEONfiles == TRUE){
@@ -335,11 +344,17 @@ if (downloadNEONfiles == TRUE){
 
 PAR <- read.csv(file = paste0(getwd(), "/NEONfiles", "/stackedFiles", 
                               "/PARPAR_30min.csv"), header = TRUE)
+```
 
+### Data cleanup  
+
+```{r NEONcleanup, include=FALSE, eval=TRUE}
 # data cleanup
 PAR <- PAR[,-c(1:4, 6, 11:22)] #drop unneccess columns
 PAR$startDateTime <- ymd_hms(PAR$startDateTime)
 tz(PAR$startDateTime) <- "America/Chicago"
+
+plot(PAR$PARMean)
 ```
 
 ***  
@@ -999,5 +1014,20 @@ names(desoto_MetabData_calcDepth) <- c("solar.time", "temp.water", "discharge",
                                        "DO.obs", "DO.sat", "depth", "light")
 
  
+```
+
+```{r leafletmaps}
+map <- leaflet()
+map <- addTiles(map)
+GPS <- read.csv(file = "KansasR_Nitratax_GPS.csv", header = TRUE)
+
+map <- addMarkers(map = map, 
+                  lng = GPS$Longitude, lat = GPS$Latitude, 
+                  popup = c("Upstream", "5km Downstream", 
+                            "Discharge point", "30km Downstream"))
+map <- addProviderTiles(map = map, providers$MtbMap)
+map <- addProviderTiles(map = map, providers$Stamen.TonerLite)
+map
+names(providers)
 ```
 
