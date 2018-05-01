@@ -1296,12 +1296,7 @@ metab_inputs("bayes", "data") # list of required inputs
 
 
 
-mm <- metab_bayes(specs = bayes_specs, data = desoto_MetabData_GH)
-mm
-predict_metab(mm)
-
 
  
 ```
-
 

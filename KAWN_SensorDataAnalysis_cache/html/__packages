@@ -8,5 +8,7 @@ wesanderson
 zoo
 neonUtilities
 streamMetabolizer
+StanHeaders
+rstan
+dplyr
 bindrcpp
-leaflet
