@@ -28,7 +28,8 @@ library(zoo)
 #install_github("NEONScience/NEON-utilities/neonUtilities", dependencies = TRUE)
 library(neonUtilities)
 library(streamMetabolizer)
-library(leaflet)
+library(rstan)
+library(dplyr)
 ```
 
 ***  
@@ -1190,66 +1191,62 @@ ggsave(filename = "waterBal_plot.png", plot = waterBal_plot, dpi = 500,
 # Metabolism modeling
 
 ```{r MetabolismSetup}
-#need: convert to solar time, DO saturation, depth of site, light
-metab_inputs("mle", "data")
-
-# start with desoto
+# Desoto dataframe setup
 desoto_longitude <- -94.964616
+# calculate solar time
 PAR$dateTime_solar <- calc_solar_time(PAR$startDateTime, longitude = desoto_longitude)
 desoto$dateTime_solar <- calc_solar_time(desoto$dateTime, longitude = desoto_longitude)
-
-sum(PAR$dateTime_solar==desoto$dateTime_solar)
-
 # estimate stream depth from discharge data
   # using d = c*Q^f Leopold and Maddock 1953
   # default values for c and f as suggested in Raymond et al 2012
       # c = 0.409 m, f = 0.294 **verify if these are representative of Kaw
-
 desoto$depth <- calc_depth(desoto$Flow_Inst)
   # this gives us close the the GH readings for depth
-
-# fitting a bayesian model (better for multiple days of data b/c it can pool k600 values)
-model_name <- mm_name(type = "bayes", pool_K600 = "none",
-                      err_obs_iid = TRUE, err_proc_iid = TRUE)
-bayes_specs <- specs(model_name)
-bayes_specs # displays specifications of model
-
-metab_inputs("bayes", "data") # list of required inputs
-
 #assemble data frame of data needed for metabolism model
 desoto_MetabData <- merge.data.frame(desoto, PAR, 
                                      by = intersect(names(desoto), names(PAR)))
-desoto_MetabData <- desoto_MetabData[-c(2:4, 6, 8, 10, 12, 14:17, 19, 21:23)]
-
+desoto_MetabData <- desoto_MetabData[, c("dateTime_solar", "Wtemp_Inst", "Flow_Inst",
+                                         "GH_Inst", "DO_Inst", "DO_percentsat", "depth",
+                                         "PARMean")]
 # comparison between using gage height and estimated depth
-# using USGS measured gage height
-desoto_MetabData_GH <- desoto_MetabData[-7]
+    # using USGS measured gage height
+desoto_MetabData_GH <- subset(desoto_MetabData, select = -c(depth))
 names(desoto_MetabData_GH) <- c("solar.time", "temp.water", "discharge",
                                 "depth", "DO.obs", "DO.sat", "light")
-desoto_MetabData_GH <- desoto_MetabData_GH[-3]
-#metab_bayes(specs = bayes_specs, data = desoto_MetabData_GH)
+
+# model fitting
+    # using the basic MLE model
+mle_name <- mm_name(type='mle')
+mle_specs <- specs(mle_name)
+mm_mle_desoto <- metab(mle_specs, data = desoto_MetabData_GH)
+plot_metab_preds(mm_mle_desoto)
+plot_DO_preds(mm_mle_desoto)
+
+  # trying a bayseian model for better prediction of multi-day metabolism
+bayes_name <- mm_name(type = "bayes", pool_K600 = "linear")
+bayes_specs <- specs(bayes_name)
+mm_bayes_desoto <- metab_bayes(specs = bayes_specs, data = desoto_MetabData_GH)
+
+# fitting a bayesian model (better for multiple days of data b/c it can pool k600 values)
+model_name <- mm_name(type = "bayes", pool_K600 = "binned",
+                      err_obs_iid = TRUE, err_proc_iid = TRUE)
+bayes_specs <- specs(model_name)
+bayes_specs
+bayes_specs <- revise(bayes_specs, burnin_steps=100, saved_steps=200, n_cores=1, GPP_daily_mu=3, GPP_daily_sigma=2)
+bayes_specs
+metab_inputs("bayes", "data") # list of required inputs
 
 
-# using calculated depth
-desoto_MetabData_calcDepth <- desoto_MetabData[-4]
-names(desoto_MetabData_calcDepth) <- c("solar.time", "temp.water", "discharge",
-                                       "DO.obs", "DO.sat", "depth", "light")
+
+
+
+
+mm <- metab_bayes(specs = bayes_specs, data = desoto_MetabData_GH)
+mm
+predict_metab(mm)
+
 
  
 ```
 
-```{r leafletmaps}
-map <- leaflet()
-map <- addTiles(map)
-GPS <- read.csv(file = "KansasR_Nitratax_GPS.csv", header = TRUE)
-
-map <- addMarkers(map = map, 
-                  lng = GPS$Longitude, lat = GPS$Latitude, 
-                  popup = c("Upstream", "5km Downstream", 
-                            "Discharge point", "30km Downstream"))
-map <- addProviderTiles(map = map, providers$MtbMap)
-map <- addProviderTiles(map = map, providers$Stamen.TonerLite)
-map
-names(providers)
-```
 
