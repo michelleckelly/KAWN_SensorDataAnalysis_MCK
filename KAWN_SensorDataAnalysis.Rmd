@@ -339,7 +339,7 @@ if (downloadNEONfiles == TRUE){
            savepath = paste(getwd(), "NEONfiles", sep = "/")) # March at KU field station
   #getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
            #year_month = "2018-04", package = "basic",
-           #savepath = getwd()) # April at KU field station - wont be released until end of april
+           #savepath = getwd()) # April at KU field station 
   stackByTable(dpID = "DP1.00024.001", 
                filepath = paste0(getwd(), "/NEONfiles"), 
                savepath = paste0(getwd(), "/NEONfiles"), 
@@ -622,9 +622,48 @@ ggsave(filename = "StackedNPlot.png", plot = stackedNPlot, dpi = 500)
 ```
 
 ## Difference in N with time (include in talk)
-```{r Nderiv}
+```{r Nderiv, fig.height=3, fig.width=10}
 plot(diff(bowersock_N$`Nitrate plus nitrite as mg-N/L`, lag = 1, differences = 1,
      object = bowersock_N$`Date and time`))
+
+# taking the first derivative of eric's N data
+eric_firstderiv <- data.frame(
+  eric_N$`Date and time`[2:length(eric_N$`Date and time`)],
+  diff(eric_N$`Nitrate plus nitrite as mg-N/L`, lag = 1, differences = 1, 
+       object = eric_N$`Date and time`)*100
+)
+names(eric_firstderiv) <- c("Date and time", "Rate of change")
+
+ggplot() +
+  geom_point(data = eric_firstderiv, aes(x = eric_firstderiv$`Date and time`,
+                                         y = eric_firstderiv$`Rate of change`,
+                                         color = "site 2"), show.legend = FALSE) +
+  theme_classic() +
+  coord_cartesian(xlim = c(pullBegin, pullEnd)) +
+  labs(y = "Rate of change (%)", x = "Date") +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14)) +
+  scale_color_manual(values = colorBlindPalette[2])
+
+# steve's
+steve_firstderiv <- data.frame(
+  steve_N$`Date and time`[2:length(steve_N$`Date and time`)],
+  diff(steve_N$`Nitrate plus nitrite as mg-N/L`, lag = 1, differences = 1, 
+       object = steve_N$`Date and time`)*100
+)
+names(steve_firstderiv) <- c("Date and time", "Rate of change")
+
+ggplot() +
+  geom_point(data = steve_firstderiv, aes(x = steve_firstderiv$`Date and time`,
+                                         y = steve_firstderiv$`Rate of change`,
+                                         color = "site 3"), show.legend = FALSE) +
+  theme_classic() +
+  coord_cartesian(xlim = c(pullBegin, pullEnd)) +
+  labs(y = "Rate of change (%)", x = "Date") +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14)) +
+  scale_color_manual(values = colorBlindPalette[3])
+
 ```
 ## Combined temperature plot
 ```{r comboTemp, fig.width=9, fig.height=3}
@@ -643,8 +682,7 @@ ggplot() +
   ylab("Water temperature, deg C") +
   xlab(NULL) +
   ggtitle(NULL) +
-  theme(axis.text = element_text(size = 14),
-        )
+  theme(axis.text = element_text(size = 14))
 
 ggsave(filename = "temp_comboplot.png", plot = comboTemp, dpi = 500,
        width = 10, height = 3, units = "in")
@@ -1168,7 +1206,7 @@ waterBal_plot <- ggplot() +
             show.legend = FALSE, 
             color = colorBlindPalette[4]) +
   geom_hline(aes(yintercept = mean(na.omit(waterBal$difference))),
-             color = "grey",
+             color = "red",
              linetype = "solid") +
   coord_cartesian(xlim = c(pullBegin, pullEnd), 
                   ylim = c(-50, 50)) +
@@ -1190,7 +1228,7 @@ ggsave(filename = "waterBal_plot.png", plot = waterBal_plot, dpi = 500,
 
 # Metabolism modeling
 
-```{r MetabolismSetup}
+```{r MetabolismSetup, fig.height=7, fig.width=10}
 # Desoto dataframe setup
 desoto_longitude <- -94.964616
 # calculate solar time
@@ -1219,8 +1257,25 @@ names(desoto_MetabData_GH) <- c("solar.time", "temp.water", "discharge",
 mle_name <- mm_name(type='mle')
 mle_specs <- specs(mle_name)
 mm_mle_desoto <- metab(mle_specs, data = desoto_MetabData_GH)
-plot_metab_preds(mm_mle_desoto)
-plot_DO_preds(mm_mle_desoto)
+
+# model plotting
+mm_mle_desoto_plot <- 
+  plot_metab_preds(mm_mle_desoto) + 
+  theme_classic() +
+  xlab("Date") +
+  ylab("Predicted values") +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14))
+mm_mle_desoto_plotDO <- 
+  plot_DO_preds(mm_mle_desoto) +
+  theme_classic() +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14))
+
+ggsave(filename = "Metabolism_desoto_mle.png", plot = mm_mle_desoto_plot,
+       dpi = 500, width = 10, height = 5, units = "in")
+ggsave(filename = "Metabolism_desoto_mle_DO.png", plot = mm_mle_desoto_plotDO,
+       dpi = 500, width = 10, height = 5, units = "in")
 
   # trying a bayseian model for better prediction of multi-day metabolism
 bayes_name <- mm_name(type = "bayes", pool_K600 = "linear")
