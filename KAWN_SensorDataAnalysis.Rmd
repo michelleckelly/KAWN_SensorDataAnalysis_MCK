@@ -13,8 +13,7 @@ output:
 ```{r setup, echo = FALSE, warning=FALSE, error=FALSE, message=FALSE}
 knitr::opts_chunk$set(fig.height = 8, 
                       fig.width = 10, 
-                      cache=TRUE, # enable caching globally
-                      echo=TRUE) # all code will print to screen
+                      cache=TRUE) # enable caching globally
 
 library(XML)
 library(lubridate)
@@ -621,10 +620,33 @@ stackedNPlot <-
 ggsave(filename = "StackedNPlot.png", plot = stackedNPlot, dpi = 500)
 ```
 
-## Difference in N with time (include in talk)
-```{r Nderiv, fig.height=3, fig.width=10}
-plot(diff(bowersock_N$`Nitrate plus nitrite as mg-N/L`, lag = 1, differences = 1,
-     object = bowersock_N$`Date and time`))
+## Temporal difference in N (include in talk)
+```{r Ntemporal, fig.height=3, fig.width=10}
+# 4 (15 min intervals per hour) * 12 hours between midnight and noon = 48 step lag
+bowersockN_daynightdiff <- diff(bowersock_N$`Nitrate plus nitrite as mg-N/L`,
+                                lag = 49, differences = 1,
+                                object = bowersock_N$`Date and time`)
+ericN_daynightdiff <- diff(eric_N$`Nitrate plus nitrite as mg-N/L`, 
+                           lag = 49, differences = 1, 
+                           object = eric_N$`Date and time`)
+steveN_daynightdiff <- diff(steve_N$`Nitrate plus nitrite as mg-N/L`, 
+                            lag = 49, differences = 1,
+                            object = steve_N$`Date and time`)
+desotoN_daynightdiff <- diff(desoto$nitrateNitrite, 
+                             lag = 49, differences = 1,
+                             object = desoto$dateTime)
+#head(merge(bowersock_N$`Date and time`, bowersockN_daynightdiff, all.x = TRUE))
+head(lag(bowersock_N$`Date and time`, k = 2))
+
+ggplot() +
+  geom_freqpoly(data = bowersockN_daynightdiff)
+
+plot.ts()
+plot.ts(diff(steve_N$`Nitrate plus nitrite as mg-N/L`, lag = 49, differences = 1,
+     object = steve_N$`Date and time`))
+plot.ts(diff(desoto$nitrateNitrite, lag = 49, differences = 1,
+     object = desoto$dateTime))
+# find a way to step between solar noon and midnight
 
 # taking the first derivative of eric's N data
 eric_firstderiv <- data.frame(
