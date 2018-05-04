@@ -635,56 +635,13 @@ steveN_daynightdiff <- diff(steve_N$`Nitrate plus nitrite as mg-N/L`,
 desotoN_daynightdiff <- diff(desoto$nitrateNitrite, 
                              lag = 49, differences = 1,
                              object = desoto$dateTime)
-#head(merge(bowersock_N$`Date and time`, bowersockN_daynightdiff, all.x = TRUE))
-head(lag(bowersock_N$`Date and time`, k = 2))
 
-ggplot() +
-  geom_freqpoly(data = bowersockN_daynightdiff)
+plot.ts(bowersockN_daynightdiff, col = colorBlindPalette[1])
+plot.ts(ericN_daynightdiff, col = colorBlindPalette[2])
+plot.ts(steveN_daynightdiff, col = colorBlindPalette[3])
+plot.ts(desotoN_daynightdiff, col = colorBlindPalette[4])
 
-plot.ts()
-plot.ts(diff(steve_N$`Nitrate plus nitrite as mg-N/L`, lag = 49, differences = 1,
-     object = steve_N$`Date and time`))
-plot.ts(diff(desoto$nitrateNitrite, lag = 49, differences = 1,
-     object = desoto$dateTime))
 # find a way to step between solar noon and midnight
-
-# taking the first derivative of eric's N data
-eric_firstderiv <- data.frame(
-  eric_N$`Date and time`[2:length(eric_N$`Date and time`)],
-  diff(eric_N$`Nitrate plus nitrite as mg-N/L`, lag = 1, differences = 1, 
-       object = eric_N$`Date and time`)*100
-)
-names(eric_firstderiv) <- c("Date and time", "Rate of change")
-
-ggplot() +
-  geom_point(data = eric_firstderiv, aes(x = eric_firstderiv$`Date and time`,
-                                         y = eric_firstderiv$`Rate of change`,
-                                         color = "site 2"), show.legend = FALSE) +
-  theme_classic() +
-  coord_cartesian(xlim = c(pullBegin, pullEnd)) +
-  labs(y = "Rate of change (%)", x = "Date") +
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 14)) +
-  scale_color_manual(values = colorBlindPalette[2])
-
-# steve's
-steve_firstderiv <- data.frame(
-  steve_N$`Date and time`[2:length(steve_N$`Date and time`)],
-  diff(steve_N$`Nitrate plus nitrite as mg-N/L`, lag = 1, differences = 1, 
-       object = steve_N$`Date and time`)*100
-)
-names(steve_firstderiv) <- c("Date and time", "Rate of change")
-
-ggplot() +
-  geom_point(data = steve_firstderiv, aes(x = steve_firstderiv$`Date and time`,
-                                         y = steve_firstderiv$`Rate of change`,
-                                         color = "site 3"), show.legend = FALSE) +
-  theme_classic() +
-  coord_cartesian(xlim = c(pullBegin, pullEnd)) +
-  labs(y = "Rate of change (%)", x = "Date") +
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 14)) +
-  scale_color_manual(values = colorBlindPalette[3])
 
 ```
 ## Combined temperature plot
