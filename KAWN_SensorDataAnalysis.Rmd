@@ -37,6 +37,8 @@ library(dplyr)
 # install.packages("Rcpp")
 # library(Rcpp)
 # Rcpp::evalCpp("2+2")
+
+library(rstan)
 ```
 
 ***  
@@ -1203,7 +1205,7 @@ ggsave(filename = "waterBal_plot.png", plot = waterBal_plot, dpi = 500,
 
 # Metabolism modeling
 
-```{r MetabolismSetup, fig.height=7, fig.width=10}
+```{r MetabolismSetup}
 # Desoto dataframe setup
 desoto_longitude <- -94.964616
 # calculate solar time
@@ -1231,24 +1233,31 @@ names(desoto_MetabData) <- c("solar.time", "temp.water", "discharge",
     # using the basic MLE model
 mle_name <- mm_name(type='mle', ode_method = "trapezoid")
 mle_specs <- specs(mle_name)
-mle_specs <- revise(mle_specs, split_dates = FALSE, verbose = TRUE)
+mle_specs <- revise(mle_specs, split_dates = FALSE, verbose = TRUE, GPP_fun = "limlight",
+                    ER_fun = "q10temp", deficit_src = "DO_obs")
 mm_mle_desoto <- metab(mle_specs, data = desoto_MetabData)
 
 # model plotting
 plot_metab_preds(mm_mle_desoto)
 plot_DO_preds(mm_mle_desoto)
 
-
 # view errors
 get_params(mm_mle_desoto) %>% select(date, warnings, errors)
 
 # trying a bayseian model for better prediction of multi-day metabolism
-bayes_name <- mm_name(type = "bayes", pool_K600 = "binned", ode_method = "trapezoid")
+bayes_name <- mm_name(type = "bayes", pool_K600 = "binned")
 bayes_specs <- specs(bayes_name) 
-bayes_specs <- revise(bayes_specs, burnin_steps=100, saved_steps=100,
-                      split_dates = FALSE, verbose = TRUE) 
+bayes_specs <- revise(bayes_specs, burnin_steps=1000, saved_steps=2000,
+                      split_dates = FALSE, verbose = TRUE, GPP_fun = "limlight",
+                      ER_fun = "q10temp", deficit_src = "DO_obs", ode_method = "trapezoid",
+                      control = list(max_treedepth = 20)) 
 # steps are low for practice
 mm_bayes_desoto <- metab_bayes(specs = bayes_specs, data = desoto_MetabData)
+mm_bayes_desoto_stanobj <- get_mcmc(mm_bayes_desoto)
+
+traceplot(mm_bayes_desoto_stanobj)
+get_fit(mm_bayes_desoto)$warnings
+
 
 get_params(mm_bayes_desoto) %>% select(date, warnings, errors)
 
