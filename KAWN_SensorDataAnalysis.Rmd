@@ -1262,5 +1262,8 @@ get_params(mm_bayes_desoto) %>% select(date, warnings, errors)
 plot_metab_preds(mm_bayes_desoto)
 plot_DO_preds(mm_bayes_desoto)
 
+# what if we estimate K first, then find GPP and ER with fixed K
+kmodel_name <- mm_name(type = "Kmodel", engine = "mean")
+kmodel_desoto <- metab_Kmodel(specs = kmodel_name, data = desoto_MetabData)
 ```
 
