@@ -26,6 +26,7 @@ library(zoo)
 # library(devtools)
 # install_github("NEONScience/NEON-utilities/neonUtilities", dependencies = TRUE)
 library(neonUtilities)
+# install.packages("streamMetabolizer", dependencies = TRUE, repos = c("https://owi.usgs.gov/R", "https://cran.rstudio.com"))
 library(streamMetabolizer)
 library(rstan)
 library(dplyr)
@@ -37,8 +38,6 @@ library(dplyr)
 # install.packages("Rcpp")
 # library(Rcpp)
 # Rcpp::evalCpp("2+2")
-
-library(rstan)
 ```
 
 ***  
@@ -1247,11 +1246,10 @@ get_params(mm_mle_desoto) %>% select(date, warnings, errors)
 # trying a bayseian model for better prediction of multi-day metabolism
 bayes_name <- mm_name(type = "bayes", pool_K600 = "binned")
 bayes_specs <- specs(bayes_name) 
-bayes_specs <- revise(bayes_specs, burnin_steps=1000, saved_steps=2000,
+bayes_specs <- revise(bayes_specs, burnin_steps=500, saved_steps=500,
                       split_dates = FALSE, verbose = TRUE, GPP_fun = "limlight",
                       ER_fun = "q10temp", deficit_src = "DO_obs", ode_method = "trapezoid",
-                      control = list(max_treedepth = 20)) 
-# steps are low for practice
+                      control = list(max_treedepth = 30))
 mm_bayes_desoto <- metab_bayes(specs = bayes_specs, data = desoto_MetabData)
 mm_bayes_desoto_stanobj <- get_mcmc(mm_bayes_desoto)
 
