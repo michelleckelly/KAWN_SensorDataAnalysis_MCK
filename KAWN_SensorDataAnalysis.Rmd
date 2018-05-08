@@ -23,12 +23,20 @@ library(grid)
 library(dataRetrieval) # USGS
 library(wesanderson) # pallets
 library(zoo)
-#library(devtools)
-#install_github("NEONScience/NEON-utilities/neonUtilities", dependencies = TRUE)
+# library(devtools)
+# install_github("NEONScience/NEON-utilities/neonUtilities", dependencies = TRUE)
 library(neonUtilities)
 library(streamMetabolizer)
 library(rstan)
 library(dplyr)
+# install.packages("installr")
+# library("installr")
+# install.Rtools()
+
+# check if Rtools is installed properly, output should be 4
+# install.packages("Rcpp")
+# library(Rcpp)
+# Rcpp::evalCpp("2+2")
 ```
 
 ***  
@@ -200,10 +208,10 @@ eric_DO <- read.table(file = "miniDOT_Eric_Pulled04-04-2018.txt", header = TRUE,
 
 ## USGS Data  
 
-### Data pull  
+### Data pull and cleanup  
 
 Pulling data from USGS server for sensor at Desoto KS (fourth core site)  
-```{r DesotoPull, include=FALSE, warning=FALSE}
+```{r DesotoPullCleanup, include=FALSE, warning=FALSE}
 siteNoDesoto <- "06892350" # USGS code for Kansas River site at Desoto, KS
 pCode <- c("99133", "00060", "00065", "00300", "00301","00010") 
   # USGS parameter codes:
@@ -219,21 +227,7 @@ pullEnd <- as.POSIXct("2018-04-22", format = "%Y-%m-%d") # Date for end of data 
 # USGS data pull
 desoto <- readNWISuv(siteNumbers = siteNoDesoto, parameterCd = pCode, 
                      startDate = pullBegin, endDate = pullEnd, tz = "America/Chicago") 
-```
 
-Pulling data from USGS stream gauge at Lawrence, for finding water balance
-```{r LawrencePull, include=FALSE, warning=FALSE}
-siteNoLawrence <- "06891080"
-pCodesLawrence <- c("00060","00065")
-
-lawrence <- readNWISuv(siteNumbers = siteNoLawrence, parameterCd = pCodesLawrence, 
-                       startDate = pullBegin, endDate = pullEnd, tz = "America/Chicago") 
-```
-
-### Data cleanup  
-
-Desoto data cleanup
-```{r DesotoCleanup, include=TRUE}
 # Rename columns from codes to parameter names
 desoto <- renameNWISColumns(desoto)
 # Fix remaining names that are still parameter codes
@@ -257,8 +251,14 @@ desoto$Flow_Inst <- ft3s_m3s(desoto$Flow_Inst)
 desoto$GH_Inst <- ft_m(desoto$GH_Inst)
 ```
 
-Lawrence data cleanup
-```{r LawrenceCleanup, include=TRUE}
+Pulling data from USGS stream gauge at Lawrence, for finding water balance
+```{r LawrencePullCleanup, include=FALSE, warning=FALSE}
+siteNoLawrence <- "06891080"
+pCodesLawrence <- c("00060","00065")
+
+lawrence <- readNWISuv(siteNumbers = siteNoLawrence, parameterCd = pCodesLawrence, 
+                       startDate = pullBegin, endDate = pullEnd, tz = "America/Chicago") 
+
 # Rename columns from codes to parameter names
 lawrence <- renameNWISColumns(lawrence)
 
@@ -322,9 +322,9 @@ FarmlandPumpingLogs$Notes <- as.character(FarmlandPumpingLogs$Notes)
 
 ## NEON Data   
 
-### Data pull  
+### Data pull and cleanup  
 
-```{r NEONpull, include=FALSE, eval=TRUE}
+```{r NEONpullCleanup, include=FALSE, eval=TRUE}
 downloadNEONfiles <- FALSE
 
 if (downloadNEONfiles == TRUE){
@@ -347,11 +347,7 @@ if (downloadNEONfiles == TRUE){
 
 PAR <- read.csv(file = paste0(getwd(), "/NEONfiles", "/stackedFiles", 
                               "/PARPAR_30min.csv"), header = TRUE)
-```
 
-### Data cleanup  
-
-```{r NEONcleanup, include=FALSE, eval=TRUE}
 # data cleanup
 PAR <- subset(PAR, subset = PAR$verticalPosition == 10) # take measurements that are closest to ground
 
@@ -1227,55 +1223,37 @@ desoto_MetabData <- desoto_MetabData[, c("dateTime_solar", "Wtemp_Inst", "Flow_I
                                          "PARMean")]
 # comparison between using gage height and estimated depth
     # using USGS measured gage height
-desoto_MetabData_GH <- subset(desoto_MetabData, select = -c(depth))
-names(desoto_MetabData_GH) <- c("solar.time", "temp.water", "discharge",
-                                "depth", "DO.obs", "DO.sat", "light")
+desoto_MetabData <- subset(desoto_MetabData, select = -c(GH_Inst))
+names(desoto_MetabData) <- c("solar.time", "temp.water", "discharge",
+                              "DO.obs", "DO.sat", "depth", "light")
 
 # model fitting
     # using the basic MLE model
-mle_name <- mm_name(type='mle')
+mle_name <- mm_name(type='mle', ode_method = "trapezoid")
 mle_specs <- specs(mle_name)
-mm_mle_desoto <- metab(mle_specs, data = desoto_MetabData_GH)
+mle_specs <- revise(mle_specs, split_dates = FALSE, verbose = TRUE)
+mm_mle_desoto <- metab(mle_specs, data = desoto_MetabData)
 
 # model plotting
-mm_mle_desoto_plot <- 
-  plot_metab_preds(mm_mle_desoto) + 
-  theme_classic() +
-  xlab("Date") +
-  ylab("Predicted values") +
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 14))
-mm_mle_desoto_plotDO <- 
-  plot_DO_preds(mm_mle_desoto) +
-  theme_classic() +
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 14))
-
-ggsave(filename = "Metabolism_desoto_mle.png", plot = mm_mle_desoto_plot,
-       dpi = 500, width = 10, height = 5, units = "in")
-ggsave(filename = "Metabolism_desoto_mle_DO.png", plot = mm_mle_desoto_plotDO,
-       dpi = 500, width = 10, height = 5, units = "in")
-
-  # trying a bayseian model for better prediction of multi-day metabolism
-bayes_name <- mm_name(type = "bayes", pool_K600 = "linear")
-bayes_specs <- specs(bayes_name)
-mm_bayes_desoto <- metab_bayes(specs = bayes_specs, data = desoto_MetabData_GH)
-
-# fitting a bayesian model (better for multiple days of data b/c it can pool k600 values)
-model_name <- mm_name(type = "bayes", pool_K600 = "binned",
-                      err_obs_iid = TRUE, err_proc_iid = TRUE)
-bayes_specs <- specs(model_name)
-bayes_specs
-bayes_specs <- revise(bayes_specs, burnin_steps=100, saved_steps=200, n_cores=1, GPP_daily_mu=3, GPP_daily_sigma=2)
-bayes_specs
-metab_inputs("bayes", "data") # list of required inputs
+plot_metab_preds(mm_mle_desoto)
+plot_DO_preds(mm_mle_desoto)
 
 
+# view errors
+get_params(mm_mle_desoto) %>% select(date, warnings, errors)
 
+# trying a bayseian model for better prediction of multi-day metabolism
+bayes_name <- mm_name(type = "bayes", pool_K600 = "binned", ode_method = "trapezoid")
+bayes_specs <- specs(bayes_name) 
+bayes_specs <- revise(bayes_specs, burnin_steps=100, saved_steps=100,
+                      split_dates = FALSE, verbose = TRUE) 
+# steps are low for practice
+mm_bayes_desoto <- metab_bayes(specs = bayes_specs, data = desoto_MetabData)
 
+get_params(mm_bayes_desoto) %>% select(date, warnings, errors)
 
+plot_metab_preds(mm_bayes_desoto)
+plot_DO_preds(mm_bayes_desoto)
 
-
- 
 ```
 
