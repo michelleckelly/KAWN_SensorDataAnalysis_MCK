@@ -1304,10 +1304,9 @@ kmodel_desoto <- metab_Kmodel(specs = kmodel_name, data = desoto_MetabData)
 # [1] load data, date and time must be in different columns
 
 steve_metab <- 
-as.data.frame(
-  ymd_hms(steve_DO$time_CST, tz = "America/Chicago")
+data.frame(
+  dateTime = ymd_hms(steve_DO$time_CST, tz = "America/Chicago")
 )
-names(steve_metab) <- "Date"
 
 # [2] calculate oxygen saturation at temperature (the minidot already does this)
 osat<- function(temp, bp) {
@@ -1344,7 +1343,11 @@ bpcalc<- function(bpst, alt) {
 }
 
 steve_alt <- 249.02 # m
-BarPress$mean_steve <- bpcalc(bpst = BarPress$mean, alt = steve_alt)
+steve_pressure <- 
+data.frame(
+  dateTime = BarPress$dateTime,
+  mean_pressure = bpcalc(bpst = BarPress$mean, alt = steve_alt)
+)
 
 # [4] load gas exchange (K) functions
 
@@ -1352,6 +1355,133 @@ BarPress$mean_steve <- bpcalc(bpst = BarPress$mean, alt = steve_alt)
 K600fromO2<-function (temp, KO2) {
     ((600/(1800.6 - (120.1 * temp) + (3.7818 * temp^2) - (0.047608 * temp^3)))^-0.5) * KO2
 }
-steve_metab$K600 <- K600fromO2(temp = )
+steve_metab$K600 <- K600fromO2(temp = steve_metab$temp, KO2 = steve_metab$DOmgL)
+
+# [5] depth
+#     using streamMetabolizer package and desoto discharge data here. this won't be entirely accurate.
+# estimate stream depth from discharge data
+  # using d = c*Q^f Leopold and Maddock 1953
+  # default values for c and f as suggested in Raymond et al 2012
+      # c = 0.409 m, f = 0.294 **verify if these are representative of Kaw
+steve_depth <- 
+data.frame(
+  dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago"),
+  steve_z = calc_depth(desoto$Flow_Inst)
+)
+
+# [6] combine metabolism data frame into one, while making sure dates match
+
+# need to combine steve_metab with steve_pressure, steve_depth, and PAR
+steve_metab$dateTime <- steve_metab$dateTime - dminutes(4)
+
+# merge
+steve_metab <- 
+  merge(steve_metab,
+        steve_pressure,
+        by = "dateTime")
+steve_metab <- 
+  merge(steve_metab,
+        steve_depth,
+        by = "dateTime")
+steve_metab <- 
+  merge(steve_metab,
+        PAR,
+        by = "dateTime")
+steve_metab <- 
+  data.frame(dateTime = steve_metab$dateTime,
+             oxy = steve_metab$DOmgL,
+             oxySat = steve_metab$DOsat,
+             temp = steve_metab$temp,
+             K = steve_metab$K600,
+             bp = steve_metab$mean_pressure,
+             z = steve_metab$steve_z,
+             light = steve_metab$mean)
+
+# [7] load river metabolism function 
+
+# parameter names (and units)
+	# oxy.mod = modeled O2 (mg/L)
+	# oxy = O2 data (mg/L)
+	# MET[1] = GPP = estimated daily gross primary production (g O2 m-2 d-1); + flux of O2 production
+	# MET[2] = ER = estimated daily ecosystem respiration (g O2 m-2 d-1); - flux of O2 consumption 
+	# MET[3] = K = estimated K600 (d-1)
+	# z = estimated site depth (m)
+	# Kcor = KO2 corrected for temperature, calculated from K600 (d-1)
+	# bp = barometric pressure (mmHg)
+	# temp = water temperature (C)
+	# light = PAR data (or modlight from above light function)
+	# ts = time step of O2 data from logger (10 min intervals --> units are day, so 10/1440=0.06944)
+
+# Model to calculate GPP, ER and K simultaneously
+  # This model is advantageous in the sense that one can estimate K from the data, 
+  # but beware that it may be an overparameterized model.  
+
+# rivermetabK is the master function that calls the MLE function (onestationmleK) and plotting function (onestationplot) below
+rivermetabK<-function(o2file, z, bp, ts){
+
+  temp<-o2file$temp
+  oxy<-o2file$oxy
+  light<-o2file$light
+
+  ##This calls onestationmleK (below) to calculate metabolism by non-linear minimization. We use nlm() function in R stats package; for more information see "help(nlm)"  The first argument is the function to be minimized, the second defines the starting values.  The function that is minimized (onestationmleK, see below) always has as its first argument, a vector of parameters (MET), and second argument a vector of starting values for those parameters, p=c(3,-5, 10).
+
+  river.mle<-nlm(onestationmleK, p=c(3,-5, 10), 
+                 oxy=oxy, z=z, temp=temp, 
+                 light=light, bp=bp, ts=ts)
+
+  ##plot modeled and measaured O2 given MLE estimates of GPP, ER, and K600.  It calls a function below onestationplot()
+
+  onestationplot(GPP = river.mle$estimate[1],
+                 ER = river.mle$estimate[2],
+                 oxy=oxy, z=z, temp=temp, light=light, 
+                 K=river.mle$estimate[3], bp=bp, ts=ts)
+  
+  ##return GPP, ER, K600, and MLE values
+	b <- list(GPP=river.mle$estimate[1], ER=river.mle$estimate[2], K600=river.mle$estimate[3], neglogL=river.mle$minimum[1])
+	b
+}
+# end of function
+
+
+# This function returns the negative log likelihood value given O2 data and estimates of GPP, ER, and K (which is vector MET); is included in master rivermetabK function above
+onestationmleK<-function(MET,temp, oxy, light, z, bp, ts) {
+
+	# create new vector for modeled O2
+	oxy.mod<-numeric(length(data))
+	# give starting value from oxygen data; this is the only time O2 data is used to model GPP and ER
+	oxy.mod[1]<-oxy[1]
+
+	# this is the metabolism equation as in Van de Bogert et al 2007 L&OMethods
+	for (i in 2:length(oxy)) {oxy.mod[i]<-oxy.mod[i-1]+((MET[1]/z)*(light[i]/sum(light)))+ MET[2]*ts/z+(Kcor(temp[i],MET[3]))*ts*(osat(temp[i],bp)-oxy.mod[i-1]) }
+	
+	##below is MLE calculation; output is -log likelihood
+	# diff in measured and modeled O2
+	sqdiff<-(oxy-oxy.mod)^2 
+	# likelihood function
+	L <- length(oxy) * (log(((sum(sqdiff)/length(oxy))^0.5))+0.5*log(6.28)) + ((2*sum(sqdiff)/length(oxy))^-1) * sum(sqdiff)
+	L
+}
+# end of function
+
+# this function plots modeled O2 and O2 data from estimates of daily GPP, ER, and K; is included in master rivermetabK function above
+# Calls same metabolism equation as in mle function, but plots modeled O2 as a function of GPP, ER, and K estimates from mle
+# use this to visually assess your model estimates (should be good agreement between modeled and measured O2)
+onestationplot<-function(GPP, ER, oxy, z, temp, K, light, bp, ts) {
+	
+	oxy.mod<-numeric(length(oxy))
+	oxy.mod[1]<-oxy[1]
+	
+	# this is the metabolism equation as in Van de Bogert et al (2007) L&OMethods
+	for (i in 2:length(oxy)) { oxy.mod[i]<-oxy.mod[i-1]+((GPP/z)*(light[i]/sum(light)))+ ER*ts/z+(Kcor(temp[i],K))*ts*(osat(temp[i],bp)-oxy.mod[i-1]) }
+
+	plot(seq(1:length(oxy)),oxy.mod, type="l",xlab="Time", ylab="Dissolved oxygen  (mg/L)", cex.lab=1.5, cex.axis=1.5, lwd=2 )
+	points(seq(1:length(oxy)),oxy)
+}
+# end of function
+
+####### END LOADING rivermetabK function ####### 
+
+# [8] run metabolism model
+
 ```
 
