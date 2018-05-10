@@ -27,6 +27,7 @@ library(magrittr)
 library(zoo)
 library(wesanderson) # pallets
 library(chron)
+library(data.table)
 
 ### USGS loading ###
 library(dataRetrieval)
@@ -672,7 +673,7 @@ plot.ts(desotoN_daynightdiff, col = colorBlindPalette[4])
 
 ```
 ## Combined temperature plot
-```{r comboTemp, fig.width=9, fig.height=3}
+```{r comboTemp, fig.width=9, fig.height=3, eval=FALSE}
 comboTemp <- 
 ggplot() +
   geom_point(data = desoto, aes(x = dateTime, y = Wtemp_Inst, color = "site 4"),
@@ -698,7 +699,7 @@ ggsave(filename = "temp_comboplot.png", plot = comboTemp, dpi = 500,
 
 ### Period 1:  Feb 3-6  
 
-```{r Period1Plot, include=FALSE, fig.height=9, fig.width=5}
+```{r Period1Plot, include=FALSE, fig.height=9, fig.width=5, eval=FALSE}
 Period1Start <- mdy_hms("02-03-2018 12:00:00")
 Period1End <- mdy_hms("02-06-2018 12:00:00")
 
@@ -759,7 +760,7 @@ desotoPlot_Period1 <- grid.arrange(
 )
 ```
 
-```{r Period1ComboPlot, echo=FALSE, fig.height=9, fig.width=15}
+```{r Period1ComboPlot, echo=FALSE, fig.height=9, fig.width=15, eval=FALSE}
 grid.arrange(bowersockPlot_Period1,
              ericPlot_Period1,
              stevePlot_Period1,
@@ -773,7 +774,7 @@ grid.arrange(bowersockPlot_Period1,
 
 ### Period 2:  Feb 20-22  
 
-```{r Period2Plot, include=FALSE, fig.height=9, fig.width=5}
+```{r Period2Plot, include=FALSE, fig.height=9, fig.width=5, eval=FALSE}
 Period2Start <- mdy_hms("02-20-2018 12:00:00")
 Period2End <- mdy_hms("02-22-2018 12:00:00")
 
@@ -834,7 +835,7 @@ desotoPlot_Period2 <- grid.arrange(
 )
 ```
 
-```{r Period2ComboPlot, echo=FALSE, fig.height=9, fig.width=15}
+```{r Period2ComboPlot, echo=FALSE, fig.height=9, fig.width=15, eval=FALSE}
 grid.arrange(bowersockPlot_Period2,
              ericPlot_Period2,
              stevePlot_Period2,
@@ -848,7 +849,7 @@ grid.arrange(bowersockPlot_Period2,
 
 ### Period 3:  Mar 22-25  
 
-```{r Period3Plot, include=FALSE, fig.height=9, fig.width=5}
+```{r Period3Plot, include=FALSE, fig.height=9, fig.width=5, eval=FALSE}
 Period3Start <- mdy_hms("03-22-2018 12:00:00")
 Period3End <- mdy_hms("03-25-2018 12:00:00")
 
@@ -899,7 +900,7 @@ desotoPlot_Period3 <- grid.arrange(
 )
 ```
 
-```{r Period3ComboPlot, echo=FALSE, fig.height=9, fig.width=15}
+```{r Period3ComboPlot, echo=FALSE, fig.height=9, fig.width=15, eval=FALSE}
 grid.arrange(bowersockPlot_Period3,
              ericPlot_Period3,
              stevePlot_Period3,
@@ -913,7 +914,7 @@ grid.arrange(bowersockPlot_Period3,
 
 ### Period 4:  Apr 3-6  
 
-```{r Period4Plot, include=FALSE, fig.height=9, fig.width=5}
+```{r Period4Plot, include=FALSE, fig.height=9, fig.width=5, eval=FALSE}
 Period4Start <- mdy_hms("04-03-2018 12:00:00")
 Period4End <- mdy_hms("04-06-2018 12:00:00")
 
@@ -964,7 +965,7 @@ desotoPlot_Period4 <- grid.arrange(
 )
 ```
 
-```{r Period4ComboPlot, echo=FALSE, fig.height=9, fig.width=15}
+```{r Period4ComboPlot, echo=FALSE, fig.height=9, fig.width=15, eval=FALSE}
 grid.arrange(bowersockPlot_Period4,
              ericPlot_Period4,
              stevePlot_Period4,
@@ -978,7 +979,7 @@ grid.arrange(bowersockPlot_Period4,
 
 ### Period 5:  Apr 11-13  
 
-```{r Period5Plot, include=FALSE, fig.height=9, fig.width=5}
+```{r Period5Plot, include=FALSE, fig.height=9, fig.width=5, eval=FALSE}
 Period5Start <- mdy_hms("04-11-2018 12:00:00")
 Period5End <- mdy_hms("04-13-2018 12:00:00")
 
@@ -1029,7 +1030,7 @@ desotoPlot_Period5 <- grid.arrange(
 )
 ```
 
-```{r Period5ComboPlot, echo=FALSE, fig.height=9, fig.width=15}
+```{r Period5ComboPlot, echo=FALSE, fig.height=9, fig.width=15, eval=FALSE}
 grid.arrange(bowersockPlot_Period5,
              ericPlot_Period5,
              stevePlot_Period5,
@@ -1042,7 +1043,7 @@ grid.arrange(bowersockPlot_Period5,
 ```
 
 ## Diel cutaway plots for SFS powerpoint  
-```{r dielCutaway, fig.height=2, fig.width=2}
+```{r dielCutaway, fig.height=2, fig.width=2, eval=FALSE}
 # diel cutaway plot for powerpoint
 ericPlot_N_dielCutaway <- 
   ericPlot_N +
@@ -1087,7 +1088,7 @@ ggsave(filename = "Site3_dielCutaway.png", plot = stevePlot_N_dielCutaway, dpi =
 ```
 
 ## PAR plot
-```{r PARplotting, fig.height=3, fig.width=9}
+```{r PARplotting, fig.height=3, fig.width=9, eval=FALSE}
 # calculate sum of PAR mean values
 PAR$PARMean_sum <- cumsum(PAR$PARMean)
 
@@ -1177,7 +1178,7 @@ ggsave(filename = "PAR_sumPlot_molm2day.png", plot = PAR_sumPlot_convertunits_mo
 
 ## Computation  
 
-```{r waterBalanceComputation, include=TRUE}
+```{r waterBalanceComputation, include=TRUE, eval=FALSE}
 #subset data frames
 desoto_sub <- data.frame(desoto$dateTime, desoto$Flow_Inst)
 names(desoto_sub) <- c("dateTime", "Flow_Inst")
@@ -1197,7 +1198,7 @@ waterBal$difference <- waterBal$Flow_Inst.desoto - waterBal$Flow_Inst.lawrence
 
 ## Plotting  
 
-```{r waterBalancePlotting, echo=FALSE, fig.height=3, fig.width=10, warning=FALSE}
+```{r waterBalancePlotting, echo=FALSE, fig.height=3, fig.width=10, warning=FALSE, eval=FALSE}
 # plotting flow at upstream and downstream locations on same time series graph
 ggplot() +
   geom_line(data = desoto, aes(x = dateTime, y = Flow_Inst, color = "Desoto")) +
@@ -1234,7 +1235,7 @@ ggsave(filename = "waterBal_plot.png", plot = waterBal_plot, dpi = 500,
 
 # Metabolism modeling
 
-```{r MetabolismSetup}
+```{r StreamMetabolizer, eval=FALSE}
 # Desoto dataframe setup
 desoto_longitude <- -94.964616
 # calculate solar time
@@ -1295,10 +1296,9 @@ plot_DO_preds(mm_bayes_desoto)
 # what if we estimate K first, then find GPP and ER with fixed K
 kmodel_name <- mm_name(type = "Kmodel", engine = "mean")
 kmodel_desoto <- metab_Kmodel(specs = kmodel_name, data = desoto_MetabData)
+```
 
-
-#########################################
-
+```{r MetabolismModel_HotchkissHall}
 # simpler hotchkiss & hall approach, let's start with steve [supp materials from lamberti textbook]
 
 # [1] load data, date and time must be in different columns
@@ -1372,7 +1372,7 @@ data.frame(
 # [6] combine metabolism data frame into one, while making sure dates match
 
 # need to combine steve_metab with steve_pressure, steve_depth, and PAR
-steve_metab$dateTime <- steve_metab$dateTime - dminutes(4)
+steve_metab$dateTime <- round_date(steve_metab$dateTime, "10 minutes") # round to nearest 10 min interval
 
 # merge
 steve_metab <- 
@@ -1497,12 +1497,14 @@ onestationplot <- function(GPP, ER, oxy, z, temp, K, light, bp, ts) {
 }
 
 # [8] run metabolism model
-
-# time period 2: Feb 20-22
 rivermetabK(o2file = steve_metab, z = mean(steve_metab$z), bp = mean(steve_metab$bp), 
             ts = 0.02083333)
 
-steve_metab[steve_metab$dateTime]
+# time period 2: Feb 20-22
+
+
+
+steve_metab$dateTime %between% c(ymd_hms("2018-02-20 00:00:00"), ymd_hms("2018-02-22 00:00:00"))
 
 ```
 
