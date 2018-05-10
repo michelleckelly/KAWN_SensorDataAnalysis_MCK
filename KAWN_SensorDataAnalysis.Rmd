@@ -11,25 +11,35 @@ output:
 ---
 
 ```{r setup, echo = FALSE, warning=FALSE, error=FALSE, message=FALSE}
+### Global options ###
 knitr::opts_chunk$set(fig.height = 8, 
                       fig.width = 10, 
                       cache=TRUE) # enable caching globally
 
+### General packages ###
 library(XML)
 library(lubridate)
 library(ggplot2)
 library(gridExtra)
 library(grid)
-library(dataRetrieval) # USGS
-library(wesanderson) # pallets
+library(dplyr)
+library(magrittr)
 library(zoo)
+library(wesanderson) # pallets
+library(chron)
+
+### USGS loading ###
+library(dataRetrieval)
+
+### NEON loading ###
 # library(devtools)
 # install_github("NEONScience/NEON-utilities/neonUtilities", dependencies = TRUE)
 library(neonUtilities)
+
+### Stream metabolism ###
 # install.packages("streamMetabolizer", dependencies = TRUE, repos = c("https://owi.usgs.gov/R", "https://cran.rstudio.com"))
 library(streamMetabolizer)
 library(rstan)
-library(dplyr)
 # install.packages("installr")
 # library("installr")
 # install.Rtools()
@@ -57,7 +67,7 @@ Data load = data is taken from local file
 
 ## Nitratax Data  
 
-### Data pull  
+### Data pull and cleanup  
 
 **Nitratax_XMLtoCSV:** Function to convert raw-from-sensor .xml file to more convenient .csv file  
 ```{r Nitratax_XMLtoCSV, include=FALSE}
@@ -109,8 +119,8 @@ Nitratax_XMLtoCSV <- function(filename, sensor, deployDate){
 }
 ```
 
-Import of Nitratax data into R environment
-```{r NitrataxLoading, include=FALSE}
+Import of Nitratax data into R environment, cleanup
+```{r NitrataxLoadingCleanup, include=FALSE}
 # Variable descriptions:    
       # loadfromCSV = logical vector, if TRUE data will be loaded from .csv files
                                     # if FALSE data will be converted from .xml to .csv
@@ -154,15 +164,6 @@ if (loadfromCSV == FALSE) {
   
   cat("data loaded from .xml file")
   
-}
-```
-
-### Data cleanup  
-
-Cleanup of Nitratax data files
-```{r NitrataxCleanup, include=FALSE}
-if (loadfromCSV == FALSE){
-  
   # Eric sensor was buried under sediment from 05-Mar to 15-Mar, setting these measurements to NA
   dateSedimentStartEric <- lubridate::as_datetime("2018-03-05 11:00:00")
   dateSedimentEndEric <- lubridate::as_datetime("2018-03-15 00:00:00")
@@ -179,7 +180,6 @@ if (loadfromCSV == FALSE){
   steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time`>=dateSedimentStartSteve 
                                            & 
                                              steve_N$`Date and time`<=dateSedimentEndSteve] <- NA
-
 }
 ```
 
@@ -331,6 +331,7 @@ downloadNEONfiles <- FALSE
 if (downloadNEONfiles == TRUE){
   dir.create(paste0(getwd(), "/NEONfiles"))
   
+  ######## PAR ############
   getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
            year_month = "2018-02", package = "basic",
            savepath = paste(getwd(), "NEONfiles", sep = "/")) # Feb at KU field station
@@ -344,19 +345,48 @@ if (downloadNEONfiles == TRUE){
                filepath = paste0(getwd(), "/NEONfiles"), 
                savepath = paste0(getwd(), "/NEONfiles"), 
                folder = TRUE)
+  
+  ######## Barometric pressure ############
+  getPackage(dpID = "DP1.00004.001", site_code = "UKFS",
+           year_month = "2018-02", package = "basic",
+           savepath = paste(getwd(), "NEONfiles", sep = "/")) # Feb at KU field station
+  getPackage(dpID = "DP1.00004.001", site_code = "UKFS",
+           year_month = "2018-03", package = "basic",
+           savepath = paste(getwd(), "NEONfiles", sep = "/")) # March
+  #getPackage(dpID = "DP1.00004.001", site_code = "UKFS",
+           #year_month = "2018-04", package = "basic",
+           #savepath = paste(getwd(), "NEONfiles", sep = "/")) # April
+  stackByTable(dpID = "DP1.00004.001", 
+               filepath = paste0(getwd(), "/NEONfiles"), 
+               savepath = paste0(getwd(), "/NEONfiles"), 
+               folder = TRUE)
 }
 
 PAR <- read.csv(file = paste0(getwd(), "/NEONfiles", "/stackedFiles", 
                               "/PARPAR_30min.csv"), header = TRUE)
-
-# data cleanup
 PAR <- subset(PAR, subset = PAR$verticalPosition == 10) # take measurements that are closest to ground
-
-PAR <- PAR[,-c(1:4, 6, 11:22)] #drop unneccess columns
-PAR$startDateTime <- ymd_hms(PAR$startDateTime)
-tz(PAR$startDateTime) <- "America/Chicago"
+PAR$startDateTime <- ymd_hms(PAR$startDateTime, tz = "America/Chicago")
+PAR <- data.frame(
+    dateTime = PAR$startDateTime,
+    mean = PAR$PARMean,
+    min = PAR$PARMinimum,
+    max = PAR$PARMaximum,
+    var = PAR$PARVariance
+)
 
 # PAR units are micromoles per m^2 per second
+
+#### Barometric pressure
+BarPress <- read.csv(file = paste0(getwd(), "/NEONfiles", "/stackedFiles", 
+                              "/BP_30min.csv"), header = TRUE)
+BarPress$startDateTime <- ymd_hms(BarPress$startDateTime, tz = "America/Chicago")
+BarPress <- data.frame(
+  dateTime = BarPress$startDateTime,
+  mean = BarPress$staPresMean,
+  min = BarPress$staPresMinimum,
+  max = BarPress$staPresMaximum,
+  var = BarPress$staPresVariance
+)
 ```
 
 ***  
@@ -1265,5 +1295,63 @@ plot_DO_preds(mm_bayes_desoto)
 # what if we estimate K first, then find GPP and ER with fixed K
 kmodel_name <- mm_name(type = "Kmodel", engine = "mean")
 kmodel_desoto <- metab_Kmodel(specs = kmodel_name, data = desoto_MetabData)
+
+
+#########################################
+
+# simpler hotchkiss & hall approach, let's start with steve [supp materials from lamberti textbook]
+
+# [1] load data, date and time must be in different columns
+
+steve_metab <- 
+as.data.frame(
+  ymd_hms(steve_DO$time_CST, tz = "America/Chicago")
+)
+names(steve_metab) <- "Date"
+
+# [2] calculate oxygen saturation at temperature (the minidot already does this)
+osat<- function(temp, bp) {
+	
+	tstd<-log((298.15-temp) / (273.15 + temp))
+	
+	a0<-2.00907
+	a1<-3.22014
+	a2<-4.0501
+	a3<-4.94457
+	a4<- -0.256847
+	a5<- 3.88767
+	
+	u<-10^(8.10765-(1750.286/(235+temp)))
+	
+	sato<-(exp(a0 + a1*tstd + a2*tstd^2 + a3*tstd^3 + a4*tstd^4+a5*tstd^5))*((bp-u)/(760-u))*1.42905
+	sato
+}
+
+steve_metab$DOsat <- steve_DO$DO_sat
+steve_metab$DOmgL <- steve_DO$DO_mgL
+steve_metab$temp <- steve_DO$temp_C
+
+# [3] calculate barometric pressure
+
+## Function to correct barometric pressure for altitude. From Colt (2012).
+## This function gives bp in mmHg for altitude given nearby measurement of standardized barometric pressure. 
+	## temp is degC 
+	## alt is m
+	## bpst is in inches of Hg and the sort of data you will find from U.S. weather stations.  Delete the *25.4 if you in the rest of the world where pressure is given in metric units
+####function returns mm of Hg
+bpcalc<- function(bpst, alt) {
+  bpst*25.4*exp((-9.80665*0.0289644*alt)/(8.31447*(273.15+15)))
+}
+
+steve_alt <- 249.02 # m
+BarPress$mean_steve <- bpcalc(bpst = BarPress$mean, alt = steve_alt)
+
+# [4] load gas exchange (K) functions
+
+## This code estimates K600 for KO2 at a given temperature. From Wanninkhof (1992).
+K600fromO2<-function (temp, KO2) {
+    ((600/(1800.6 - (120.1 * temp) + (3.7818 * temp^2) - (0.047608 * temp^3)))^-0.5) * KO2
+}
+steve_metab$K600 <- K600fromO2(temp = )
 ```
 
