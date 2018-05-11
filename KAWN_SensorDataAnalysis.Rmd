@@ -166,8 +166,8 @@ if (loadfromCSV == FALSE) {
   cat("data loaded from .xml file")
   
   # Eric sensor was buried under sediment from 05-Mar to 15-Mar, setting these measurements to NA
-  dateSedimentStartEric <- lubridate::as_datetime("2018-03-05 11:00:00")
-  dateSedimentEndEric <- lubridate::as_datetime("2018-03-15 00:00:00")
+  dateSedimentStartEric <- ymd_hms("2018-03-05 11:00:00", tz = "America/Chicago")
+  dateSedimentEndEric <- ymd_hms("2018-03-15 11:00:00", tz = "America/Chicago")
   eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` >= dateSedimentStartEric 
                                           & 
                                             eric_N$`Date and time` <= dateSedimentEndEric] <- NA
@@ -197,12 +197,111 @@ steve_DO <- read.table(file = "miniDOT_Steve_Pulled04-20-2018.txt", header = TRU
                        col.names = c("unixTimestamp", "time_UTC", "time_CST", "battery_V",
                                      "temp_C", "DO_mgL", "DO_sat", "Q"))
 
-eric_DO <- read.table(file = "miniDOT_Eric_Pulled04-04-2018.txt", header = TRUE,
+eric_DO <- read.table(file = "miniDOT_Eric_Pulled05-07-2018.txt", header = TRUE,
                        sep = ",", skip = 8, stringsAsFactors = FALSE,
                        colClasses = c("numeric", "POSIXct", "POSIXct", "numeric",
                                       "numeric", "numeric", "numeric", "numeric"),
                        col.names = c("unixTimestamp", "time_UTC", "time_CST", "battery_V",
                                      "temp_C", "DO_mgL", "DO_sat", "Q"))
+
+# Eric DO cleanup
+# 19 - 25 Feb
+eric_DO$DO_mgL[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-02-19 10:38:00", tz = "America/Chicago"),
+                   ymd_hms("2018-02-25 01:28:00", tz = "America/Chicago"))] <- NA
+eric_DO$temp_C[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-02-19 10:38:00", tz = "America/Chicago"),
+                   ymd_hms("2018-02-25 01:28:00", tz = "America/Chicago"))] <- NA
+# 5 - 15 Mar
+eric_DO$DO_mgL[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-03-05 09:58:00", tz = "America/Chicago"),
+                   ymd_hms("2018-03-15 11:08:00", tz = "America/Chicago"))] <- NA
+eric_DO$temp_C[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-03-05 09:58:00", tz = "America/Chicago"),
+                   ymd_hms("2018-03-15 11:08:00", tz = "America/Chicago"))] <- NA
+# 28 Mar
+eric_DO$DO_mgL[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-03-28 04:25:00", tz = "America/Chicago"),
+                   ymd_hms("2018-03-28 21:25:00", tz = "America/Chicago"))] <- NA
+eric_DO$temp_C[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-03-28 04:25:00", tz = "America/Chicago"),
+                   ymd_hms("2018-03-28 21:25:00", tz = "America/Chicago"))] <- NA
+# 30 Mar - 5 Apr
+eric_DO$DO_mgL[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-03-30 23:35:00", tz = "America/Chicago"),
+                   ymd_hms("2018-04-05 12:00:00", tz = "America/Chicago"))] <- NA
+eric_DO$temp_C[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-03-30 23:35:00", tz = "America/Chicago"),
+                   ymd_hms("2018-04-05 12:00:00", tz = "America/Chicago"))] <- NA
+# 14-18 Apr
+eric_DO$DO_mgL[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-04-14 12:23:00", tz = "America/Chicago"),
+                   ymd_hms("2018-04-18 00:00:00", tz = "America/Chicago"))] <- NA
+eric_DO$temp_C[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-04-14 12:23:00", tz = "America/Chicago"),
+                   ymd_hms("2018-04-18 00:00:00", tz = "America/Chicago"))] <- NA
+# 25-30 Apr
+eric_DO$DO_mgL[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-04-25 19:33:00", tz = "America/Chicago"),
+                   ymd_hms("2018-04-30 15:53:00", tz = "America/Chicago"))] <- NA
+eric_DO$temp_C[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-04-25 19:33:00", tz = "America/Chicago"),
+                   ymd_hms("2018-04-30 15:53:00", tz = "America/Chicago"))] <- NA
+
+# Steve
+# 30 Jan
+steve_DO$DO_mgL[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-01-30 15:24:00", tz = "America/Chicago"),
+                  ymd_hms("2018-01-30 16:54:00", tz = "America/Chicago"))] <- NA
+steve_DO$temp_C[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-01-30 15:24:00", tz = "America/Chicago"),
+                  ymd_hms("2018-01-30 16:54:00", tz = "America/Chicago"))] <- NA
+# 9-12 Mar
+steve_DO$DO_mgL[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-03-09 17:17:00", tz = "America/Chicago"),
+                  ymd_hms("2018-03-12 10:47:00", tz = "America/Chicago"))] <- NA
+steve_DO$temp_C[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-03-09 17:17:00", tz = "America/Chicago"),
+                  ymd_hms("2018-03-12 10:47:00", tz = "America/Chicago"))] <- NA
+# 13 Mar
+steve_DO$DO_mgL[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-03-13 05:09:00", tz = "America/Chicago"),
+                  ymd_hms("2018-03-13 08:49:00", tz = "America/Chicago"))] <- NA
+steve_DO$temp_C[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-03-13 05:09:00", tz = "America/Chicago"),
+                  ymd_hms("2018-03-13 08:49:00", tz = "America/Chicago"))] <- NA
+# 19-20 Mar
+steve_DO$DO_mgL[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-04-19 23:37:00", tz = "America/Chicago"),
+                  ymd_hms("2018-04-20 08:17:00", tz = "America/Chicago"))] <- NA
+steve_DO$temp_C[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-04-19 23:37:00", tz = "America/Chicago"),
+                  ymd_hms("2018-04-20 08:17:00", tz = "America/Chicago"))] <- NA
+
+
+plot(y = steve_DO$DO_mgL, x = steve_DO$time_CST)
+
+
 
 ```
 
@@ -1551,16 +1650,28 @@ eric_metab <-
 
 # [7] run metabolism model
 steve_metab_output <- rivermetabK(o2file = steve_metab, 
-                                  z = mean(steve_metab$z), 
-                                  bp = mean(steve_metab$bp), 
+                                  z = mean(steve_metab$z, na.rm = TRUE), 
+                                  bp = mean(steve_metab$bp, na.rm = TRUE), 
                                   ts = 0.02083333)
 steve_metab_output
 
+# omit sensor burial days, will have to play with this
 eric_metab_output <- rivermetabK(o2file = eric_metab, 
-                                  z = mean(eric_metab$z), 
-                                  bp = mean(eric_metab$bp), 
+                                  z = mean(eric_metab$z, na.rm = TRUE), 
+                                  bp = mean(eric_metab$bp, na.rm = TRUE), 
                                   ts = 0.02083333)
 eric_metab_output
+
+# time period 1: Feb 3-6
+steve_metab_period1 <- steve_metab[steve_metab$dateTime 
+                             %between% 
+                               c(ymd_hms("2018-02-03 00:00:00", tz = "America/Chicago"),
+                                 ymd_hms("2018-02-05 00:00:00", tz = "America/Chicago")),]
+steve_metab_output_period1 <- rivermetabK(o2file = steve_metab_period1, 
+                                          z = mean(steve_metab_period1$z, na.rm = TRUE), 
+                                          bp = mean(steve_metab_period1$bp), 
+                                          ts = 0.02083333)
+steve_metab_output_period1
 
 # time period 2: Feb 20-22
 steve_metab_period2 <- steve_metab[steve_metab$dateTime 
