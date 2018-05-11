@@ -1298,15 +1298,8 @@ kmodel_name <- mm_name(type = "Kmodel", engine = "mean")
 kmodel_desoto <- metab_Kmodel(specs = kmodel_name, data = desoto_MetabData)
 ```
 
-```{r MetabolismModel_HotchkissHall}
+```{r MetabolismModel_HotchkissHall_Equations}
 # simpler hotchkiss & hall approach, let's start with steve [supp materials from lamberti textbook]
-
-# [1] load data, date and time must be in different columns
-
-steve_metab <- 
-data.frame(
-  dateTime = ymd_hms(steve_DO$time_CST, tz = "America/Chicago")
-)
 
 # [2] calculate oxygen saturation at temperature (the minidot already does this)
 osat<- function(temp, bp) {
@@ -1326,9 +1319,6 @@ osat<- function(temp, bp) {
 	sato
 }
 
-steve_metab$DOmgL <- steve_DO$DO_mgL
-steve_metab$temp <- steve_DO$temp_C
-
 # [3] calculate barometric pressure
 
 ## Function to correct barometric pressure for altitude. From Colt (2012).
@@ -1341,13 +1331,6 @@ bpcalc<- function(bpst, alt) {
   bpst*25.4*exp((-9.80665*0.0289644*alt)/(8.31447*(273.15+15)))
 }
 
-steve_alt <- 249.02 # m
-steve_pressure <- 
-data.frame(
-  dateTime = BarPress$dateTime,
-  mean_pressure = bpcalc(bpst = BarPress$mean, alt = steve_alt)
-)
-
 # [4] load gas exchange (K) functions
 
 ## This code estimates K600 for KO2 at a given temperature. From Wanninkhof (1992).
@@ -1355,48 +1338,7 @@ K600fromO2<-function (temp, KO2) {
     ((600/(1800.6 - (120.1 * temp) + (3.7818 * temp^2) - (0.047608 * temp^3)))^-0.5) * KO2
 }
 
-steve_metab$K600 <- K600fromO2(temp = steve_metab$temp, KO2 = steve_metab$DOmgL)
-
-# [5] depth
-#     using streamMetabolizer package and desoto discharge data here. this won't be entirely accurate.
-# estimate stream depth from discharge data
-  # using d = c*Q^f Leopold and Maddock 1953
-  # default values for c and f as suggested in Raymond et al 2012
-      # c = 0.409 m, f = 0.294 **verify if these are representative of Kaw
-steve_depth <- 
-data.frame(
-  dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago"),
-  steve_z = calc_depth(desoto$Flow_Inst)
-)
-
-# [6] combine metabolism data frame into one, while making sure dates match
-
-# need to combine steve_metab with steve_pressure, steve_depth, and PAR
-steve_metab$dateTime <- round_date(steve_metab$dateTime, "10 minutes") # round to nearest 10 min interval
-
-# merge
-steve_metab <- 
-  merge(steve_metab,
-        steve_pressure,
-        by = "dateTime")
-steve_metab <- 
-  merge(steve_metab,
-        steve_depth,
-        by = "dateTime")
-steve_metab <- 
-  merge(steve_metab,
-        PAR,
-        by = "dateTime")
-steve_metab <- 
-  data.frame(dateTime = steve_metab$dateTime,
-             oxy = steve_metab$DOmgL,
-             temp = steve_metab$temp,
-             K600 = steve_metab$K600,
-             bp = steve_metab$mean_pressure,
-             z = steve_metab$steve_z,
-             light = steve_metab$mean)
-
-# [7] load river metabolism function 
+# [5] load river metabolism function 
 
 # parameter names (and units)
 	# oxy.mod = modeled O2 (mg/L)
@@ -1495,16 +1437,181 @@ onestationplot <- function(GPP, ER, oxy, z, temp, K, light, bp, ts) {
        cex.lab=1.5, cex.axis=1.5, lwd=2)
   points(seq(1:length(oxy)), oxy)
 }
-
-# [8] run metabolism model
-rivermetabK(o2file = steve_metab, z = mean(steve_metab$z), bp = mean(steve_metab$bp), 
-            ts = 0.02083333)
-
-# time period 2: Feb 20-22
-
-
-
-steve_metab$dateTime %between% c(ymd_hms("2018-02-20 00:00:00"), ymd_hms("2018-02-22 00:00:00"))
-
 ```
 
+```{r MetabolismModel_HotchkissHall_Evaluation}
+# [1] load data, date and time must be in different columns
+
+steve_metab <- 
+data.frame(
+  dateTime = ymd_hms(steve_DO$time_CST, tz = "America/Chicago")
+)
+
+eric_metab <- 
+data.frame(
+  dateTime = ymd_hms(eric_DO$time_CST, tz = "America/Chicago")
+)
+
+# [2] calculate oxygen saturation at temperature (the minidot already does this)
+
+steve_metab$DOmgL <- steve_DO$DO_mgL
+steve_metab$temp <- steve_DO$temp_C
+
+eric_metab$DOmgL <- eric_DO$DO_mgL
+eric_metab$temp <- eric_DO$temp_C
+
+# [3] calculate barometric pressure
+
+steve_alt <- 249.02 # m
+steve_pressure <- 
+data.frame(
+  dateTime = BarPress$dateTime,
+  mean_pressure = bpcalc(bpst = BarPress$mean, alt = steve_alt)
+)
+
+eric_alt <- 246.89 # m
+eric_pressure <- 
+data.frame(
+  dateTime = BarPress$dateTime,
+  mean_pressure = bpcalc(bpst = BarPress$mean, alt = eric_alt)
+)
+
+# [4] load gas exchange (K) functions
+
+steve_metab$K600 <- K600fromO2(temp = steve_metab$temp, KO2 = steve_metab$DOmgL)
+
+eric_metab$K600 <- K600fromO2(temp = eric_metab$temp, KO2 = eric_metab$DOmgL)
+
+# [5] depth
+#     using streamMetabolizer package and desoto discharge data here. this won't be entirely accurate.
+# estimate stream depth from discharge data
+  # using d = c*Q^f Leopold and Maddock 1953
+  # default values for c and f as suggested in Raymond et al 2012
+      # c = 0.409 m, f = 0.294 **verify if these are representative of Kaw
+steve_depth <- 
+data.frame(
+  dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago"),
+  steve_z = calc_depth(desoto$Flow_Inst)
+)
+
+eric_depth <- 
+data.frame(
+  dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago"),
+  eric_z = calc_depth(desoto$Flow_Inst)
+)
+
+# [6] combine metabolism data frame into one, while making sure dates match
+
+# need to combine steve_metab with steve_pressure, steve_depth, and PAR
+steve_metab$dateTime <- round_date(steve_metab$dateTime, "10 minutes") # round to nearest 10 min interval
+eric_metab$dateTime <- round_date(eric_metab$dateTime, "10 minutes") 
+
+# merge
+steve_metab <- 
+  merge(steve_metab,
+        steve_pressure,
+        by = "dateTime")
+steve_metab <- 
+  merge(steve_metab,
+        steve_depth,
+        by = "dateTime")
+steve_metab <- 
+  merge(steve_metab,
+        PAR,
+        by = "dateTime")
+steve_metab <- 
+  data.frame(dateTime = steve_metab$dateTime,
+             oxy = steve_metab$DOmgL,
+             temp = steve_metab$temp,
+             K600 = steve_metab$K600,
+             bp = steve_metab$mean_pressure,
+             z = steve_metab$steve_z,
+             light = steve_metab$mean)
+
+eric_metab <- 
+  merge(eric_metab,
+        eric_pressure,
+        by = "dateTime")
+eric_metab <- 
+  merge(eric_metab,
+        eric_depth,
+        by = "dateTime")
+eric_metab <- 
+  merge(eric_metab,
+        PAR,
+        by = "dateTime")
+eric_metab <- 
+  data.frame(dateTime = eric_metab$dateTime,
+             oxy = eric_metab$DOmgL,
+             temp = eric_metab$temp,
+             K600 = eric_metab$K600,
+             bp = eric_metab$mean_pressure,
+             z = eric_metab$eric_z,
+             light = eric_metab$mean)
+
+# [7] run metabolism model
+steve_metab_output <- rivermetabK(o2file = steve_metab, 
+                                  z = mean(steve_metab$z), 
+                                  bp = mean(steve_metab$bp), 
+                                  ts = 0.02083333)
+steve_metab_output
+
+eric_metab_output <- rivermetabK(o2file = eric_metab, 
+                                  z = mean(eric_metab$z), 
+                                  bp = mean(eric_metab$bp), 
+                                  ts = 0.02083333)
+eric_metab_output
+
+# time period 2: Feb 20-22
+steve_metab_period2 <- steve_metab[steve_metab$dateTime 
+                             %between% 
+                               c(ymd_hms("2018-02-20 00:00:00", tz = "America/Chicago"),
+                                 ymd_hms("2018-02-22 00:00:00", tz = "America/Chicago")),]
+steve_metab_output_period2 <- rivermetabK(o2file = steve_metab_period2, 
+                                          z = mean(steve_metab_period2$z), 
+                                          bp = mean(steve_metab_period2$bp), 
+                                          ts = 0.02083333)
+steve_metab_output_period2
+
+eric_metab_period2 <- eric_metab[eric_metab$dateTime 
+                             %between% 
+                               c(ymd_hms("2018-02-20 00:00:00", tz = "America/Chicago"),
+                                 ymd_hms("2018-02-22 00:00:00", tz = "America/Chicago")),]
+eric_metab_output_period2 <- rivermetabK(o2file = eric_metab_period2, 
+                                          z = mean(eric_metab_period2$z), 
+                                          bp = mean(eric_metab_period2$bp), 
+                                          ts = 0.02083333)
+eric_metab_output_period2
+
+# time period 3: Mar 22-25
+steve_metab_period3 <- steve_metab[steve_metab$dateTime 
+                             %between% 
+                               c(ymd_hms("2018-03-22 00:00:00", tz = "America/Chicago"),
+                                 ymd_hms("2018-03-25 00:00:00", tz = "America/Chicago")),]
+steve_metab_output_period3 <- rivermetabK(o2file = steve_metab_period3, 
+                                          z = mean(steve_metab_period3$z), 
+                                          bp = mean(steve_metab_period3$bp), 
+                                          ts = 0.02083333)
+steve_metab_output_period3
+
+eric_metab_period3 <- eric_metab[eric_metab$dateTime 
+                             %between% 
+                               c(ymd_hms("2018-03-22 00:00:00", tz = "America/Chicago"),
+                                 ymd_hms("2018-03-25 00:00:00", tz = "America/Chicago")),]
+eric_metab_output_period3 <- rivermetabK(o2file = eric_metab_period3, 
+                                          z = mean(eric_metab_period3$z), 
+                                          bp = mean(eric_metab_period3$bp), 
+                                          ts = 0.02083333)
+eric_metab_output_period3
+
+# time period 5: Apr 11-13 - dont yet have neon PAR for april!!
+steve_metab_period5 <- steve_metab[steve_metab$dateTime 
+                             %between% 
+                               c(ymd_hms("2018-04-11 00:00:00", tz = "America/Chicago"),
+                                 ymd_hms("2018-04-13 00:00:00", tz = "America/Chicago")),]
+steve_metab_output_period5 <- rivermetabK(o2file = steve_metab_period5, 
+                                          z = mean(steve_metab_period5$z), 
+                                          bp = mean(steve_metab_period5$bp), 
+                                          ts = 0.02083333)
+steve_metab_output_period5
+```
