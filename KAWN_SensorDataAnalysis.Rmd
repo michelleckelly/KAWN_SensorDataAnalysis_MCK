@@ -189,7 +189,7 @@ if (loadfromCSV == FALSE) {
 ## miniDOT Data  
 
 Loading miniDOT sensor files: dissolved oxygen and temperature data  
-```{r DOloading, include=FALSE}
+```{r DOloadingCleanup, include=FALSE}
 steve_DO <- read.table(file = "miniDOT_Steve_Pulled04-20-2018.txt", header = TRUE,
                        sep = ",", skip = 8, stringsAsFactors = FALSE,
                        colClasses = c("numeric", "POSIXct", "POSIXct", "numeric",
@@ -297,12 +297,6 @@ steve_DO$temp_C[steve_DO$time_CST
                 %between% 
                 c(ymd_hms("2018-04-19 23:37:00", tz = "America/Chicago"),
                   ymd_hms("2018-04-20 08:17:00", tz = "America/Chicago"))] <- NA
-
-
-plot(y = steve_DO$DO_mgL, x = steve_DO$time_CST)
-
-
-
 ```
 
 ***
@@ -350,6 +344,7 @@ ft_m <- function(ft){
 }
 desoto$Flow_Inst <- ft3s_m3s(desoto$Flow_Inst)
 desoto$GH_Inst <- ft_m(desoto$GH_Inst)
+
 ```
 
 Pulling data from USGS stream gauge at Lawrence, for finding water balance
@@ -1649,80 +1644,47 @@ eric_metab <-
              light = eric_metab$mean)
 
 # [7] run metabolism model
-steve_metab_output <- rivermetabK(o2file = steve_metab, 
+steve_metab_output <- rivermetabK(o2file = na.omit(steve_metab), 
                                   z = mean(steve_metab$z, na.rm = TRUE), 
                                   bp = mean(steve_metab$bp, na.rm = TRUE), 
                                   ts = 0.02083333)
 steve_metab_output
 
-# omit sensor burial days, will have to play with this
-eric_metab_output <- rivermetabK(o2file = eric_metab, 
+eric_metab_output <- rivermetabK(o2file = na.omit(eric_metab), 
                                   z = mean(eric_metab$z, na.rm = TRUE), 
                                   bp = mean(eric_metab$bp, na.rm = TRUE), 
                                   ts = 0.02083333)
 eric_metab_output
 
-# time period 1: Feb 3-6
-steve_metab_period1 <- steve_metab[steve_metab$dateTime 
-                             %between% 
-                               c(ymd_hms("2018-02-03 00:00:00", tz = "America/Chicago"),
-                                 ymd_hms("2018-02-05 00:00:00", tz = "America/Chicago")),]
-steve_metab_output_period1 <- rivermetabK(o2file = steve_metab_period1, 
-                                          z = mean(steve_metab_period1$z, na.rm = TRUE), 
-                                          bp = mean(steve_metab_period1$bp), 
-                                          ts = 0.02083333)
-steve_metab_output_period1
+# function to subset metabolism data and run model for specific time period
+metab_timeperiods <- function(metab_dataframe, startTime, endTime){
+  metab_timeperiod_subsection <- metab_dataframe[metab_dataframe$dateTime 
+                                                 %between% 
+                                                   c(ymd_hms(startTime, tz = "America/Chicago"),
+                                                     ymd_hms(endTime, tz = "America/Chicago")),]
+  metab_output <- rivermetabK(o2file = metab_timeperiod_subsection,
+                              z = mean(metab_timeperiod_subsection$z, na.rm = TRUE),
+                              bp = mean(metab_timeperiod_subsection$bp, na.rm = TRUE),
+                              ts = 0.02083333)
+  return(metab_output)
+}
 
-# time period 2: Feb 20-22
-steve_metab_period2 <- steve_metab[steve_metab$dateTime 
-                             %between% 
-                               c(ymd_hms("2018-02-20 00:00:00", tz = "America/Chicago"),
-                                 ymd_hms("2018-02-22 00:00:00", tz = "America/Chicago")),]
-steve_metab_output_period2 <- rivermetabK(o2file = steve_metab_period2, 
-                                          z = mean(steve_metab_period2$z), 
-                                          bp = mean(steve_metab_period2$bp), 
-                                          ts = 0.02083333)
-steve_metab_output_period2
+# steve: Feb 3-6
+metab_timeperiods(steve_metab, "2018-02-03 00:00:00", "2018-02-05 00:00:00")
 
-eric_metab_period2 <- eric_metab[eric_metab$dateTime 
-                             %between% 
-                               c(ymd_hms("2018-02-20 00:00:00", tz = "America/Chicago"),
-                                 ymd_hms("2018-02-22 00:00:00", tz = "America/Chicago")),]
-eric_metab_output_period2 <- rivermetabK(o2file = eric_metab_period2, 
-                                          z = mean(eric_metab_period2$z), 
-                                          bp = mean(eric_metab_period2$bp), 
-                                          ts = 0.02083333)
-eric_metab_output_period2
+# steve: Feb 20 - 22
+metab_timeperiods(steve_metab, "2018-02-20 00:00:00", "2018-02-22 00:00:00")
 
-# time period 3: Mar 22-25
-steve_metab_period3 <- steve_metab[steve_metab$dateTime 
-                             %between% 
-                               c(ymd_hms("2018-03-22 00:00:00", tz = "America/Chicago"),
-                                 ymd_hms("2018-03-25 00:00:00", tz = "America/Chicago")),]
-steve_metab_output_period3 <- rivermetabK(o2file = steve_metab_period3, 
-                                          z = mean(steve_metab_period3$z), 
-                                          bp = mean(steve_metab_period3$bp), 
-                                          ts = 0.02083333)
-steve_metab_output_period3
+# eric needs a different time period, but close to this one in feb
+metab_timeperiods(eric_metab, "2018-02-20 00:00:00", "2018-02-22 00:00:00")
 
-eric_metab_period3 <- eric_metab[eric_metab$dateTime 
-                             %between% 
-                               c(ymd_hms("2018-03-22 00:00:00", tz = "America/Chicago"),
-                                 ymd_hms("2018-03-25 00:00:00", tz = "America/Chicago")),]
-eric_metab_output_period3 <- rivermetabK(o2file = eric_metab_period3, 
-                                          z = mean(eric_metab_period3$z), 
-                                          bp = mean(eric_metab_period3$bp), 
-                                          ts = 0.02083333)
-eric_metab_output_period3
+# steve: Mar 22-25
+metab_timeperiods(steve_metab, "2018-03-22 00:00:00", "2018-03-25 00:00:00")
 
-# time period 5: Apr 11-13 - dont yet have neon PAR for april!!
-steve_metab_period5 <- steve_metab[steve_metab$dateTime 
-                             %between% 
-                               c(ymd_hms("2018-04-11 00:00:00", tz = "America/Chicago"),
-                                 ymd_hms("2018-04-13 00:00:00", tz = "America/Chicago")),]
-steve_metab_output_period5 <- rivermetabK(o2file = steve_metab_period5, 
-                                          z = mean(steve_metab_period5$z), 
-                                          bp = mean(steve_metab_period5$bp), 
-                                          ts = 0.02083333)
-steve_metab_output_period5
+# eric: Mar 22-25
+metab_timeperiods(eric_metab, "2018-03-22 00:00:00", "2018-03-25 00:00:00")
+
+# steve: Apr 11-13 (dont have april PAR)
+metab_timeperiods(steve_metab, "2018-04-11 00:00:00", "2018-04-13 00:00:00") 
+
 ```

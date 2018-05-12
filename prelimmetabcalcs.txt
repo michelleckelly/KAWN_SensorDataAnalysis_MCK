@@ -1,0 +1,51 @@
+Assumption questions: 
+	depth - at the sensor site, or average across the channel?, 
+			this calc uses one measure for depth
+
+(discharge) eric
+
+	over all time points: 
+		GPP 	= 	176.9531	(g O2 m-2 d-1, O2 production)
+		ER 	= 	-157.6489	(g O2 m-2 d-1, O2 consumption)
+		K600 	= 	5.761103	(d-1)
+		-log(L) = 	1528.924	(log likelhood, higher values are better)
+	
+	Feb 20 - 22: (fit not good, no diel O2 pattern, think sensor buried here)
+		GPP	=	-0.008699238
+		ER	=	-0.2545678
+		K600	=	0.00652792
+		-log(L)	=	-402.0636
+
+	Mar 22 - 25:
+		GPP	=	28.94987
+		ER	=	-210.9823
+		K600	=	8.186919
+		-log(L)	=	157.414
+
+
+(5 km downstream of discharge) steve
+	
+	over all time points:
+		GPP 	= 	438.2068			
+		ER 	= 	-226.2747				
+		K600 	= 	8.568494				
+		-log(L) = 	3645.414	
+
+	Feb 03 - 06:
+		GPP	=	15.27836
+		ER	=	-215.5051
+		K600	=	7.515591
+		-log(L)	=	72.66157
+
+	Feb 20 - 22:
+		GPP	=	13.04918
+		ER	=	-177.6009
+		K600	=	6.594199
+		-log(L)	=	57.06684
+
+	Mar 22 - 25:
+		GPP	=	37.93233
+		ER	=	-265.7307
+		K600	=	10.47112
+		-log(L)	=	178.6169
+	
