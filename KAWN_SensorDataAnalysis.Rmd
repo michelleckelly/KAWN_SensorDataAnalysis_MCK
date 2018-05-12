@@ -1465,7 +1465,7 @@ rivermetabK<-function(o2file, z, bp, ts){
 
   river.mle<-nlm(onestationmleK, p=c(3,-5, 10), 
                  oxy=oxy, z=z, temp=temp, 
-                 light=light, bp=bp, ts=ts, print.level = 2)
+                 light=light, bp=bp, ts=ts)
 
   ##plot modeled and measaured O2 given MLE estimates of GPP, ER, and K600.  It calls a function below onestationplot()
 
@@ -1473,11 +1473,9 @@ rivermetabK<-function(o2file, z, bp, ts){
                  ER = river.mle$estimate[2],
                  oxy=oxy, z=z, temp=temp, light=light, 
                  K=river.mle$estimate[3], bp=bp, ts=ts)
-  mle_estimates
   
   ##return GPP, ER, K600, and MLE values
-	b <- list(GPP = river.mle$estimate[1], 
-	          GPP_SE = sd(river.mle$estimate[1])/sqrt(river.mle$iterations),
+	b <- list(GPP = river.mle$estimate[1],
 	          ER = river.mle$estimate[2], 
 	          K600 = river.mle$estimate[3], 
 	          neglogL = river.mle$minimum[1])
@@ -1686,22 +1684,64 @@ metab_timeperiods <- function(metab_dataframe, startTime, endTime){
   return(metab_output)
 }
 
-# steve: Feb 3-6
-metab_timeperiods(steve_metab, "2018-02-03 00:00:00", "2018-02-05 00:00:00")
+# eric
+metabmodels_eric <- 
+  list(
+    feb_26 = metab_timeperiods(eric_metab, "2018-02-25 02:00:00", "2018-02-27 02:00:00"), # Feb 25-27
+    mar_03 = metab_timeperiods(eric_metab, "2018-03-03 09:30:00", "2018-03-05 09:30:00"), # Mar 2-4
+    mar_23 = metab_timeperiods(eric_metab, "2018-03-22 00:00:00", "2018-03-24 00:00:00") # Mar 22-24
+    )
+metabmodels_eric_results <- 
+  data.frame(
+    GPP = t(as.data.frame(lapply(metabmodels_eric, `[[`, 1))),
+    ER = t(as.data.frame(lapply(metabmodels_eric, `[[`, 2)))
+  )
+metabmodels_eric_results$date <- strptime(row.names(metabmodels_eric_results), format = "%b_%d")
 
-# steve: Feb 20 - 22
-metab_timeperiods(steve_metab, "2018-02-20 00:00:00", "2018-02-22 00:00:00")
+# steve
+metabmodels_steve <- 
+  list(
+    feb_05 = metab_timeperiods(steve_metab, "2018-02-04 00:00:00", "2018-02-06 00:00:00"), # Feb 4-6
+    feb_12 = metab_timeperiods(steve_metab, "2018-02-11 00:00:00", "2018-02-13 00:00:00"), # Feb 11-13
+    feb_21 = metab_timeperiods(steve_metab, "2018-02-20 00:00:00", "2018-02-22 00:00:00"), # Feb 20-22
+    feb_26 = metab_timeperiods(steve_metab, "2018-02-25 02:00:00", "2018-02-27 02:00:00"), # Feb 25-27
+    mar_03 = metab_timeperiods(steve_metab, "2018-03-02 09:30:00", "2018-03-04 09:30:00"), # Mar 2-4
+    mar_08 = metab_timeperiods(steve_metab, "2018-03-07 17:00:00", "2018-03-09 17:00:00"), # Mar 7-9
+    mar_14 = metab_timeperiods(steve_metab, "2018-03-13 09:00:00", "2018-03-15 09:00:00"), # Mar 13-15
+    mar_19 = metab_timeperiods(steve_metab, "2018-03-17 09:00:00", "2018-03-19 09:00:00"), # Mar 18-20
+    mar_23 = metab_timeperiods(steve_metab, "2018-03-22 00:00:00", "2018-03-24 00:00:00"), # Mar 22-24
+    mar_28 = metab_timeperiods(steve_metab, "2018-03-27 00:00:00", "2018-03-29 00:00:00") # Mar 27-29
+  )
 
-# eric needs a different time period, but close to this one in feb
-metab_timeperiods(eric_metab, "2018-02-20 00:00:00", "2018-02-22 00:00:00")
+metab_timeperiods(steve_metab, "2018-04-11 00:00:00", "2018-04-13 00:00:00") # Apr 11-13 (dont have april PAR)
 
-# steve: Mar 22-25
-metab_timeperiods(steve_metab, "2018-03-22 00:00:00", "2018-03-25 00:00:00")
+metabmodels_steve_results <- 
+  data.frame(
+    GPP = t(as.data.frame(lapply(metabmodels_steve, `[[`, 1))),
+    ER = t(as.data.frame(lapply(metabmodels_steve, `[[`, 2)))
+  )
+metabmodels_steve_results$date <- strptime(row.names(metabmodels_steve_results), format = "%b_%d")
 
-# eric: Mar 22-25
-metab_timeperiods(eric_metab, "2018-03-22 00:00:00", "2018-03-25 00:00:00")
+# desoto
+metabmodels_desoto <- 
+  list(
+    Feb_05 = metab_timeperiods(desoto_metab, "2018-02-04 00:00:00", "2018-02-06 00:00:00"), # Feb 4-6
+    feb_21 = metab_timeperiods(desoto_metab, "2018-02-20 00:00:00", "2018-02-22 00:00:00"), # Feb 20-22
+    feb_26 = metab_timeperiods(desoto_metab, "2018-02-25 02:00:00", "2018-02-27 02:00:00"), # Feb 25-27
+    mar_03 = metab_timeperiods(desoto_metab, "2018-03-02 09:30:00", "2018-03-04 09:30:00"), # Mar 2-4
+    mar_08 = metab_timeperiods(desoto_metab, "2018-03-07 17:00:00", "2018-03-09 17:00:00"), # Mar 7-9
+    mar_19 = metab_timeperiods(desoto_metab, "2018-03-18 09:00:00", "2018-03-20 09:00:00"), # Mar 18-20
+    mar_23 = metab_timeperiods(desoto_metab, "2018-03-22 00:00:00", "2018-03-24 00:00:00"), # Mar 22-24
+    mar_28 = metab_timeperiods(desoto_metab, "2018-03-27 00:00:00", "2018-03-29 00:00:00") # Mar 27-29
+  )
+metabmodels_desoto_results <- 
+  data.frame(
+    GPP = t(as.data.frame(lapply(metabmodels_desoto, `[[`, 1))),
+    ER = t(as.data.frame(lapply(metabmodels_desoto, `[[`, 2)))
+  )
+metabmodels_desoto_results$date <- strptime(row.names(metabmodels_desoto_results), format = "%b_%d")
+```
 
-# steve: Apr 11-13 (dont have april PAR)
-metab_timeperiods(steve_metab, "2018-04-11 00:00:00", "2018-04-13 00:00:00") 
-
+```{r metabPlotting}
+ggplot()
 ```
