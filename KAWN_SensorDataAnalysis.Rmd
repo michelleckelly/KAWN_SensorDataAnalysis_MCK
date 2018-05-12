@@ -317,7 +317,7 @@ pCode <- c("99133", "00060", "00065", "00300", "00301","00010")
     # 00301 = dissolved oxygen [% saturation]
     # 00010 = water temperature [C]
 pullBegin <- as.POSIXct("2018-02-01", format = "%Y-%m-%d") # Date for start of data pull
-pullEnd <- as.POSIXct("2018-04-22", format = "%Y-%m-%d") # Date for end of data pull
+pullEnd <- as.POSIXct("2018-05-01", format = "%Y-%m-%d") # Date for end of data pull
 
 # USGS data pull
 desoto <- readNWISuv(siteNumbers = siteNoDesoto, parameterCd = pCode, 
@@ -1457,7 +1457,6 @@ Kcor<-function (temp,K600) {
 
 # rivermetabK is the master function that calls the MLE function (onestationmleK) and plotting function (onestationplot) below
 rivermetabK<-function(o2file, z, bp, ts){
-
   temp<-o2file$temp
   oxy<-o2file$oxy
   light<-o2file$light
@@ -1466,17 +1465,19 @@ rivermetabK<-function(o2file, z, bp, ts){
 
   river.mle<-nlm(onestationmleK, p=c(3,-5, 10), 
                  oxy=oxy, z=z, temp=temp, 
-                 light=light, bp=bp, ts=ts)
+                 light=light, bp=bp, ts=ts, print.level = 2)
 
   ##plot modeled and measaured O2 given MLE estimates of GPP, ER, and K600.  It calls a function below onestationplot()
 
-  onestationplot(GPP = river.mle$estimate[1],
+  mle_estimates <- onestationplot(GPP = river.mle$estimate[1],
                  ER = river.mle$estimate[2],
                  oxy=oxy, z=z, temp=temp, light=light, 
                  K=river.mle$estimate[3], bp=bp, ts=ts)
+  mle_estimates
   
   ##return GPP, ER, K600, and MLE values
 	b <- list(GPP = river.mle$estimate[1], 
+	          GPP_SE = sd(river.mle$estimate[1])/sqrt(river.mle$iterations),
 	          ER = river.mle$estimate[2], 
 	          K600 = river.mle$estimate[3], 
 	          neglogL = river.mle$minimum[1])
@@ -1535,46 +1536,59 @@ onestationplot <- function(GPP, ER, oxy, z, temp, K, light, bp, ts) {
 
 ```{r MetabolismModel_HotchkissHall_Evaluation}
 # [1] load data, date and time must be in different columns
+eric_metab <- 
+data.frame(
+  dateTime = ymd_hms(eric_DO$time_CST, tz = "America/Chicago")
+)
 
 steve_metab <- 
 data.frame(
   dateTime = ymd_hms(steve_DO$time_CST, tz = "America/Chicago")
 )
 
-eric_metab <- 
-data.frame(
-  dateTime = ymd_hms(eric_DO$time_CST, tz = "America/Chicago")
+desoto_metab <- 
+  data.frame(
+  dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago")
 )
 
 # [2] calculate oxygen saturation at temperature (the minidot already does this)
+eric_metab$DOmgL <- eric_DO$DO_mgL
+eric_metab$temp <- eric_DO$temp_C
 
 steve_metab$DOmgL <- steve_DO$DO_mgL
 steve_metab$temp <- steve_DO$temp_C
 
-eric_metab$DOmgL <- eric_DO$DO_mgL
-eric_metab$temp <- eric_DO$temp_C
+desoto_metab$DOmgL <- desoto$DO_Inst
+desoto_metab$temp <- desoto$Wtemp_Inst
 
 # [3] calculate barometric pressure
+eric_alt <- 246.89 # m
+eric_pressure <- 
+  data.frame(
+    dateTime = BarPress$dateTime,
+    mean_pressure = bpcalc(bpst = BarPress$mean, alt = eric_alt)
+  )
 
 steve_alt <- 249.02 # m
 steve_pressure <- 
-data.frame(
-  dateTime = BarPress$dateTime,
-  mean_pressure = bpcalc(bpst = BarPress$mean, alt = steve_alt)
-)
+  data.frame(
+    dateTime = BarPress$dateTime,
+    mean_pressure = bpcalc(bpst = BarPress$mean, alt = steve_alt)
+  )
 
-eric_alt <- 246.89 # m
-eric_pressure <- 
-data.frame(
-  dateTime = BarPress$dateTime,
-  mean_pressure = bpcalc(bpst = BarPress$mean, alt = eric_alt)
-)
+desoto_alt <- 229.78 # m
+desoto_pressure <- 
+  data.frame(
+    dateTime = BarPress$dateTime,
+    mean_pressure = bpcalc(bpst = BarPress$mean, alt = desoto_alt)
+  )
 
 # [4] load gas exchange (K) functions
+eric_metab$K600 <- K600fromO2(temp = eric_metab$temp, KO2 = eric_metab$DOmgL)
 
 steve_metab$K600 <- K600fromO2(temp = steve_metab$temp, KO2 = steve_metab$DOmgL)
 
-eric_metab$K600 <- K600fromO2(temp = eric_metab$temp, KO2 = eric_metab$DOmgL)
+desoto_metab$K600 <- K600fromO2(temp = desoto_metab$temp, KO2 = desoto_metab$DOmgL)
 
 # [5] depth
 #     using streamMetabolizer package and desoto discharge data here. this won't be entirely accurate.
@@ -1582,17 +1596,23 @@ eric_metab$K600 <- K600fromO2(temp = eric_metab$temp, KO2 = eric_metab$DOmgL)
   # using d = c*Q^f Leopold and Maddock 1953
   # default values for c and f as suggested in Raymond et al 2012
       # c = 0.409 m, f = 0.294 **verify if these are representative of Kaw
-steve_depth <- 
-data.frame(
-  dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago"),
-  steve_z = calc_depth(desoto$Flow_Inst)
-)
-
 eric_depth <- 
-data.frame(
-  dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago"),
-  eric_z = calc_depth(desoto$Flow_Inst)
-)
+  data.frame(
+    dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago"),
+    z = calc_depth(desoto$Flow_Inst)
+  )
+
+steve_depth <- 
+  data.frame(
+    dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago"),
+    z = calc_depth(desoto$Flow_Inst)
+  )
+
+desoto_depth <- 
+  data.frame(
+    dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago"),
+    z = calc_depth(desoto$Flow_Inst)
+  )
 
 # [6] combine metabolism data frame into one, while making sure dates match
 
@@ -1600,61 +1620,58 @@ data.frame(
 steve_metab$dateTime <- round_date(steve_metab$dateTime, "10 minutes") # round to nearest 10 min interval
 eric_metab$dateTime <- round_date(eric_metab$dateTime, "10 minutes") 
 
-# merge
-steve_metab <- 
-  merge(steve_metab,
-        steve_pressure,
-        by = "dateTime")
-steve_metab <- 
-  merge(steve_metab,
-        steve_depth,
-        by = "dateTime")
-steve_metab <- 
-  merge(steve_metab,
-        PAR,
-        by = "dateTime")
-steve_metab <- 
-  data.frame(dateTime = steve_metab$dateTime,
-             oxy = steve_metab$DOmgL,
-             temp = steve_metab$temp,
-             K600 = steve_metab$K600,
-             bp = steve_metab$mean_pressure,
-             z = steve_metab$steve_z,
-             light = steve_metab$mean)
+# merge function
+merge_metab <- function(metabDataframe, pressureDataframe, depthDataframe, rounddateTime){
+  if (rounddateTime == TRUE){
+    metabDataframe$dateTime <- round_date(metabDataframe$dateTime, "10 minutes")
+  }
+  metabDataframe <- 
+    merge(metabDataframe,
+          pressureDataframe,
+          by = "dateTime")
+  metabDataframe <- 
+    merge(metabDataframe,
+          depthDataframe,
+          by = "dateTime")
+  metabDataframe <- 
+    merge(metabDataframe,
+          PAR,
+          by = "dateTime")
+  metabDataframe <- 
+    data.frame(dateTime = metabDataframe$dateTime,
+               oxy = metabDataframe$DOmgL,
+               temp = metabDataframe$temp,
+               K600 = metabDataframe$K600,
+               bp = metabDataframe$mean_pressure,
+               z = metabDataframe$z,
+               light = metabDataframe$mean)
+  metabDataframe
+}
 
-eric_metab <- 
-  merge(eric_metab,
-        eric_pressure,
-        by = "dateTime")
-eric_metab <- 
-  merge(eric_metab,
-        eric_depth,
-        by = "dateTime")
-eric_metab <- 
-  merge(eric_metab,
-        PAR,
-        by = "dateTime")
-eric_metab <- 
-  data.frame(dateTime = eric_metab$dateTime,
-             oxy = eric_metab$DOmgL,
-             temp = eric_metab$temp,
-             K600 = eric_metab$K600,
-             bp = eric_metab$mean_pressure,
-             z = eric_metab$eric_z,
-             light = eric_metab$mean)
+eric_metab <- merge_metab(eric_metab, eric_pressure, eric_depth, TRUE)
+
+steve_metab <- merge_metab(steve_metab, steve_pressure, steve_depth, TRUE)
+
+desoto_metab <- merge_metab(desoto_metab, desoto_pressure, desoto_depth, FALSE)
 
 # [7] run metabolism model
+eric_metab_output <- rivermetabK(o2file = na.omit(eric_metab), 
+                                  z = mean(eric_metab$z, na.rm = TRUE), 
+                                  bp = mean(eric_metab$bp, na.rm = TRUE), 
+                                  ts = 0.02083333)
+eric_metab_output
+
 steve_metab_output <- rivermetabK(o2file = na.omit(steve_metab), 
                                   z = mean(steve_metab$z, na.rm = TRUE), 
                                   bp = mean(steve_metab$bp, na.rm = TRUE), 
                                   ts = 0.02083333)
 steve_metab_output
 
-eric_metab_output <- rivermetabK(o2file = na.omit(eric_metab), 
-                                  z = mean(eric_metab$z, na.rm = TRUE), 
-                                  bp = mean(eric_metab$bp, na.rm = TRUE), 
-                                  ts = 0.02083333)
-eric_metab_output
+desoto_metab_output <- rivermetabK(o2file = na.omit(desoto_metab),
+                                   z = mean(desoto_metab$z, na.rm = TRUE),
+                                   bp = mean(desoto_metab$bp, na.rm = TRUE),
+                                   ts = 0.02083333)
+desoto_metab_output
 
 # function to subset metabolism data and run model for specific time period
 metab_timeperiods <- function(metab_dataframe, startTime, endTime){
