@@ -10,17 +10,11 @@ Assumption questions:
 		K600 	= 	5.761103	(d-1)
 		-log(L) = 	1528.924	(log likelhood, higher values are better)
 	
-	Feb 20 - 22: (fit not good, no diel O2 pattern, think sensor buried here)
-		GPP	=	-0.008699238
-		ER	=	-0.2545678
-		K600	=	0.00652792
-		-log(L)	=	-402.0636
+	Feb 25 - 27: (good fit)
 
-	Mar 22 - 25:
-		GPP	=	28.94987
-		ER	=	-210.9823
-		K600	=	8.186919
-		-log(L)	=	157.414
+	Mar 2 - 4: (not good fit)
+
+	Mar 22 - 25: (good fit)
 
 
 (5 km downstream of discharge) steve
@@ -31,21 +25,48 @@ Assumption questions:
 		K600 	= 	8.568494				
 		-log(L) = 	3645.414	
 
-	Feb 03 - 06:
-		GPP	=	15.27836
-		ER	=	-215.5051
-		K600	=	7.515591
-		-log(L)	=	72.66157
+	Feb 4 - 6: (good fit)
 
-	Feb 20 - 22:
-		GPP	=	13.04918
-		ER	=	-177.6009
-		K600	=	6.594199
-		-log(L)	=	57.06684
+	Feb 11 - 13: (not great fit)
 
-	Mar 22 - 25:
-		GPP	=	37.93233
-		ER	=	-265.7307
-		K600	=	10.47112
-		-log(L)	=	178.6169
+	Feb 20 - 22: (good fit)
+
+	Feb 25 - 27: (good fit oooo sexy)
+
+	Mar 2 - 4: (good fit)
 	
+	Mar 7 - 9: (good fit)
+
+	Mar 13 - 16: (good fit!!!)
+
+	Mar 18 - 20: (pretty good fit)
+
+	Mar 22 - 24: (pretty good fit)
+
+	Mar 27 - 29: (good fit)
+
+(30 km downstream) desoto
+
+	over all time points:
+		GPP 	= 	180.1896			
+		ER 	= 	-146.8491				
+		K600 	= 	5.609594				
+		-log(L) = 	2879.685
+	
+	Feb 4 - 6: (bad fit, no diel pattern)
+
+	Feb 20 - 22: (good fit to a non-diel pattern)
+
+	Feb 25 - 27: (good fit)
+
+	Mar 2 - 4: (good fit)
+	
+	Mar 7 - 9: (good fit)
+
+	Mar 13 - 15: (good fit)
+
+	Mar 18 - 20: (pretty good fit)
+
+	Mar 22 - 24: (good fit)
+
+	Mar 27 - 29: (good fit)

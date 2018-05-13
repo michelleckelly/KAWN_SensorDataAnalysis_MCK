@@ -130,10 +130,9 @@ Import of Nitratax data into R environment, cleanup
       # eric_N = Nitratax sensor located at the waste release point
       # steve_N = Nitratax sensor located about ~5 miles downstream of bowersock
 
-loadfromCSV <- TRUE 
+loadfromCSV <- FALSE 
 
 if (loadfromCSV == TRUE){
-  
   bowersock_N <- read.csv(file = "KansasR_Nitratax_Bowersock.csv", 
                           header = TRUE,
                           colClasses = c("POSIXct", "numeric"))
@@ -149,39 +148,61 @@ if (loadfromCSV == TRUE){
   names(steve_N) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
   
   cat("data loaded from .csv file")
-  
 }
 if (loadfromCSV == FALSE) {
-  
-  bowersock_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Bowersock_Pulled04-13-2018.xml", 
+  bowersock_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Bowersock_Pulled05-07-2018.xml", 
                                    sensor = "Bowersock", 
                                    deployDate = "2018-01-13")
-  eric_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Eric_Pulled04-13-2018.xml", 
+  eric_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Eric_Pulled05-07-2018.xml", 
                               sensor = "Eric", 
                               deployDate = "2018-02-19")
-  steve_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Steve_Pulled04-20-2018.xml", 
+  steve_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Steve_Pulled05-07-2018.xml", 
                                sensor = "Steve", 
                                deployDate = "2018-01-31")
   
   cat("data loaded from .xml file")
-  
-  # Eric sensor was buried under sediment from 05-Mar to 15-Mar, setting these measurements to NA
-  dateSedimentStartEric <- ymd_hms("2018-03-05 11:00:00", tz = "America/Chicago")
-  dateSedimentEndEric <- ymd_hms("2018-03-15 11:00:00", tz = "America/Chicago")
-  eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` >= dateSedimentStartEric 
-                                          & 
-                                            eric_N$`Date and time` <= dateSedimentEndEric] <- NA
-
-  # Setting Steve to NA for all measurements of "0", due to sediment issues
-  steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Nitrate plus nitrite as mg-N/L` <= 0] <- NA
-
-  # Setting Steve to NA during time period of sediment burial
-  dateSedimentStartSteve <- lubridate::as_datetime("2018-03-12 15:00:00")
-  dateSedimentEndSteve <- lubridate::as_datetime("2018-03-27 11:30:00")
-  steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time`>=dateSedimentStartSteve 
-                                           & 
-                                             steve_N$`Date and time`<=dateSedimentEndSteve] <- NA
 }
+
+# eric cleanup
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-05 00:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-15 11:00:00", tz = "America/Chicago"))] <- NA
+
+# steve N cleanup
+steve_N$`Date and time` <- ymd_hms(steve_N$`Date and time`, tz = "America/Chicago")
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-02-13 13:15:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-02-13 18:45:00", tz = "America/Chicago"))] <- NA
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-02-14 11:45:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-02-14 14:45:00", tz = "America/Chicago"))] <- NA
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-02-22 12:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-02-27 20:45:00", tz = "America/Chicago"))] <- NA
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-01 14:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-01 14:30:00", tz = "America/Chicago"))] <- NA
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-09 00:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-27 11:30:00", tz = "America/Chicago"))] <- NA
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-04-12 09:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-04-12 09:30:00", tz = "America/Chicago"))] <- NA
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-04-20 15:15:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-04-20 15:45:00", tz = "America/Chicago"))] <- NA
+
+# bowersock
+  
+plot(bowersock_N$`Date and time`, bowersock_N$`Nitrate plus nitrite as mg-N/L`, ylim = c(-1,5))
 ```
 
 ***  
@@ -1767,7 +1788,9 @@ ggplot(NULL) +
   coord_cartesian(y = c(0,5), x = c(mdy("02/01/2018"), mdy("04/05/2018"))) +
   ggtitle(NULL) +
   theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 14)) +
+        axis.title = element_text(size = 14),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 14)) +
   scale_x_date(date_breaks = "2 weeks", date_labels = "%b %d") +
   scale_color_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
                        labels = c("Site 2", "Site 3", "Site 4")) +
@@ -1789,7 +1812,9 @@ ggplot(NULL) +
   coord_cartesian(y = c(-2,2), x = c(mdy("02/01/2018"), mdy("04/05/2018"))) +
   ggtitle(NULL) +
   theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 14)) +
+        axis.title = element_text(size = 14),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 14)) +
   scale_x_date(date_breaks = "2 weeks", date_labels = "%b %d", position = "top") +
   scale_color_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
                        labels = c("Site 2", "Site 3", "Site 4")) +
