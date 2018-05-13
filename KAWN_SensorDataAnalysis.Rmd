@@ -471,7 +471,7 @@ PAR <- data.frame(
 
 # PAR units are micromoles per m^2 per second
 
-#### Barometric pressure
+#### Barometric pressure, units are kPa
 BarPress <- read.csv(file = paste0(getwd(), "/NEONfiles", "/stackedFiles", 
                               "/BP_30min.csv"), header = TRUE)
 BarPress$startDateTime <- ymd_hms(BarPress$startDateTime, tz = "America/Chicago")
@@ -482,6 +482,15 @@ BarPress <- data.frame(
   max = BarPress$staPresMaximum,
   var = BarPress$staPresVariance
 )
+# convert to mmHg
+kpa_mmhg <- function(kpa){
+  mmhg <- kpa*7.5006156130264
+  return(mmhg)
+}
+BarPress$mean <- kpa_mmhg(BarPress$mean)
+BarPress$min <- kpa_mmhg(BarPress$min)
+BarPress$max <- kpa_mmhg(BarPress$max)
+BarPress$var <- kpa_mmhg(BarPress$var)
 ```
 
 ***  
@@ -692,7 +701,7 @@ grid.arrange(desotoPlot_N, desotoPlot_DO, desotoPlot_temp, ncol = 1, nrow = 3)
 ## Stacked raw N data plot (include in talk)  
 
 ```{r StackedNPlot, fig.height=9, fig.width=9}
-colorBlindPalette <- c("#56B4E9", "#E69F00", "#CC79A7", "#000000")
+colorBlindPalette <- c("blue2", "red", "darkorchid1", "black")
 
 stackedNPlot <- 
   grid.arrange(
@@ -1357,8 +1366,7 @@ names(desoto_MetabData) <- c("solar.time", "temp.water", "discharge",
     # using the basic MLE model
 mle_name <- mm_name(type='mle', ode_method = "trapezoid")
 mle_specs <- specs(mle_name)
-mle_specs <- revise(mle_specs, split_dates = FALSE, verbose = TRUE, GPP_fun = "limlight",
-                    ER_fun = "q10temp", deficit_src = "DO_obs")
+mle_specs <- revise(mle_specs, split_dates = FALSE, verbose = TRUE)
 mm_mle_desoto <- metab(mle_specs, data = desoto_MetabData)
 
 # model plotting
@@ -1564,21 +1572,21 @@ eric_alt <- 246.89 # m
 eric_pressure <- 
   data.frame(
     dateTime = BarPress$dateTime,
-    mean_pressure = bpcalc(bpst = BarPress$mean, alt = eric_alt)
+    mean_pressure = BarPress$mean
   )
 
 steve_alt <- 249.02 # m
 steve_pressure <- 
   data.frame(
     dateTime = BarPress$dateTime,
-    mean_pressure = bpcalc(bpst = BarPress$mean, alt = steve_alt)
+    mean_pressure = BarPress$mean
   )
 
 desoto_alt <- 229.78 # m
 desoto_pressure <- 
   data.frame(
     dateTime = BarPress$dateTime,
-    mean_pressure = bpcalc(bpst = BarPress$mean, alt = desoto_alt)
+    mean_pressure = BarPress$mean
   )
 
 # [4] load gas exchange (K) functions
@@ -1654,19 +1662,19 @@ desoto_metab <- merge_metab(desoto_metab, desoto_pressure, desoto_depth, FALSE)
 
 # [7] run metabolism model
 eric_metab_output <- rivermetabK(o2file = na.omit(eric_metab), 
-                                  z = mean(eric_metab$z, na.rm = TRUE), 
+                                  z = 0.2, 
                                   bp = mean(eric_metab$bp, na.rm = TRUE), 
                                   ts = 0.02083333)
 eric_metab_output
 
 steve_metab_output <- rivermetabK(o2file = na.omit(steve_metab), 
-                                  z = mean(steve_metab$z, na.rm = TRUE), 
+                                  z = 0.2, 
                                   bp = mean(steve_metab$bp, na.rm = TRUE), 
                                   ts = 0.02083333)
 steve_metab_output
 
 desoto_metab_output <- rivermetabK(o2file = na.omit(desoto_metab),
-                                   z = mean(desoto_metab$z, na.rm = TRUE),
+                                   z = 0.2,
                                    bp = mean(desoto_metab$bp, na.rm = TRUE),
                                    ts = 0.02083333)
 desoto_metab_output
@@ -1678,7 +1686,7 @@ metab_timeperiods <- function(metab_dataframe, startTime, endTime){
                                                    c(ymd_hms(startTime, tz = "America/Chicago"),
                                                      ymd_hms(endTime, tz = "America/Chicago")),]
   metab_output <- rivermetabK(o2file = metab_timeperiod_subsection,
-                              z = mean(metab_timeperiod_subsection$z, na.rm = TRUE),
+                              z = 0.2,
                               bp = mean(metab_timeperiod_subsection$bp, na.rm = TRUE),
                               ts = 0.02083333)
   return(metab_output)
@@ -1697,6 +1705,7 @@ metabmodels_eric_results <-
     ER = t(as.data.frame(lapply(metabmodels_eric, `[[`, 2)))
   )
 metabmodels_eric_results$date <- strptime(row.names(metabmodels_eric_results), format = "%b_%d")
+metabmodels_eric_results$date <- as.Date(metabmodels_eric_results$date)
 
 # steve
 metabmodels_steve <- 
@@ -1713,7 +1722,7 @@ metabmodels_steve <-
     mar_28 = metab_timeperiods(steve_metab, "2018-03-27 00:00:00", "2018-03-29 00:00:00") # Mar 27-29
   )
 
-metab_timeperiods(steve_metab, "2018-04-11 00:00:00", "2018-04-13 00:00:00") # Apr 11-13 (dont have april PAR)
+#metab_timeperiods(steve_metab, "2018-04-11 00:00:00", "2018-04-13 00:00:00") # Apr 11-13 (dont have april PAR)
 
 metabmodels_steve_results <- 
   data.frame(
@@ -1721,6 +1730,7 @@ metabmodels_steve_results <-
     ER = t(as.data.frame(lapply(metabmodels_steve, `[[`, 2)))
   )
 metabmodels_steve_results$date <- strptime(row.names(metabmodels_steve_results), format = "%b_%d")
+metabmodels_steve_results$date <- as.Date(metabmodels_steve_results$date)
 
 # desoto
 metabmodels_desoto <- 
@@ -1740,8 +1750,51 @@ metabmodels_desoto_results <-
     ER = t(as.data.frame(lapply(metabmodels_desoto, `[[`, 2)))
   )
 metabmodels_desoto_results$date <- strptime(row.names(metabmodels_desoto_results), format = "%b_%d")
+metabmodels_desoto_results$date <- as.Date(metabmodels_desoto_results$date)
 ```
 
-```{r metabPlotting}
-ggplot()
+```{r metabPlotting, fig.width = 10, fig.height=4}
+ggplot(NULL) +
+  geom_point(data = metabmodels_eric_results, aes(x = date, y = GPP, color = "Site 2",
+                                                  shape = "19", size = 2)) +
+  geom_point(data = metabmodels_steve_results, aes(x = date, y = GPP, color = "Site 3", 
+                                                   shape = "17", size = 2)) +
+  geom_point(data = metabmodels_desoto_results, aes(x = date, y = GPP, color = "Site 4", 
+                                                    shape = "15", size = 2)) +
+  theme_classic() +
+  xlab("Date") +
+  ylab("GPP (g O2 m-2 d-1)") +
+  coord_cartesian(y = c(0,5), x = c(mdy("02/01/2018"), mdy("04/05/2018"))) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14)) +
+  scale_x_date(date_breaks = "2 weeks", date_labels = "%b %d") +
+  scale_color_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
+                       labels = c("Site 2", "Site 3", "Site 4")) +
+  scale_shape_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
+                       labels = c("Site 2", "Site 3", "Site 4")) +
+  scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
+                     values = colorBlindPalette[2:4])
+
+ggplot(NULL) +
+  geom_point(data = metabmodels_eric_results, aes(x = date, y = ER, color = "Site 2",
+                                                  shape = "19", size = 2)) +
+  geom_point(data = metabmodels_steve_results, aes(x = date, y = ER, color = "Site 3", 
+                                                   shape = "17", size = 2)) +
+  geom_point(data = metabmodels_desoto_results, aes(x = date, y = ER, color = "Site 4", 
+                                                    shape = "15", size = 2)) +
+  theme_classic() +
+  xlab("Date") +
+  ylab("ER (g O2 m-2 d-1)") +
+  coord_cartesian(y = c(-2,2), x = c(mdy("02/01/2018"), mdy("04/05/2018"))) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14)) +
+  scale_x_date(date_breaks = "2 weeks", date_labels = "%b %d", position = "top") +
+  scale_color_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
+                       labels = c("Site 2", "Site 3", "Site 4")) +
+  scale_shape_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
+                       labels = c("Site 2", "Site 3", "Site 4")) +
+  scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
+                     values = colorBlindPalette[2:4])
 ```
