@@ -68,8 +68,6 @@ Data load = data is taken from local file
 
 ## Nitratax Data  
 
-### Data pull and cleanup  
-
 **Nitratax_XMLtoCSV:** Function to convert raw-from-sensor .xml file to more convenient .csv file  
 ```{r Nitratax_XMLtoCSV, include=FALSE}
 # Function name:
@@ -130,7 +128,7 @@ Import of Nitratax data into R environment, cleanup
       # eric_N = Nitratax sensor located at the waste release point
       # steve_N = Nitratax sensor located about ~5 miles downstream of bowersock
 
-loadfromCSV <- FALSE 
+loadfromCSV <- TRUE
 
 if (loadfromCSV == TRUE){
   bowersock_N <- read.csv(file = "KansasR_Nitratax_Bowersock.csv", 
@@ -162,12 +160,61 @@ if (loadfromCSV == FALSE) {
   
   cat("data loaded from .xml file")
 }
+# bowersock N cleanup
+bowersock_N$`Nitrate plus nitrite as mg-N/L`[bowersock_N$`Date and time` 
+                                             %between% 
+                                               c(ymd_hms("2018-02-05 21:30:00", tz = "America/Chicago"),
+                                                 ymd_hms("2018-02-07 15:30:00", tz = "America/Chicago"))] <- NA
 
-# eric cleanup
+bowersock_N$`Nitrate plus nitrite as mg-N/L`[bowersock_N$`Date and time` 
+                                             %between% 
+                                               c(ymd_hms("2018-02-16 11:00:00", tz = "America/Chicago"),
+                                                 ymd_hms("2018-02-16 11:30:00", tz = "America/Chicago"))] <- NA
+# for purposes of sfs talk.....
+bowersock_N$`Nitrate plus nitrite as mg-N/L`[bowersock_N$`Date and time` 
+                                             %between% 
+                                               c(ymd_hms("2018-05-01 00:00:00", tz = "America/Chicago"),
+                                                 ymd_hms("2018-05-07 00:00:00", tz = "America/Chicago"))] <- NA
+
+# eric N cleanup
 eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
                                          %between% 
-                                           c(ymd_hms("2018-03-05 00:00:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-03-15 11:00:00", tz = "America/Chicago"))] <- NA
+                                           c(ymd_hms("2018-02-27 00:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-15 19:30:00", tz = "America/Chicago"))] <- NA
+# large precip events
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-18 10:15:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-18 13:15:00", tz = "America/Chicago"))] <- NA
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-19 04:15:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-19 06:00:00", tz = "America/Chicago"))] <- NA
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-19 08:15:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-19 10:15:00", tz = "America/Chicago"))] <- NA
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-19 11:15:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-19 18:45:00", tz = "America/Chicago"))] <- NA
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-26 07:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-26 10:30:00", tz = "America/Chicago"))] <- NA
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-26 11:45:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-26 19:45:00", tz = "America/Chicago"))] <- NA
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-04-26 11:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-04-26 13:00:00", tz = "America/Chicago"))] <- NA
+# for purposes of sfs talk.....
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                        %between% 
+                                          c(ymd_hms("2018-05-01 00:00:00", tz = "America/Chicago"),
+                                            ymd_hms("2018-05-07 00:00:00", tz = "America/Chicago"))] <- NA
 
 # steve N cleanup
 steve_N$`Date and time` <- ymd_hms(steve_N$`Date and time`, tz = "America/Chicago")
@@ -199,10 +246,11 @@ steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time`
                                          %between% 
                                            c(ymd_hms("2018-04-20 15:15:00", tz = "America/Chicago"),
                                              ymd_hms("2018-04-20 15:45:00", tz = "America/Chicago"))] <- NA
-
-# bowersock
-  
-plot(bowersock_N$`Date and time`, bowersock_N$`Nitrate plus nitrite as mg-N/L`, ylim = c(-1,5))
+# for purposes of sfs talk.....
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-05-01 00:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-05-07 00:00:00", tz = "America/Chicago"))] <- NA
 ```
 
 ***  
@@ -324,8 +372,6 @@ steve_DO$temp_C[steve_DO$time_CST
 
 ## USGS Data  
 
-### Data pull and cleanup  
-
 Pulling data from USGS server for sensor at Desoto KS (fourth core site)  
 ```{r DesotoPullCleanup, include=FALSE, warning=FALSE}
 siteNoDesoto <- "06892350" # USGS code for Kansas River site at Desoto, KS
@@ -338,7 +384,7 @@ pCode <- c("99133", "00060", "00065", "00300", "00301","00010")
     # 00301 = dissolved oxygen [% saturation]
     # 00010 = water temperature [C]
 pullBegin <- as.POSIXct("2018-02-01", format = "%Y-%m-%d") # Date for start of data pull
-pullEnd <- as.POSIXct("2018-05-01", format = "%Y-%m-%d") # Date for end of data pull
+pullEnd <- as.POSIXct("2018-04-30", format = "%Y-%m-%d") # Date for end of data pull
 
 # USGS data pull
 desoto <- readNWISuv(siteNumbers = siteNoDesoto, parameterCd = pCode, 
@@ -366,6 +412,20 @@ ft_m <- function(ft){
 desoto$Flow_Inst <- ft3s_m3s(desoto$Flow_Inst)
 desoto$GH_Inst <- ft_m(desoto$GH_Inst)
 
+# large precipitation events
+desoto$nitrateNitrite[desoto$dateTime
+                      %between%
+                        c(ymd_hms("2018-03-19 20:30:00", tz = "America/Chicago"),
+                          ymd_hms("2018-03-21 16:45:00", tz = "America/Chicago"))] <- NA
+desoto$nitrateNitrite[desoto$dateTime
+                      %between%
+                        c(ymd_hms("2018-03-25 00:00:00", tz = "America/Chicago"),
+                          ymd_hms("2018-03-30 11:30:00", tz = "America/Chicago"))] <- NA
+desoto$nitrateNitrite[desoto$dateTime
+                      %between%
+                        c(ymd_hms("2018-04-14 13:30:00", tz = "America/Chicago"),
+                          ymd_hms("2018-04-14 20:45:00", tz = "America/Chicago"))] <- NA
+
 ```
 
 Pulling data from USGS stream gauge at Lawrence, for finding water balance
@@ -391,21 +451,16 @@ lawrence$.Upstream.of.Bowersock.Dam._GH_Inst <- ft_m(lawrence$.Upstream.of.Bower
 
 ## City of Lawrence Pumping Logs  
 
-### Data load  
-
 Data code         |   Meaning
 ----------------- |----------
 NA                |no sample was taken on this date
 BDL_NitrateNitrite|sample concentration was less than 0.25 mg-N/L
 BDL_Ammonia       |sample concentration was less than 0.30 mg-N/L
 
-```{r FarmlandLogsLoading, include=FALSE}
+```{r FarmlandLogs_plotting, include=TRUE}
 FarmlandPumpingLogs <- read.csv(file = "FarmlandDailyReport_MCKformatted.csv", 
                                 header = TRUE, sep = ",")
-```
 
-### Data cleanup  
-```{r FarmlandLogsCleanup, include=TRUE}
 # conversion from american to metric units
 # million gallons to liters
 MG_L <- function(MG){
@@ -433,13 +488,39 @@ names(FarmlandPumpingLogs)[names(FarmlandPumpingLogs) == "flowRate_AveragePump_g
 # Reformatting column data types
 FarmlandPumpingLogs$Date <- mdy(FarmlandPumpingLogs$Date)
 FarmlandPumpingLogs$Notes <- as.character(FarmlandPumpingLogs$Notes)
+
+LogDateStart <- min(FarmlandPumpingLogs$Date) 
+LogDateEnd <- max(FarmlandPumpingLogs$Date)
+
+pullBegin1 <- ymd(pullBegin)
+pullEnd1 <- ymd(pullEnd)
+
+FarmlandPump_DrainageDitch_NitratePlot <- ggplot(data = FarmlandPumpingLogs, 
+                                                 aes(Date, Downstream_1625RdDitch_NitrateNitrite_mgN.L)) + 
+    geom_line(show.legend = FALSE, size = 1, 
+              color = wes_palette(n=5, name="Royal2")[5]) +
+    coord_cartesian(xlim = c(LogDateStart, LogDateEnd), ylim = c(0, 700)) +
+    labs(y = "Nitrate plus nitrite [mg-N/L]", x = "Date", 
+         title = "Farmland pipe outflow") +
+    theme_classic() + scale_color_manual(values=wes_palette(n=5, name="Darjeeling")[1])
+
+FarmlandPump_DrainageDitch_NitratePlot
+
+FarmlandPump_DrainageDitch_NitratePlot_zoom <- ggplot(data = FarmlandPumpingLogs, 
+                                                 aes(Date, Downstream_1625RdDitch_NitrateNitrite_mgN.L)) + 
+    geom_point(show.legend = FALSE, size = 1, 
+              color = wes_palette(n=5, name="Royal2")[5]) +
+    coord_cartesian(xlim = c(pullBegin1, pullEnd1), ylim = c(0, 700)) +
+    labs(y = "Nitrate plus nitrite [mg-N/L]", x = "Date", 
+         title = "Farmland pipe outflow") +
+    theme_classic() + scale_color_manual(values=wes_palette(n=5, name="Darjeeling")[1])
+
+FarmlandPump_DrainageDitch_NitratePlot_zoom
 ```
 
 ***  
 
 ## NEON Data   
-
-### Data pull and cleanup  
 
 ```{r NEONpullCleanup, include=FALSE, eval=TRUE}
 downloadNEONfiles <- FALSE
@@ -518,7 +599,7 @@ BarPress$var <- kpa_mmhg(BarPress$var)
 
 # Raw data visualizations  
 
-```{r NmergedPlot, include = FALSE, echo=FALSE, warning=FALSE, fig.height=6, fig.width=10}
+```{r NmergedPlot, echo=FALSE, warning=FALSE, fig.height=6, fig.width=10}
 #combined plot of all N data on one axis
 nitrataxMergedPlot <- ggplot(NULL) +
   geom_point(data = bowersock_N, aes(x = `Date and time`, 
@@ -533,7 +614,7 @@ nitrataxMergedPlot <- ggplot(NULL) +
   geom_point(data = desoto, aes(x = dateTime, 
                                 y = nitrateNitrite, color = "Far downstream"), 
                             show.legend = TRUE, size = 1) +
-  coord_cartesian(xlim = c(pullBegin, pullEnd), ylim = c(0, 25), expand = TRUE) +
+  coord_cartesian(xlim = c(pullBegin, pullEnd), ylim = c(0, 15), expand = TRUE) +
   labs(y = "Nitrate plus nitrite [mg-N/L]", x = "Date", title = "", color = "Legend") +
   theme_classic() +
   theme(legend.position = "right", legend.direction = "vertical") +
@@ -542,7 +623,7 @@ nitrataxMergedPlot <- ggplot(NULL) +
 nitrataxMergedPlot
 ```
 
-## Individual raw plots: DO, Temp, N Plots  
+## DO, Temp, N Plots  
 
 Function setup for individual, simple plots for each site  
 ```{r simplePlotFunction, include=FALSE}
@@ -575,9 +656,10 @@ simplePlot <- function(dataset, xAxis, yAxis, plotBegin, plotEnd, yMin, yMax, xL
 }
 ```
 
-### Bowersock (Upstream)  
 
-```{r bowersockPlots, echo=FALSE, warning=FALSE, fig.height=3, fig.width=10}
+
+```{r DO_N_temp_Plots, echo=FALSE, warning=FALSE}
+# bowersock
 bowersockPlot_N <- simplePlot(dataset = bowersock_N, 
                               xAxis = bowersock_N$`Date and time`, 
                               yAxis = bowersock_N$`Nitrate plus nitrite as mg-N/L`,
@@ -585,46 +667,11 @@ bowersockPlot_N <- simplePlot(dataset = bowersock_N,
                               yMin = 0, yMax = 1.5, 
                               yLabel = "Nitrate plus nitrite [mg-N/L]",
                               title = "Upstream") +
-  scale_color_manual(values=wes_palette(n=5, name="Darjeeling")[1])
+  scale_color_manual(values=colorBlindPalette[1])
 
 bowersockPlot_N
-```
 
-### Farmland Logs (Pipe outflow)  
-
-```{r FarmlandPumpLogsPlots, echo=FALSE, warning=FALSE, fig.height=3, fig.width=10}
-LogDateStart <- min(FarmlandPumpingLogs$Date) 
-LogDateEnd <- max(FarmlandPumpingLogs$Date)
-
-pullBegin1 <- ymd(pullBegin)
-pullEnd1 <- ymd(pullEnd)
-
-FarmlandPump_DrainageDitch_NitratePlot <- ggplot(data = FarmlandPumpingLogs, 
-                                                 aes(Date, Downstream_1625RdDitch_NitrateNitrite_mgN.L)) + 
-    geom_line(show.legend = FALSE, size = 1, 
-              color = wes_palette(n=5, name="Royal2")[5]) +
-    coord_cartesian(xlim = c(LogDateStart, LogDateEnd), ylim = c(0, 700)) +
-    labs(y = "Nitrate plus nitrite [mg-N/L]", x = "Date", 
-         title = "Farmland pipe outflow") +
-    theme_classic() + scale_color_manual(values=wes_palette(n=5, name="Darjeeling")[1])
-
-FarmlandPump_DrainageDitch_NitratePlot
-
-FarmlandPump_DrainageDitch_NitratePlot_zoom <- ggplot(data = FarmlandPumpingLogs, 
-                                                 aes(Date, Downstream_1625RdDitch_NitrateNitrite_mgN.L)) + 
-    geom_point(show.legend = FALSE, size = 1, 
-              color = wes_palette(n=5, name="Royal2")[5]) +
-    coord_cartesian(xlim = c(pullBegin1, pullEnd1), ylim = c(0, 700)) +
-    labs(y = "Nitrate plus nitrite [mg-N/L]", x = "Date", 
-         title = "Farmland pipe outflow") +
-    theme_classic() + scale_color_manual(values=wes_palette(n=5, name="Darjeeling")[1])
-
-FarmlandPump_DrainageDitch_NitratePlot_zoom
-```
-
-### Eric (Discharge point)  
-
-```{r ericPlots, echo=FALSE, warning=FALSE}
+# Eric
 ericPlot_N <- simplePlot(dataset = eric_N, 
                          xAxis = eric_N$`Date and time`,
                          yAxis = eric_N$`Nitrate plus nitrite as mg-N/L`,
@@ -652,11 +699,7 @@ ericPlot_temp <- simplePlot(dataset = eric_DO,
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[3])
 
 grid.arrange(ericPlot_N, ericPlot_DO, ericPlot_temp, ncol = 1, nrow = 3)
-```
 
-### Steve (5 km Downstream)  
-
-```{r stevePlots, echo=FALSE, warning=FALSE}
 # Steve (downstream)
 stevePlot_N <- simplePlot(dataset = steve_N, 
                           xAxis = steve_N$`Date and time`,
@@ -685,11 +728,8 @@ stevePlot_temp <- ericPlot_temp <- simplePlot(dataset = steve_DO,
   scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[3])
 
 grid.arrange(stevePlot_N, stevePlot_DO, stevePlot_temp, ncol = 1, nrow = 3)
-```
 
-### Desoto (30 km Downstream)  
-
-```{r desotoPlots, echo=FALSE, warning=FALSE}
+# Desoto
 desotoPlot_N <- simplePlot(dataset = desoto, 
                            xAxis = desoto$dateTime,
                            yAxis = desoto$nitrateNitrite,
@@ -719,10 +759,12 @@ desotoPlot_temp <- simplePlot(dataset = desoto,
 grid.arrange(desotoPlot_N, desotoPlot_DO, desotoPlot_temp, ncol = 1, nrow = 3)
 ```
 
-## Stacked raw N data plot (include in talk)  
+## N data plot (include in talk)  
 
 ```{r StackedNPlot, fig.height=9, fig.width=9}
 colorBlindPalette <- c("blue2", "red", "darkorchid1", "black")
+
+
 
 stackedNPlot <- 
   grid.arrange(
@@ -734,17 +776,21 @@ stackedNPlot <-
       ggtitle(NULL) +
       theme(axis.text = element_text(size = 14),
             axis.text.x = element_blank()) +
-      scale_color_manual(values = colorBlindPalette[1]),
+      scale_color_manual(values = colorBlindPalette[1]) + 
+      scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
+      geom_vline(xintercept = ymd_hms("2018-04-01 00:00:00")),
   
     ericPlot_N +
       coord_cartesian(xlim = c(pullBegin, pullEnd),
-                      ylim = c(0, 25)) +
+                      ylim = c(0, 10)) +
       xlab(NULL) +
       ylab(NULL) +
       ggtitle(NULL) +
       theme(axis.text = element_text(size = 14),
             axis.text.x = element_blank()) +
-      scale_color_manual(values = colorBlindPalette[2]),
+      scale_color_manual(values = colorBlindPalette[2]) +
+      scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
+      geom_vline(xintercept = ymd_hms("2018-04-01 00:00:00")),
   
     stevePlot_N +
       coord_cartesian(xlim = c(pullBegin, pullEnd),
@@ -754,7 +800,9 @@ stackedNPlot <-
       ggtitle(NULL) +
       theme(axis.text = element_text(size = 14),
             axis.text.x = element_blank()) +
-      scale_color_manual(values = colorBlindPalette[3]),
+      scale_color_manual(values = colorBlindPalette[3]) +
+      scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
+      geom_vline(xintercept = ymd_hms("2018-04-01 00:00:00")),
   
     desotoPlot_N +
       coord_cartesian(xlim = c(pullBegin, pullEnd),
@@ -763,7 +811,9 @@ stackedNPlot <-
       ylab(NULL) +
       ggtitle(NULL) +
       theme(axis.text = element_text(size = 14)) +
-      scale_color_manual(values = colorBlindPalette[4]),
+      scale_color_manual(values = colorBlindPalette[4]) +
+      scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
+      geom_vline(xintercept = ymd_hms("2018-04-01 00:00:00")),
   
     nrow = 4,
     ncol = 1
@@ -775,6 +825,10 @@ ggsave(filename = "StackedNPlot.png", plot = stackedNPlot, dpi = 500)
 ## Temporal difference in N (include in talk)
 ```{r Ntemporal, fig.height=3, fig.width=10}
 # 4 (15 min intervals per hour) * 12 hours between midnight and noon = 48 step lag
+bowersock_N$Ndiff <- diff(bowersock_N$`Nitrate plus nitrite as mg-N/L`,
+                                lag = 49, differences = 1,
+                                object = bowersock_N$`Date and time`)
+
 bowersockN_daynightdiff <- diff(bowersock_N$`Nitrate plus nitrite as mg-N/L`,
                                 lag = 49, differences = 1,
                                 object = bowersock_N$`Date and time`)
@@ -797,7 +851,7 @@ plot.ts(desotoN_daynightdiff, col = colorBlindPalette[4])
 
 ```
 ## Combined temperature plot
-```{r comboTemp, fig.width=9, fig.height=3, eval=FALSE}
+```{r comboTemp, fig.width=9, fig.height=3}
 comboTemp <- 
 ggplot() +
   geom_point(data = desoto, aes(x = dateTime, y = Wtemp_Inst, color = "site 4"),
