@@ -659,6 +659,8 @@ simplePlot <- function(dataset, xAxis, yAxis, plotBegin, plotEnd, yMin, yMax, xL
 
 
 ```{r DO_N_temp_Plots, echo=FALSE, warning=FALSE}
+colorBlindPalette <- c("blue2", "red", "darkorchid1", "black")
+
 # bowersock
 bowersockPlot_N <- simplePlot(dataset = bowersock_N, 
                               xAxis = bowersock_N$`Date and time`, 
@@ -762,10 +764,6 @@ grid.arrange(desotoPlot_N, desotoPlot_DO, desotoPlot_temp, ncol = 1, nrow = 3)
 ## N data plot (include in talk)  
 
 ```{r StackedNPlot, fig.height=9, fig.width=9}
-colorBlindPalette <- c("blue2", "red", "darkorchid1", "black")
-
-
-
 stackedNPlot <- 
   grid.arrange(
     bowersockPlot_N +
@@ -933,7 +931,7 @@ grid.arrange(
 
 ggsave(filename = "Ndiff.png", plot = ndiff_plot, dpi = 500)
 ```
-## Combined temperature plot
+## Combined temperature plot (include in talk)
 ```{r comboTemp, fig.width=9, fig.height=3}
 comboTemp <- 
 ggplot() +
@@ -950,10 +948,12 @@ ggplot() +
   ylab("Water temperature, deg C") +
   xlab(NULL) +
   ggtitle(NULL) +
-  theme(axis.text = element_text(size = 14))
+  theme(axis.text = element_text(size = 14)) +
+  scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
+  geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00"))
 
 ggsave(filename = "temp_comboplot.png", plot = comboTemp, dpi = 500,
-       width = 10, height = 3, units = "in")
+       width = 9, height = 3, units = "in")
 ```
 
 ## Time period plots  
@@ -1348,7 +1348,7 @@ ggsave(filename = "Site3_dielCutaway.png", plot = stevePlot_N_dielCutaway, dpi =
 
 ```
 
-## PAR plot
+## PAR plot (include in talk)
 ```{r PARplotting, fig.height=3, fig.width=9, eval=FALSE}
 # calculate sum of PAR mean values
 PAR$PARMean_sum <- cumsum(PAR$PARMean)
@@ -1374,15 +1374,16 @@ PAR$PARMean_sum_molm2s <- umol_mol(PAR$PARMean_sum)
 
 PAR_rawPlot <- 
   ggplot(NULL) + 
-    geom_line(data = PAR, aes(x = startDateTime, y = PARMean), 
+    geom_line(data = PAR, aes(x = dateTime, y = mean), 
                show.legend = FALSE, size = 1) +
     coord_cartesian(xlim = c(pullBegin, pullEnd)) +
-    labs(y = "PAR, 
-         umol m^-2 s^-1", 
-         x = "Date") +
+    labs(y = "PAR, umol m^-2 s^-1", 
+         x = NULL) +
     theme_classic() +
     theme(axis.text = element_text(size = 14),
-          axis.title = element_text(size = 14))
+          axis.title = element_text(size = 14)) +
+    scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
+    geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00"))
 
 PAR_sumPlot <- 
   ggplot(NULL) + 
@@ -1421,18 +1422,9 @@ PAR_sumPlot_convertunits_mol <-
           axis.title = element_text(size = 14))
 
 PAR_rawPlot
-PAR_sumPlot
-PAR_sumPlot_convertunits_mol
-PAR_sumPlot_convertunits_molday
 
 ggsave(filename = "PAR_rawPlot.png", plot = PAR_rawPlot, dpi = 500,
-       width = 10, height = 3, units = "in")
-ggsave(filename = "PAR_sumPlot.png", plot = PAR_sumPlot, dpi = 500,
-       width = 10, height = 3)
-ggsave(filename = "PAR_sumPlot_molm2sec.png", plot = PAR_sumPlot_convertunits_mol, dpi = 500,
-       width = 10, height = 3)
-ggsave(filename = "PAR_sumPlot_molm2day.png", plot = PAR_sumPlot_convertunits_molday, dpi = 500,
-       width = 10, height = 3)
+       width = 9, height = 3, units = "in")
 ```
 
 # Water Balance  
@@ -1472,24 +1464,24 @@ waterBal_plot <- ggplot() +
   geom_line(data = waterBal, 
             aes(x = dateTime, y = difference, color = "difference"),
             show.legend = FALSE, 
-            color = colorBlindPalette[4]) +
+            color = colorBlindPalette[4], size = 1.5) +
   geom_hline(aes(yintercept = mean(na.omit(waterBal$difference))),
              color = "red",
              linetype = "solid") +
   coord_cartesian(xlim = c(pullBegin, pullEnd), 
                   ylim = c(-50, 50)) +
-  labs(y = "Difference between 
-downstream and 
-upstream flow, m3/s",
-       x = "Date", 
-       title = "Water balance of study reach") +
+  labs(y = "Difference between downstream and upstream flow, m3/s",
+       x = NULL) +
   theme_classic() +
-  ggtitle(NULL) +
   theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 14))
+        axis.title = element_text(size = 14)) +
+  scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
+    geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00"))
+
+waterBal_plot
 
 ggsave(filename = "waterBal_plot.png", plot = waterBal_plot, dpi = 500,
-       width = 10, height = 3, units = "in")
+       width = 9, height = 3, units = "in")
 ```
 
 ***  
@@ -1915,13 +1907,13 @@ metabmodels_desoto_results$date <- as.Date(metabmodels_desoto_results$date)
 GPP_plot <- 
 ggplot(NULL) +
   geom_point(data = metabmodels_eric_results, aes(x = date, y = GPP, color = "Site 2",
-                                                  shape = "19", size = 2)) +
+                                                  shape = "19", size = 2), show.legend = FALSE) +
   geom_point(data = metabmodels_steve_results, aes(x = date, y = GPP, color = "Site 3", 
-                                                   shape = "17", size = 2)) +
+                                                   shape = "17", size = 2), show.legend = FALSE) +
   geom_point(data = metabmodels_desoto_results, aes(x = date, y = GPP, color = "Site 4", 
-                                                    shape = "15", size = 2)) +
+                                                    shape = "15", size = 2), show.legend = FALSE) +
   theme_classic() +
-  xlab("Date") +
+  xlab(NULL) +
   ylab("GPP (g O2 m-2 d-1)") +
   coord_cartesian(y = c(0,5), x = c(mdy("02/01/2018"), mdy("04/05/2018"))) +
   ggtitle(NULL) +
@@ -1936,19 +1928,19 @@ ggplot(NULL) +
                        labels = c("Site 2", "Site 3", "Site 4")) +
   scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
                      values = colorBlindPalette[2:4])
-ggsave(filename = "GPP_plot.png", plot = GPP_plot, dpi = 500, scale = 1)
+ggsave(filename = "GPP_plot.png", plot = GPP_plot, dpi = 500, width = 9, height = 3)
 GPP_plot
 
 ER_plot <- 
 ggplot(NULL) +
   geom_point(data = metabmodels_eric_results, aes(x = date, y = ER, color = "Site 2",
-                                                  shape = "19", size = 2)) +
+                                                  shape = "19", size = 2), show.legend = FALSE) +
   geom_point(data = metabmodels_steve_results, aes(x = date, y = ER, color = "Site 3", 
-                                                   shape = "17", size = 2)) +
+                                                   shape = "17", size = 2), show.legend = FALSE) +
   geom_point(data = metabmodels_desoto_results, aes(x = date, y = ER, color = "Site 4", 
-                                                    shape = "15", size = 2)) +
+                                                    shape = "15", size = 2), show.legend = FALSE) +
   theme_classic() +
-  xlab("Date") +
+  xlab(NULL) +
   ylab("ER (g O2 m-2 d-1)") +
   coord_cartesian(y = c(-2,2), x = c(mdy("02/01/2018"), mdy("04/05/2018"))) +
   ggtitle(NULL) +
@@ -1963,5 +1955,83 @@ ggplot(NULL) +
                        labels = c("Site 2", "Site 3", "Site 4")) +
   scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
                      values = colorBlindPalette[2:4])
-ggsave(filename = "ER.png", plot = ER_plot, dpi = 500)
+ggsave(filename = "ER.png", plot = ER_plot, dpi = 500, width = 9, height = 3)
 ```
+
+```{r comparisonofNtoMetab, fig.width=5, fig.height=5}
+# GPP
+ericN_daynightdiff$date <- date(ericN_daynightdiff$dateTime)
+NMetabComp_eric <- merge(ericN_daynightdiff, metabmodels_eric_results, by = "date")
+#NMetabComp_eric <- NMetabComp_eric[seq(1, nrow(NMetabComp_eric), 2),]
+
+steveN_daynightdiff$date <- date(steveN_daynightdiff$dateTime)
+NMetabComp_steve <- merge(steveN_daynightdiff, metabmodels_steve_results, by = "date")
+#NMetabComp_steve <- NMetabComp_steve[seq(1, nrow(NMetabComp_steve), 2),]
+
+desotoN_daynightdiff$date <- date(desotoN_daynightdiff$dateTime)
+NMetabComp_desoto <- merge(desotoN_daynightdiff, metabmodels_desoto_results, by = "date")
+#NMetabComp_desoto <- NMetabComp_desoto[seq(1, nrow(NMetabComp_desoto), 2),]
+
+lm_data_GPP <- data.frame(
+  GPP = c(NMetabComp_eric$GPP, NMetabComp_steve$GPP, NMetabComp_desoto$GPP),
+  perc = c(NMetabComp_eric$perc, NMetabComp_steve$perc, NMetabComp_desoto$perc)
+)
+lm_fit_GPP <- lm(data = lm_data_GPP)
+predicted_GPP <- data.frame(GPPpred = predict(lm_fit_GPP, lm_data_GPP), perc = lm_data_GPP$perc)
+
+ggplot(NULL) +
+  geom_point(data = NMetabComp_eric, aes(x = GPP, y = perc, color = "Site 2",
+                                           shape = "19", size = 2), show.legend = FALSE) +
+  geom_point(data = NMetabComp_steve, aes(x = GPP, y = perc, color = "Site 3",
+                                           shape = "17", size = 2), show.legend = FALSE) +
+  geom_point(data = NMetabComp_desoto, aes(x = GPP, y = perc, color = "Site 4",
+                                           shape = "15", size = 2), show.legend = FALSE) +
+  geom_line(data = predicted_GPP, aes(x = GPPpred, y = perc)) +
+  theme_classic() +
+  xlab("GPP (g O2 m-2 d-1)") +
+  ylab("Change in NOX %") +
+  coord_cartesian(x = c(0,5), y = c(-2,2)) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 14)) +
+  scale_color_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
+                       labels = c("Site 2", "Site 3", "Site 4")) +
+  scale_shape_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
+                       labels = c("Site 2", "Site 3", "Site 4")) +
+  scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
+                     values = colorBlindPalette[2:4])
+# ER
+lm_data_ER <- data.frame(
+  ER = c(NMetabComp_eric$ER, NMetabComp_steve$ER, NMetabComp_desoto$ER),
+  perc = c(NMetabComp_eric$perc, NMetabComp_steve$perc, NMetabComp_desoto$perc)
+)
+lm_fit_ER <- lm(data = lm_data_ER)
+predicted_ER <- data.frame(ERpred = predict(lm_fit_ER, lm_data_ER), perc = lm_data_ER$perc)
+
+ggplot(NULL) +
+  geom_point(data = NMetabComp_eric, aes(x = ER, y = perc, color = "Site 2",
+                                           shape = "19", size = 2), show.legend = FALSE) +
+  geom_point(data = NMetabComp_steve, aes(x = ER, y = perc, color = "Site 3",
+                                           shape = "17", size = 2), show.legend = FALSE) +
+  geom_point(data = NMetabComp_desoto, aes(x = ER, y = perc, color = "Site 4",
+                                           shape = "15", size = 2), show.legend = FALSE) +
+  geom_line(data = predicted_ER, aes(x = ERpred, y = perc)) +
+  theme_classic() +
+  xlab("ER (g O2 m-2 d-1)") +
+  ylab("Change in NOX %") +
+  coord_cartesian(x = c(-5,1), y = c(-2,2)) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 14)) +
+  scale_color_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
+                       labels = c("Site 2", "Site 3", "Site 4")) +
+  scale_shape_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
+                       labels = c("Site 2", "Site 3", "Site 4")) +
+  scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
+                     values = colorBlindPalette[2:4])
+```
+
