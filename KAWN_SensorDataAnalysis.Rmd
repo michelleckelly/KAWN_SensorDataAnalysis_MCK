@@ -1696,12 +1696,10 @@ eric_metab <-
 data.frame(
   dateTime = ymd_hms(eric_DO$time_CST, tz = "America/Chicago")
 )
-
 steve_metab <- 
 data.frame(
   dateTime = ymd_hms(steve_DO$time_CST, tz = "America/Chicago")
 )
-
 desoto_metab <- 
   data.frame(
   dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago")
@@ -1724,14 +1722,12 @@ eric_pressure <-
     dateTime = BarPress$dateTime,
     mean_pressure = BarPress$mean
   )
-
 steve_alt <- 249.02 # m
 steve_pressure <- 
   data.frame(
     dateTime = BarPress$dateTime,
     mean_pressure = BarPress$mean
   )
-
 desoto_alt <- 229.78 # m
 desoto_pressure <- 
   data.frame(
@@ -1741,9 +1737,7 @@ desoto_pressure <-
 
 # [4] load gas exchange (K) functions
 eric_metab$K600 <- K600fromO2(temp = eric_metab$temp, KO2 = eric_metab$DOmgL)
-
 steve_metab$K600 <- K600fromO2(temp = steve_metab$temp, KO2 = steve_metab$DOmgL)
-
 desoto_metab$K600 <- K600fromO2(temp = desoto_metab$temp, KO2 = desoto_metab$DOmgL)
 
 # [5] depth
@@ -1757,13 +1751,11 @@ eric_depth <-
     dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago"),
     z = calc_depth(desoto$Flow_Inst)
   )
-
 steve_depth <- 
   data.frame(
     dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago"),
     z = calc_depth(desoto$Flow_Inst)
   )
-
 desoto_depth <- 
   data.frame(
     dateTime = ymd_hms(desoto$dateTime, tz = "America/Chicago"),
@@ -1895,7 +1887,10 @@ metabmodels_desoto <-
     mar_28 = metab_timeperiods(desoto_metab, "2018-03-27 00:00:00", "2018-03-29 00:00:00"), # Mar 27-29
     apr_02 = metab_timeperiods(desoto_metab, "2018-04-01 00:00:00", "2018-04-03 00:00:00"), # Apr 1-3
     apr_08 = metab_timeperiods(desoto_metab, "2018-04-07 00:00:00", "2018-04-09 00:00:00"), # Apr 7-9
-    apr_08 = metab_timeperiods(desoto_metab, "2018-04-07 00:00:00", "2018-04-09 00:00:00") # Apr 7-9
+    apr_15 = metab_timeperiods(desoto_metab, "2018-04-14 00:00:00", "2018-04-16 00:00:00"), # Apr 14-16
+    apr_19 = metab_timeperiods(desoto_metab, "2018-04-18 00:00:00", "2018-04-20 00:00:00"), # Apr 18-20
+    apr_23 = metab_timeperiods(desoto_metab, "2018-04-22 00:00:00", "2018-04-24 00:00:00"), # Apr 22-24
+    apr_29 = metab_timeperiods(desoto_metab, "2018-04-28 00:00:00", "2018-04-30 12:00:00") # Apr 28-30
   )
 metabmodels_desoto_results <- 
   data.frame(
@@ -1918,7 +1913,7 @@ ggplot(NULL) +
   theme_classic() +
   xlab(NULL) +
   ylab("GPP (g O2 m-2 d-1)") +
-  coord_cartesian(y = c(0,5), x = c(mdy("02/01/2018"), mdy("04/05/2018"))) +
+  coord_cartesian(y = c(0,5), x = c(mdy("02/01/2018"), mdy("05/01/2018"))) +
   ggtitle(NULL) +
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 14),
@@ -1945,7 +1940,7 @@ ggplot(NULL) +
   theme_classic() +
   xlab(NULL) +
   ylab("ER (g O2 m-2 d-1)") +
-  coord_cartesian(y = c(-2,2), x = c(mdy("02/01/2018"), mdy("04/05/2018"))) +
+  coord_cartesian(y = c(-2,2), x = c(mdy("02/01/2018"), mdy("05/01/2018"))) +
   ggtitle(NULL) +
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 14),
