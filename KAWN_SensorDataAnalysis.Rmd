@@ -1351,7 +1351,7 @@ ggsave(filename = "Site3_dielCutaway.png", plot = stevePlot_N_dielCutaway, dpi =
 ## PAR plot (include in talk)
 ```{r PARplotting, fig.height=3, fig.width=9, eval=FALSE}
 # calculate sum of PAR mean values
-PAR$PARMean_sum <- cumsum(PAR$PARMean)
+PAR$PARMean_sum <- cumsum(PAR$mean)
 
 # convert PAR units (from umol m^-2 s^-1 to mol m^-2 d^-1)
 umolm2s_to_molm2d <- function(umol_m2_s){
@@ -1892,7 +1892,10 @@ metabmodels_desoto <-
     mar_08 = metab_timeperiods(desoto_metab, "2018-03-07 17:00:00", "2018-03-09 17:00:00"), # Mar 7-9
     mar_19 = metab_timeperiods(desoto_metab, "2018-03-18 09:00:00", "2018-03-20 09:00:00"), # Mar 18-20
     mar_23 = metab_timeperiods(desoto_metab, "2018-03-22 00:00:00", "2018-03-24 00:00:00"), # Mar 22-24
-    mar_28 = metab_timeperiods(desoto_metab, "2018-03-27 00:00:00", "2018-03-29 00:00:00") # Mar 27-29
+    mar_28 = metab_timeperiods(desoto_metab, "2018-03-27 00:00:00", "2018-03-29 00:00:00"), # Mar 27-29
+    apr_02 = metab_timeperiods(desoto_metab, "2018-04-01 00:00:00", "2018-04-03 00:00:00"), # Apr 1-3
+    apr_08 = metab_timeperiods(desoto_metab, "2018-04-07 00:00:00", "2018-04-09 00:00:00"), # Apr 7-9
+    apr_08 = metab_timeperiods(desoto_metab, "2018-04-07 00:00:00", "2018-04-09 00:00:00") # Apr 7-9
   )
 metabmodels_desoto_results <- 
   data.frame(
@@ -1956,6 +1959,11 @@ ggplot(NULL) +
   scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
                      values = colorBlindPalette[2:4])
 ggsave(filename = "ER.png", plot = ER_plot, dpi = 500, width = 9, height = 3)
+GPP_plot
+ER_plot
+
+plot(metabmodels_desoto_results$GPP)
+plot(x = PAR$PARMean_sum)
 ```
 
 ```{r comparisonofNtoMetab, fig.width=5, fig.height=5}
