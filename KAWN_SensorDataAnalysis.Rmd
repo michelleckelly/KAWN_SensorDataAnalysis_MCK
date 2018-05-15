@@ -1797,9 +1797,7 @@ merge_metab <- function(metabDataframe, pressureDataframe, depthDataframe, round
 }
 
 eric_metab <- merge_metab(eric_metab, eric_pressure, eric_depth, TRUE)
-
 steve_metab <- merge_metab(steve_metab, steve_pressure, steve_depth, TRUE)
-
 desoto_metab <- merge_metab(desoto_metab, desoto_pressure, desoto_depth, FALSE)
 
 # [7] run metabolism model
@@ -1808,13 +1806,11 @@ eric_metab_output <- rivermetabK(o2file = na.omit(eric_metab),
                                   bp = mean(eric_metab$bp, na.rm = TRUE), 
                                   ts = 0.02083333)
 eric_metab_output
-
 steve_metab_output <- rivermetabK(o2file = na.omit(steve_metab), 
                                   z = 0.2, 
                                   bp = mean(steve_metab$bp, na.rm = TRUE), 
                                   ts = 0.02083333)
 steve_metab_output
-
 desoto_metab_output <- rivermetabK(o2file = na.omit(desoto_metab),
                                    z = 0.2,
                                    bp = mean(desoto_metab$bp, na.rm = TRUE),
@@ -1839,7 +1835,13 @@ metabmodels_eric <-
   list(
     feb_26 = metab_timeperiods(eric_metab, "2018-02-25 02:00:00", "2018-02-27 02:00:00"), # Feb 25-27
     mar_03 = metab_timeperiods(eric_metab, "2018-03-03 09:30:00", "2018-03-05 09:30:00"), # Mar 2-4
-    mar_23 = metab_timeperiods(eric_metab, "2018-03-22 00:00:00", "2018-03-24 00:00:00") # Mar 22-24
+    mar_23 = metab_timeperiods(eric_metab, "2018-03-22 00:00:00", "2018-03-24 00:00:00"), # Mar 22-24
+    mar_29 = metab_timeperiods(eric_metab, "2018-03-28 22:00:00", "2018-03-30 23:30:00"), # Mar 28-30
+    apr_06 = metab_timeperiods(eric_metab, "2018-04-05 12:00:00", "2018-04-07 12:00:00"), # Apr 05-07
+    apr_09 = metab_timeperiods(eric_metab, "2018-04-08 00:00:00", "2018-04-09 12:00:00"), # Apr 08-10
+    apr_12 = metab_timeperiods(eric_metab, "2018-04-11 17:30:00", "2018-04-13 17:30:00"), # Apr 11-13
+    apr_21 = metab_timeperiods(eric_metab, "2018-04-20 00:00:00", "2018-04-22 00:00:00"), # Apr 20-22
+    apr_24 = metab_timeperiods(eric_metab, "2018-04-23 19:00:00", "2018-04-25 19:00:00") # Apr 23-25
     )
 metabmodels_eric_results <- 
   data.frame(
@@ -1861,11 +1863,12 @@ metabmodels_steve <-
     mar_14 = metab_timeperiods(steve_metab, "2018-03-13 09:00:00", "2018-03-15 09:00:00"), # Mar 13-15
     mar_19 = metab_timeperiods(steve_metab, "2018-03-17 09:00:00", "2018-03-19 09:00:00"), # Mar 18-20
     mar_23 = metab_timeperiods(steve_metab, "2018-03-22 00:00:00", "2018-03-24 00:00:00"), # Mar 22-24
-    mar_28 = metab_timeperiods(steve_metab, "2018-03-27 00:00:00", "2018-03-29 00:00:00") # Mar 27-29
+    mar_28 = metab_timeperiods(steve_metab, "2018-03-27 00:00:00", "2018-03-29 00:00:00"), # Mar 27-29
+    apr_10 = metab_timeperiods(steve_metab, "2018-04-09 13:00:00", "2018-04-10 23:30:00"), # Apr 9-10
+    apr_12 = metab_timeperiods(steve_metab, "2018-04-11 17:30:00", "2018-04-13 17:30:00"), # Apr 11-13
+    apr_15 = metab_timeperiods(steve_metab, "2018-04-14 00:00:00", "2018-04-16 00:00:00"), # Apr 14-16
+    apr_19 = metab_timeperiods(steve_metab, "2018-04-19 00:00:00", "2018-04-19 23:30:00") # Apr 18-20
   )
-
-#metab_timeperiods(steve_metab, "2018-04-11 00:00:00", "2018-04-13 00:00:00") # Apr 11-13 (dont have april PAR)
-
 metabmodels_steve_results <- 
   data.frame(
     GPP = t(as.data.frame(lapply(metabmodels_steve, `[[`, 1))),
@@ -1925,7 +1928,8 @@ ggplot(NULL) +
   scale_shape_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
                        labels = c("Site 2", "Site 3", "Site 4")) +
   scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
-                     values = colorBlindPalette[2:4])
+                     values = colorBlindPalette[2:4]) +
+    geom_vline(xintercept = mdy("04/01/2018"))
 ggsave(filename = "GPP_plot.png", plot = GPP_plot, dpi = 500, width = 9, height = 3)
 GPP_plot
 
@@ -1939,8 +1943,9 @@ ggplot(NULL) +
                                                     shape = "15", size = 2), show.legend = FALSE) +
   theme_classic() +
   xlab(NULL) +
-  ylab("ER (g O2 m-2 d-1)") +
-  coord_cartesian(y = c(-2,2), x = c(mdy("02/01/2018"), mdy("05/01/2018"))) +
+  ylab(NULL) +
+  coord_cartesian(y = c(-2,0.5), x = c(mdy("02/01/2018"), mdy("05/01/2018"))) +
+  geom_vline(xintercept = mdy("04/01/2018")) +
   ggtitle(NULL) +
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 14),
@@ -1952,13 +1957,11 @@ ggplot(NULL) +
   scale_shape_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
                        labels = c("Site 2", "Site 3", "Site 4")) +
   scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
-                     values = colorBlindPalette[2:4])
-ggsave(filename = "ER.png", plot = ER_plot, dpi = 500, width = 9, height = 3)
-GPP_plot
-ER_plot
+                     values = colorBlindPalette[2:4]) 
 
-plot(metabmodels_desoto_results$GPP)
-plot(x = PAR$PARMean_sum)
+ER_plot
+ggsave(filename = "ER.png", plot = ER_plot, dpi = 500, width = 9, height = 3)
+
 ```
 
 ```{r comparisonofNtoMetab, fig.width=5, fig.height=5}
