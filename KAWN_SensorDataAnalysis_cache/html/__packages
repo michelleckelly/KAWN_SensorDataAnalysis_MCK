@@ -12,3 +12,6 @@ StanHeaders
 rstan
 dplyr
 bindrcpp
+magrittr
+chron
+data.table
