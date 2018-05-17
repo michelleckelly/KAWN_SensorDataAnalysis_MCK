@@ -820,117 +820,6 @@ stackedNPlot <-
 ggsave(filename = "StackedNPlot.png", plot = stackedNPlot, dpi = 500)
 ```
 
-## Temporal difference in N (include in talk)
-```{r Ntemporal, fig.height=9, fig.width=9}
-# bowersock
-bowersockN_daynightdiff <- data.frame(dateTime = bowersock_N$`Date and time`, 
-                                      nitrateNitrite = bowersock_N$`Nitrate plus nitrite as mg-N/L`)
-bowersockN_daynightdiff <- bowersockN_daynightdiff[seq(1, nrow(bowersockN_daynightdiff), 49),]
-bowersockN_daynightdiff$differences <- c(NA, diff(bowersockN_daynightdiff$nitrateNitrite, differences = 1))
-bowersockN_daynightdiff$perc <- NA
-for (i in 2:nrow(bowersockN_daynightdiff)){
-    bowersockN_daynightdiff$perc[i] <- 
-      bowersockN_daynightdiff$differences[i] / bowersockN_daynightdiff$nitrateNitrite[i-1]
-}
-bowersockN_daynightdiff$perc[bowersockN_daynightdiff$dateTime
-                             %between%
-                               c(ymd_hms("2018-02-27 05:00:00"), ymd_hms("2018-04-30 14:45:00"))] <- 0
-
-# eric
-ericN_daynightdiff <- data.frame(dateTime = eric_N$`Date and time`, 
-                                 nitrateNitrite = eric_N$`Nitrate plus nitrite as mg-N/L`)
-ericN_daynightdiff <- ericN_daynightdiff[seq(1, nrow(ericN_daynightdiff), 49),]
-ericN_daynightdiff$differences <- c(NA, diff(ericN_daynightdiff$nitrateNitrite, differences = 1))
-ericN_daynightdiff$perc <- NA
-for (i in 2:nrow(ericN_daynightdiff)){
-    ericN_daynightdiff$perc[i] <- 
-      ericN_daynightdiff$differences[i] / ericN_daynightdiff$nitrateNitrite[i-1]
-}
-
-# steve
-steveN_daynightdiff <- data.frame(dateTime = steve_N$`Date and time`, 
-                                  nitrateNitrite = steve_N$`Nitrate plus nitrite as mg-N/L`)
-steveN_daynightdiff <- steveN_daynightdiff[seq(1, nrow(steveN_daynightdiff), 49),]
-steveN_daynightdiff$differences <- c(NA, diff(steveN_daynightdiff$nitrateNitrite, differences = 1))
-steveN_daynightdiff$perc <- NA
-for (i in 2:nrow(steveN_daynightdiff)){
-    steveN_daynightdiff$perc[i] <- 
-      steveN_daynightdiff$differences[i] / steveN_daynightdiff$nitrateNitrite[i-1]
-}
-
-# desoto
-desotoN_daynightdiff <- data.frame(dateTime = desoto$dateTime, nitrateNitrite = desoto$nitrateNitrite)
-# select every 49 rows (should be approximating noon and midnight)
-# 4 (15 min intervals per hour) * 12 hours between midnight and noon = 48 step lag
-desotoN_daynightdiff <- desotoN_daynightdiff[seq(1, nrow(desotoN_daynightdiff), 49),]
-desotoN_daynightdiff$differences <- c(NA, diff(desotoN_daynightdiff$nitrateNitrite, differences = 1))
-desotoN_daynightdiff$perc <- NA
-for (i in 2:nrow(desotoN_daynightdiff)){
-    desotoN_daynightdiff$perc[i] <- 
-      desotoN_daynightdiff$differences[i] / desotoN_daynightdiff$nitrateNitrite[i-1]
-}
-
-# arrange all, y label is "Change in [NOx] (%)"
-ndiff_plot <- 
-grid.arrange(
-  ggplot(bowersockN_daynightdiff, aes(x = dateTime, y = perc, color = "Site 4")) +
-  geom_line(size = 2) +
-  theme_classic() +
-  xlab(NULL) +
-  ylab(NULL) +
-  coord_cartesian(y = c(-2,2), x = c(mdy_hms("02/01/2018 00:00:00"), mdy_hms("05/01/2018 00:00:00"))) +
-  ggtitle(NULL) +
-  theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14),
-        legend.position = "none", axis.text.x = element_blank()) +
-  scale_color_manual(breaks = "Site 4", values = colorBlindPalette[1]) +
-  scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
-  geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00")),
-  
-  ggplot(ericN_daynightdiff, aes(x = dateTime, y = perc, color = "Site 4")) +
-  geom_line(size = 2) +
-  theme_classic() +
-  xlab(NULL) +
-  ylab(NULL) +
-  coord_cartesian(y = c(-2,2), x = c(mdy_hms("02/01/2018 00:00:00"), mdy_hms("05/01/2018 00:00:00"))) +
-  ggtitle(NULL) +
-  theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14),
-        legend.position = "none", axis.text.x = element_blank()) +
-  scale_color_manual(breaks = "Site 4", values = colorBlindPalette[2]) +
-  scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
-  geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00")),
-  
-  ggplot(steveN_daynightdiff, aes(x = dateTime, y = perc, color = "Site 4")) +
-  geom_line(size = 2) +
-  theme_classic() +
-  xlab(NULL) +
-  ylab(NULL) +
-  coord_cartesian(y = c(-2,2), x = c(mdy_hms("02/01/2018 00:00:00"), mdy_hms("05/01/2018 00:00:00"))) +
-  ggtitle(NULL) +
-  theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14),
-        legend.position = "none", axis.text.x = element_blank()) +
-  scale_color_manual(breaks = "Site 4", values = colorBlindPalette[3]) +
-  scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
-  geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00")),
-  
-  ggplot(desotoN_daynightdiff, aes(x = dateTime, y = perc, color = "Site 4")) +
-  geom_line(size = 2) +
-  theme_classic() +
-  xlab("Date") +
-  ylab(NULL) +
-  coord_cartesian(y = c(-2,2), x = c(mdy_hms("02/01/2018 00:00:00"), mdy_hms("05/01/2018 00:00:00"))) +
-  ggtitle(NULL) +
-  theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14),
-        legend.position = "none") +
-  scale_color_manual(breaks = "Site 4", values = colorBlindPalette[4]) +
-  scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
-  geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00")),
-  
-  nrow = 4,
-  ncol = 1
-)
-
-ggsave(filename = "Ndiff.png", plot = ndiff_plot, dpi = 500)
-```
 ## Combined temperature plot (include in talk)
 ```{r comboTemp, fig.width=9, fig.height=3}
 comboTemp <- 
@@ -956,49 +845,6 @@ ggsave(filename = "temp_comboplot.png", plot = comboTemp, dpi = 500,
        width = 9, height = 3, units = "in")
 ```
 
-## Time period plots  
-
-```{r PeriodPlots, include=TRUE, fig.height=5, fig.width=6}
-# Bowersock zoom N plot
-bowersockPlot_N +
-  coord_cartesian(xlim = c(mdy_hms("02-21-2018 12:00:00"),mdy_hms("02-27-2018 12:00:00")),
-                  ylim = c(0,0.4)) +
-  scale_x_datetime(date_breaks = "2 days", date_labels = "%b %d") +
-  ylab(NULL) +
-  xlab(NULL) +
-  ggtitle(NULL) +
-  theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14))
-
-# eric zoom N plot
-ericPlot_N +
-    coord_cartesian(xlim = c(mdy_hms("03-20-2018 12:00:00"),mdy_hms("03-26-2018 12:00:00")),
-                    ylim = c(0,10)) +
-    scale_x_datetime(date_breaks = "2 days", date_labels = "%b %d") +
-    ylab(NULL) +
-    xlab(NULL) +
-    ggtitle(NULL) +
-    theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14))
-
-# steve zoom N plot
-stevePlot_N +
-    coord_cartesian(xlim = c(mdy_hms("02-10-2018 12:00:00"),mdy_hms("02-16-2018 12:00:00")),
-                    ylim = c(0,1)) +
-    scale_x_datetime(date_breaks = "2 days", date_labels = "%b %d") +
-    ylab(NULL) +
-    xlab(NULL) +
-    ggtitle(NULL) +
-    theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14))
-
-# desoto zoom N plot
-desotoPlot_N +
-    coord_cartesian(xlim = c(mdy_hms("03-10-2018 12:00:00"),mdy_hms("03-16-2018 12:00:00")),
-                    ylim = c(0,1)) +
-    scale_x_datetime(date_breaks = "2 days", date_labels = "%b %d") +
-    ylab(NULL) +
-    xlab(NULL) +
-    ggtitle(NULL) +
-    theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14))
-```
 
 ## PAR plot (include in talk)
 ```{r PARplotting, fig.height=3, fig.width=9, eval=FALSE}
@@ -1079,11 +925,53 @@ ggsave(filename = "PAR_rawPlot.png", plot = PAR_rawPlot, dpi = 500,
        width = 9, height = 3, units = "in")
 ```
 
+## Time period plots  
+
+```{r PeriodPlots, include=TRUE, fig.height=5, fig.width=6}
+# Bowersock zoom N plot
+bowersockPlot_N +
+  coord_cartesian(xlim = c(mdy_hms("02-21-2018 12:00:00"),mdy_hms("02-27-2018 12:00:00")),
+                  ylim = c(0,0.4)) +
+  scale_x_datetime(date_breaks = "2 days", date_labels = "%b %d") +
+  ylab(NULL) +
+  xlab(NULL) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14))
+
+# eric zoom N plot
+ericPlot_N +
+    coord_cartesian(xlim = c(mdy_hms("03-20-2018 12:00:00"),mdy_hms("03-26-2018 12:00:00")),
+                    ylim = c(0,10)) +
+    scale_x_datetime(date_breaks = "2 days", date_labels = "%b %d") +
+    ylab(NULL) +
+    xlab(NULL) +
+    ggtitle(NULL) +
+    theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14))
+
+# steve zoom N plot
+stevePlot_N +
+    coord_cartesian(xlim = c(mdy_hms("02-10-2018 12:00:00"),mdy_hms("02-16-2018 12:00:00")),
+                    ylim = c(0,1)) +
+    scale_x_datetime(date_breaks = "2 days", date_labels = "%b %d") +
+    ylab(NULL) +
+    xlab(NULL) +
+    ggtitle(NULL) +
+    theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14))
+
+# desoto zoom N plot
+desotoPlot_N +
+    coord_cartesian(xlim = c(mdy_hms("03-10-2018 12:00:00"),mdy_hms("03-16-2018 12:00:00")),
+                    ylim = c(0,1)) +
+    scale_x_datetime(date_breaks = "2 days", date_labels = "%b %d") +
+    ylab(NULL) +
+    xlab(NULL) +
+    ggtitle(NULL) +
+    theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14))
+```
+
 # Water Balance  
 
-## Computation  
-
-```{r waterBalanceComputation, include=TRUE, eval=FALSE}
+```{r waterBalance, fig.height=3, fig.width=10, include=TRUE}
 #subset data frames
 desoto_sub <- data.frame(desoto$dateTime, desoto$Flow_Inst)
 names(desoto_sub) <- c("dateTime", "Flow_Inst")
@@ -1099,11 +987,7 @@ waterBal <- merge(desoto_sub, lawrence_sub,
 
 #calculate difference between downstream and upstream gauge (balance = downstream discharge - upstream)
 waterBal$difference <- waterBal$Flow_Inst.desoto - waterBal$Flow_Inst.lawrence
-```
 
-## Plotting  
-
-```{r waterBalancePlotting, echo=FALSE, fig.height=3, fig.width=10, warning=FALSE, eval=FALSE}
 # plotting flow at upstream and downstream locations on same time series graph
 ggplot() +
   geom_line(data = desoto, aes(x = dateTime, y = Flow_Inst, color = "Desoto")) +
@@ -1138,6 +1022,150 @@ ggsave(filename = "waterBal_plot.png", plot = waterBal_plot, dpi = 500,
 
 ***  
 
+## Temporal difference in N (include in talk)  
+
+```{r Ntemporal, fig.height=9, fig.width=9}
+# bowersock
+bowersock_N_0 <- bowersock_N[grep("00:00:00", bowersock_N$`Date and time`),]
+bowersock_N_12 <- bowersock_N[grep("12:00:00", bowersock_N$`Date and time`),]
+bowersockN_daynightdiff <- merge(
+  bowersock_N_0,
+  bowersock_N_12,
+  by = c("Date and time", "Nitrate plus nitrite as mg-N/L"), all = TRUE
+)
+bowersockN_daynightdiff$differences <- c(NA, 
+                                         diff(bowersockN_daynightdiff$`Nitrate plus nitrite as mg-N/L`, 
+                                         differences = 1))
+bowersockN_daynightdiff$perc <- NA
+for (i in 2:nrow(bowersockN_daynightdiff)){
+    bowersockN_daynightdiff$perc[i] <- 
+      bowersockN_daynightdiff$differences[i] / 
+      bowersockN_daynightdiff$`Nitrate plus nitrite as mg-N/L`[i-1]
+}
+bowersockN_daynightdiff$perc[bowersockN_daynightdiff$`Date and time`
+                             %between%
+                               c(ymd_hms("2018-02-27 05:00:00"), 
+                                 ymd_hms("2018-04-30 14:45:00"))] <- 0
+
+# eric
+eric_N_0 <- eric_N[grep("00:00:00", eric_N$`Date and time`),]
+eric_N_12 <- eric_N[grep("12:00:00", eric_N$`Date and time`),]
+ericN_daynightdiff <- merge(
+  eric_N_0,
+  eric_N_12,
+  by = c("Date and time", "Nitrate plus nitrite as mg-N/L"), all = TRUE
+)
+ericN_daynightdiff$differences <- c(NA, 
+                                    diff(ericN_daynightdiff$`Nitrate plus nitrite as mg-N/L`, 
+                                    differences = 1))
+ericN_daynightdiff$perc <- NA
+for (i in 2:nrow(ericN_daynightdiff)){
+    ericN_daynightdiff$perc[i] <- 
+    ericN_daynightdiff$differences[i] / 
+    ericN_daynightdiff$`Nitrate plus nitrite as mg-N/L`[i-1]
+}
+
+# steve
+steve_N_0 <- steve_N[grep("00:00:00", steve_N$`Date and time`),]
+steve_N_12 <- steve_N[grep("12:00:00", steve_N$`Date and time`),]
+steveN_daynightdiff <- merge(
+  steve_N_0,
+  steve_N_12,
+  by = c("Date and time", "Nitrate plus nitrite as mg-N/L"), all = TRUE
+)
+steveN_daynightdiff$differences <- c(NA, 
+                                    diff(steveN_daynightdiff$`Nitrate plus nitrite as mg-N/L`, 
+                                    differences = 1))
+steveN_daynightdiff$perc <- NA
+for (i in 2:nrow(steveN_daynightdiff)){
+    steveN_daynightdiff$perc[i] <- 
+    steveN_daynightdiff$differences[i] / 
+    steveN_daynightdiff$`Nitrate plus nitrite as mg-N/L`[i-1]
+}
+
+# desoto
+desoto_N_0 <- desoto[grep("00:00:00", desoto$dateTime),]
+desoto_N_12 <- desoto[grep("12:00:00", desoto$dateTime),]
+desotoN_daynightdiff <- merge(
+  desoto_N_0,
+  desoto_N_12,
+  by = c("dateTime", "nitrateNitrite"), all = TRUE
+)
+desotoN_daynightdiff$differences <- c(NA, 
+                                      diff(desotoN_daynightdiff$nitrateNitrite, 
+                                      differences = 1))
+desotoN_daynightdiff$perc <- NA
+for (i in 2:nrow(desotoN_daynightdiff)){
+    desotoN_daynightdiff$perc[i] <- 
+    desotoN_daynightdiff$differences[i] / 
+    desotoN_daynightdiff$nitrateNitrite[i-1]
+}
+
+# arrange all, y label is "Change in [NOx] (%)"
+ndiff_plot <- 
+grid.arrange(
+  ggplot(bowersockN_daynightdiff, aes(x = `Date and time`, y = perc, color = "Site 4")) +
+  geom_line(size = 2) +
+  theme_classic() +
+  xlab(NULL) +
+  ylab(NULL) +
+  coord_cartesian(y = c(-2,2), x = c(mdy_hms("02/01/2018 00:00:00"), mdy_hms("05/01/2018 00:00:00"))) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14),
+        legend.position = "none", axis.text.x = element_blank()) +
+  scale_color_manual(breaks = "Site 4", values = colorBlindPalette[1]) +
+  scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
+  geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00")) +
+  geom_hline(yintercept = 0),
+  
+  ggplot(ericN_daynightdiff, aes(x = `Date and time`, y = perc, color = "Site 4")) +
+  geom_line(size = 2) +
+  theme_classic() +
+  xlab(NULL) +
+  ylab(NULL) +
+  coord_cartesian(y = c(-2,2), x = c(mdy_hms("02/01/2018 00:00:00"), mdy_hms("05/01/2018 00:00:00"))) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14),
+        legend.position = "none", axis.text.x = element_blank()) +
+  scale_color_manual(breaks = "Site 4", values = colorBlindPalette[2]) +
+  scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
+  geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00")) +
+  geom_hline(yintercept = 0),
+  
+  ggplot(steveN_daynightdiff, aes(x = `Date and time`, y = perc, color = "Site 4")) +
+  geom_line(size = 2) +
+  theme_classic() +
+  xlab(NULL) +
+  ylab(NULL) +
+  coord_cartesian(y = c(-2,2), x = c(mdy_hms("02/01/2018 00:00:00"), mdy_hms("05/01/2018 00:00:00"))) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14),
+        legend.position = "none", axis.text.x = element_blank()) +
+  scale_color_manual(breaks = "Site 4", values = colorBlindPalette[3]) +
+  scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
+  geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00")) +
+  geom_hline(yintercept = 0),
+  
+  ggplot(desotoN_daynightdiff, aes(x = dateTime, y = perc, color = "Site 4")) +
+  geom_line(size = 2) +
+  theme_classic() +
+  xlab(NULL) +
+  ylab(NULL) +
+  coord_cartesian(y = c(-2,2), x = c(mdy_hms("02/01/2018 00:00:00"), mdy_hms("05/01/2018 00:00:00"))) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14),
+        legend.position = "none") +
+  scale_color_manual(breaks = "Site 4", values = colorBlindPalette[4]) +
+  scale_x_datetime(date_breaks = "2 weeks", date_labels = "%b %d") +
+  geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00")) +
+  geom_hline(yintercept = 0),
+  
+  nrow = 4,
+  ncol = 1
+)
+
+ggsave(filename = "Ndiff.png", plot = ndiff_plot, dpi = 500)
+```
 # Metabolism modeling
 
 ```{r StreamMetabolizer, eval=FALSE}
@@ -1616,58 +1644,68 @@ ggsave(filename = "ER.png", plot = ER_plot, dpi = 500, width = 9, height = 3)
 
 ```
 
-```{r comparisonofNtoMetab, fig.width=5, fig.height=5}
-# GPP
-ericN_daynightdiff$date <- date(ericN_daynightdiff$dateTime)
-NMetabComp_eric <- merge(ericN_daynightdiff, metabmodels_eric_results, by = "date")
-#NMetabComp_eric <- NMetabComp_eric[seq(1, nrow(NMetabComp_eric), 2),]
+# Comparison of change in N to GPP and ER
 
-steveN_daynightdiff$date <- date(steveN_daynightdiff$dateTime)
-NMetabComp_steve <- merge(steveN_daynightdiff, metabmodels_steve_results, by = "date")
-#NMetabComp_steve <- NMetabComp_steve[seq(1, nrow(NMetabComp_steve), 2),]
+```{r comparisonofNtoMetab, fig.width=5, fig.height=5}
+# GPP and ER and N data frames
+ericN_daynightdiff$date <- date(ericN_daynightdiff$`Date and time`)
+NMetabComp_eric <- merge(ericN_daynightdiff, metabmodels_eric_results, 
+                         by = "date")
+NMetabComp_eric$perc <- abs(NMetabComp_eric$perc)
+
+steveN_daynightdiff$date <- date(steveN_daynightdiff$`Date and time`)
+NMetabComp_steve <- merge(steveN_daynightdiff, metabmodels_steve_results, 
+                          by = "date")
+NMetabComp_steve$perc <- abs(NMetabComp_steve$perc)
 
 desotoN_daynightdiff$date <- date(desotoN_daynightdiff$dateTime)
-NMetabComp_desoto <- merge(desotoN_daynightdiff, metabmodels_desoto_results, by = "date")
-#NMetabComp_desoto <- NMetabComp_desoto[seq(1, nrow(NMetabComp_desoto), 2),]
+NMetabComp_desoto <- merge(desotoN_daynightdiff, metabmodels_desoto_results,
+                           by = "date")
+NMetabComp_desoto$perc <- abs(NMetabComp_desoto$perc)
 
+# linear models
 lm_data_GPP <- data.frame(
   GPP = c(NMetabComp_eric$GPP, NMetabComp_steve$GPP, NMetabComp_desoto$GPP),
   perc = c(NMetabComp_eric$perc, NMetabComp_steve$perc, NMetabComp_desoto$perc)
 )
-lm_fit_GPP <- lm(data = lm_data_GPP)
-predicted_GPP <- data.frame(GPPpred = predict(lm_fit_GPP, lm_data_GPP), perc = lm_data_GPP$perc)
-
+lm_data_ER <- data.frame(
+  ER = c(NMetabComp_eric$ER, NMetabComp_steve$ER, NMetabComp_desoto$ER),
+  perc = c(NMetabComp_eric$perc, NMetabComp_steve$perc, NMetabComp_desoto$perc)
+)
+# notation: response~terms
+predicted_perc_GPP <- data.frame(
+  percpred = predict.lm(lm(lm_data_GPP$perc~lm_data_GPP$GPP), lm_data_GPP), 
+  GPP = lm_data_GPP$GPP
+  )
+predicted_perc_ER <- data.frame(
+  percpred = predict.lm(lm(lm_data_ER$perc~lm_data_ER$ER), lm_data_ER), 
+  ER = lm_data_ER$ER
+  )
+# GPP plot
 ggplot(NULL) +
-  geom_point(data = NMetabComp_eric, aes(x = GPP, y = perc, color = "Site 2",
-                                           shape = "19", size = 2), show.legend = FALSE) +
-  geom_point(data = NMetabComp_steve, aes(x = GPP, y = perc, color = "Site 3",
-                                           shape = "17", size = 2), show.legend = FALSE) +
-  geom_point(data = NMetabComp_desoto, aes(x = GPP, y = perc, color = "Site 4",
-                                           shape = "15", size = 2), show.legend = FALSE) +
-  geom_line(data = predicted_GPP, aes(x = GPPpred, y = perc)) +
+  geom_point(data = NMetabComp_eric, 
+             aes(x = GPP, y = perc, color = "Site 2", shape = "19", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_steve, 
+             aes(x = GPP, y = perc, color = "Site 3", shape = "17", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_desoto, 
+             aes(x = GPP, y = perc, color = "Site 4", shape = "15", size = 2), 
+             show.legend = FALSE) +
+  geom_line(data = predicted_perc_GPP, aes(y = percpred, x = GPP)) +
   theme_classic() +
   xlab("GPP (g O2 m-2 d-1)") +
   ylab("Change in NOX %") +
-  coord_cartesian(x = c(0,5), y = c(-2,2)) +
+  #coord_cartesian(x = c(0,5), y = c(-2,2)) +
   ggtitle(NULL) +
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 14),
         legend.title = element_blank(),
         legend.text = element_text(size = 14)) +
-  scale_color_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
-                       labels = c("Site 2", "Site 3", "Site 4")) +
-  scale_shape_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
-                       labels = c("Site 2", "Site 3", "Site 4")) +
   scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
                      values = colorBlindPalette[2:4])
-# ER
-lm_data_ER <- data.frame(
-  ER = c(NMetabComp_eric$ER, NMetabComp_steve$ER, NMetabComp_desoto$ER),
-  perc = c(NMetabComp_eric$perc, NMetabComp_steve$perc, NMetabComp_desoto$perc)
-)
-lm_fit_ER <- lm(data = lm_data_ER)
-predicted_ER <- data.frame(ERpred = predict(lm_fit_ER, lm_data_ER), perc = lm_data_ER$perc)
 
+# ER
 ggplot(NULL) +
   geom_point(data = NMetabComp_eric, aes(x = ER, y = perc, color = "Site 2",
                                            shape = "19", size = 2), show.legend = FALSE) +
@@ -1675,11 +1713,12 @@ ggplot(NULL) +
                                            shape = "17", size = 2), show.legend = FALSE) +
   geom_point(data = NMetabComp_desoto, aes(x = ER, y = perc, color = "Site 4",
                                            shape = "15", size = 2), show.legend = FALSE) +
-  geom_line(data = predicted_ER, aes(x = ERpred, y = perc)) +
+  geom_line(data = predicted_perc_ER, aes(y = percpred, x = ER)) +
   theme_classic() +
   xlab("ER (g O2 m-2 d-1)") +
   ylab("Change in NOX %") +
-  coord_cartesian(x = c(-5,1), y = c(-2,2)) +
+  scale_y_continuous(position = "right") +
+  #coord_cartesian(x = c(-5,1), y = c(-2,2)) +
   ggtitle(NULL) +
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 14),
@@ -1693,3 +1732,163 @@ ggplot(NULL) +
                      values = colorBlindPalette[2:4])
 ```
 
+```{r Metab and temp, fig.width=5, fig.height=5}
+eric_metab$date <- date(eric_metab$dateTime)
+NMetabComp_eric <- merge(NMetabComp_eric, eric_metab, by = "date")
+NMetabComp_eric_summary <- 
+NMetabComp_eric %>%
+  group_by(date) %>%
+  summarise(mean_temp = mean(temp), sd_temp = sd(temp), GPP = mean(GPP), ER = mean(ER))
+
+steve_metab$date <- date(steve_metab$dateTime)
+NMetabComp_steve <- merge(NMetabComp_steve, steve_metab, by = "date")
+NMetabComp_steve_summary <- 
+NMetabComp_steve %>%
+  group_by(date) %>%
+  summarise(mean_temp = mean(temp), sd_temp = sd(temp), GPP = mean(GPP), ER = mean(ER))
+
+desoto_metab$date <- date(desoto_metab$dateTime)
+NMetabComp_desoto <- merge(NMetabComp_desoto, desoto_metab, by = "date")
+NMetabComp_desoto_summary <- 
+NMetabComp_desoto %>%
+  group_by(date) %>%
+  summarise(mean_temp = mean(temp), sd_temp = sd(temp), GPP = mean(GPP), ER = mean(ER))
+
+# linear models
+lm_data_GPP_temp <- data.frame(
+  GPP = c(NMetabComp_eric_summary$GPP, 
+          NMetabComp_steve_summary$GPP, 
+          NMetabComp_desoto_summary$GPP),
+  temp = c(NMetabComp_eric_summary$mean_temp, 
+           NMetabComp_steve_summary$mean_temp, 
+           NMetabComp_desoto_summary$mean_temp)
+)
+lm_data_ER_temp <- data.frame(
+  ER = c(NMetabComp_eric_summary$ER, 
+         NMetabComp_steve_summary$ER, 
+         NMetabComp_desoto_summary$ER),
+  temp = c(NMetabComp_eric_summary$mean_temp, 
+           NMetabComp_steve_summary$mean_temp, 
+           NMetabComp_desoto_summary$mean_temp)
+)
+# notation: response~terms
+predicted_temp_GPP <- data.frame(
+  temppred = predict.lm(lm(lm_data_GPP_temp$temp~lm_data_GPP_temp$GPP), lm_data_GPP_temp), 
+  GPP = lm_data_GPP_temp$GPP
+  )
+predicted_temp_ER <- data.frame(
+  temppred = predict.lm(lm(lm_data_ER_temp$temp~lm_data_ER_temp$ER), lm_data_ER_temp), 
+  ER = lm_data_ER_temp$ER
+  )
+
+# GPP and temp plot
+ggplot(NULL) +
+  geom_point(data = NMetabComp_eric_summary, 
+             aes(x = GPP, y = mean_temp, color = "Site 2", shape = "19", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_steve_summary, 
+             aes(x = GPP, y = mean_temp, color = "Site 3", shape = "17", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_desoto_summary, 
+             aes(x = GPP, y = mean_temp, color = "Site 4", shape = "15", size = 2), 
+             show.legend = FALSE) +
+  geom_line(data = predicted_temp_GPP, aes(y = temppred, x = GPP)) +
+  geom_errorbar(data = NMetabComp_eric_summary, 
+                aes(ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
+  theme_classic() +
+  xlab("gpp") +
+  ylab("temp") +
+  #coord_cartesian(x = c(0,5), y = c(-2,2)) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 14)) +
+  scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
+                     values = colorBlindPalette[2:4])
+
+# ER and temp plot
+ggplot(NULL) +
+  geom_point(data = NMetabComp_eric_summary, aes(x = ER, y = mean_temp, color = "Site 2",
+                                           shape = "19", size = 2), show.legend = FALSE) +
+  geom_point(data = NMetabComp_steve_summary, aes(x = ER, y = mean_temp, color = "Site 3",
+                                           shape = "17", size = 2), show.legend = FALSE) +
+  geom_point(data = NMetabComp_desoto_summary, aes(x = ER, y = mean_temp, color = "Site 4",
+                                           shape = "15", size = 2), show.legend = FALSE) +
+  geom_line(data = predicted_temp_ER, aes(y = temppred, x = ER)) +
+  theme_classic() +
+  xlab("ER (g O2 m-2 d-1)") +
+  ylab("mean temp") +
+  scale_y_continuous(position = "right") +
+  #coord_cartesian(x = c(-5,1), y = c(-2,2)) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 14)) +
+  scale_color_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
+                       labels = c("Site 2", "Site 3", "Site 4")) +
+  scale_shape_discrete(name = "Site", breaks = c("Site 2", "Site 3", "Site 4"), 
+                       labels = c("Site 2", "Site 3", "Site 4")) +
+  scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
+                     values = colorBlindPalette[2:4])
+```
+
+```{r NtoMetabbyTime, fig.width=5, fig.height=5}
+# GPP plot: before 1 Apr
+NMetabComp_eric_before1Apr <- NMetabComp_eric[NMetabComp_eric$`Date and time`<mdy_hms("04-01-2018 00:00:00"),]
+NMetabComp_steve_before1Apr <- NMetabComp_steve[NMetabComp_steve$`Date and time`<mdy_hms("04-01-2018 00:00:00"),]
+NMetabComp_desoto_before1Apr <- NMetabComp_desoto[NMetabComp_desoto$dateTime<mdy_hms("04-01-2018 00:00:00"),]
+
+ggplot(NULL) +
+  geom_point(data = NMetabComp_eric_before1Apr, 
+             aes(x = GPP, y = perc, color = "Site 2", shape = "19", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_steve_before1Apr, 
+             aes(x = GPP, y = perc, color = "Site 3", shape = "17", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_desoto_before1Apr, 
+             aes(x = GPP, y = perc, color = "Site 4", shape = "15", size = 2), 
+             show.legend = FALSE) +
+  #geom_line(data = predicted_perc_GPP, aes(y = percpred, x = GPP)) +
+  theme_classic() +
+  xlab("GPP (g O2 m-2 d-1)") +
+  ylab("Change in NOX %") +
+  coord_cartesian(y = c(0,1.5)) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 14)) +
+  scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
+                     values = colorBlindPalette[2:4])
+
+# GPP: post 1 Apr
+NMetabComp_eric_after1Apr <- NMetabComp_eric[NMetabComp_eric$`Date and time`>mdy_hms("04-01-2018 00:00:00"),]
+NMetabComp_steve_after1Apr <- NMetabComp_steve[NMetabComp_steve$`Date and time`>mdy_hms("04-01-2018 00:00:00"),]
+NMetabComp_desoto_after1Apr <- NMetabComp_desoto[NMetabComp_desoto$dateTime>mdy_hms("04-01-2018 00:00:00"),]
+
+ggplot(NULL) +
+  geom_point(data = NMetabComp_eric_after1Apr, 
+             aes(x = GPP, y = perc, color = "Site 2", shape = "19", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_steve_after1Apr, 
+             aes(x = GPP, y = perc, color = "Site 3", shape = "17", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_desoto_after1Apr, 
+             aes(x = GPP, y = perc, color = "Site 4", shape = "15", size = 2), 
+             show.legend = FALSE) +
+  #geom_line(data = predicted_perc_GPP, aes(y = percpred, x = GPP)) +
+  theme_classic() +
+  xlab("GPP (g O2 m-2 d-1)") +
+  ylab("Change in NOX %") +
+  coord_cartesian(y = c(0,1.5)) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 14)) +
+  scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
+                     values = colorBlindPalette[2:4])
+
+```
