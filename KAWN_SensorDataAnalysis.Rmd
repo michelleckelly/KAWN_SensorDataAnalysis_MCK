@@ -1786,15 +1786,19 @@ ggplot(NULL) +
   geom_point(data = NMetabComp_eric_summary, 
              aes(x = GPP, y = mean_temp, color = "Site 2", shape = "19", size = 2), 
              show.legend = FALSE) +
+  geom_errorbar(data = NMetabComp_eric_summary, 
+                aes(x = GPP, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
   geom_point(data = NMetabComp_steve_summary, 
              aes(x = GPP, y = mean_temp, color = "Site 3", shape = "17", size = 2), 
              show.legend = FALSE) +
+  geom_errorbar(data = NMetabComp_steve_summary, 
+                aes(x = GPP, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
   geom_point(data = NMetabComp_desoto_summary, 
              aes(x = GPP, y = mean_temp, color = "Site 4", shape = "15", size = 2), 
              show.legend = FALSE) +
+  geom_errorbar(data = NMetabComp_desoto_summary, 
+                aes(x = GPP, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
   geom_line(data = predicted_temp_GPP, aes(y = temppred, x = GPP)) +
-  geom_errorbar(data = NMetabComp_eric_summary, 
-                aes(ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
   theme_classic() +
   xlab("gpp") +
   ylab("temp") +
@@ -1811,10 +1815,16 @@ ggplot(NULL) +
 ggplot(NULL) +
   geom_point(data = NMetabComp_eric_summary, aes(x = ER, y = mean_temp, color = "Site 2",
                                            shape = "19", size = 2), show.legend = FALSE) +
+  geom_errorbar(data = NMetabComp_eric_summary, 
+                aes(x = ER, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
   geom_point(data = NMetabComp_steve_summary, aes(x = ER, y = mean_temp, color = "Site 3",
                                            shape = "17", size = 2), show.legend = FALSE) +
+  geom_errorbar(data = NMetabComp_steve_summary, 
+                aes(x = ER, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
   geom_point(data = NMetabComp_desoto_summary, aes(x = ER, y = mean_temp, color = "Site 4",
                                            shape = "15", size = 2), show.legend = FALSE) +
+  geom_errorbar(data = NMetabComp_desoto_summary, 
+                aes(x = ER, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
   geom_line(data = predicted_temp_ER, aes(y = temppred, x = ER)) +
   theme_classic() +
   xlab("ER (g O2 m-2 d-1)") +
