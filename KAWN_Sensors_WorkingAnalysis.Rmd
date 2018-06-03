@@ -1,7 +1,7 @@
 ---
 title: 'KAWN RAPID: Sensor Data Analysis'
 author: "Michelle Catherine Kelly"
-date: "22 April 2018"
+date: "3 June 2018"
 output:
   html_document:
     theme: yeti
@@ -560,7 +560,7 @@ if (downloadNEONfiles == TRUE){
 }
 
 PAR <- read.csv(file = paste0(getwd(), "/NEONfiles", "/stackedFiles", 
-                              "/PARPAR_30min.csv"), header = TRUE)
+                              "/PARPAR_1min.csv"), header = TRUE)
 PAR <- subset(PAR, subset = PAR$verticalPosition == 10) # take measurements that are closest to ground
 PAR$startDateTime <- ymd_hms(PAR$startDateTime, tz = "America/Chicago")
 PAR <- data.frame(
@@ -1199,39 +1199,44 @@ desotoPlot_N +
 # Metabolism modeling
 
 ```{r StreamMetabolizer}
-# Desoto dataframe setup
-desoto_longitude <- -94.964616
-# calculate solar time
-PAR$dateTime_solar <- calc_solar_time(PAR$startDateTime, longitude = desoto_longitude)
-desoto$dateTime_solar <- calc_solar_time(desoto$dateTime, longitude = desoto_longitude)
+# round datetime_solar
+#desoto$dateTime_solar <- round_date(desoto$dateTime_solar, "10 minutes")
+
 # estimate stream depth from discharge data
   # using d = c*Q^f Leopold and Maddock 1953
   # default values for c and f as suggested in Raymond et al 2012
       # c = 0.409 m, f = 0.294 **verify if these are representative of Kaw
 desoto$depth <- calc_depth(desoto$Flow_Inst)
   # this gives us close the the GH readings for depth
-#assemble data frame of data needed for metabolism model
-desoto_MetabData <- merge.data.frame(desoto, PAR, 
-                                     by = intersect(names(desoto), names(PAR)))
-desoto_MetabData <- desoto_MetabData[, c("dateTime_solar", "Wtemp_Inst", "Flow_Inst",
-                                         "GH_Inst", "DO_Inst", "DO_percentsat", "depth",
-                                         "PARMean")]
-# comparison between using gage height and estimated depth
-    # using USGS measured gage height
-desoto_MetabData <- subset(desoto_MetabData, select = -c(GH_Inst))
-names(desoto_MetabData) <- c("solar.time", "temp.water", "discharge",
-                              "DO.obs", "DO.sat", "depth", "light")
+
+# assemble data frame of data needed for metabolism model
+desoto_MetabData <- merge.data.frame(desoto, PAR, by = "dateTime")
+# calculate solar time
+desoto_longitude <- -94.964616
+desoto_MetabData$dateTime_solar <- calc_solar_time(desoto_MetabData$dateTime, 
+                                                   longitude = desoto_longitude)
+# cleanup data frame 
+desoto_MetabData <- 
+data.frame(solar.time = desoto_MetabData$dateTime_solar,
+           temp.water = desoto_MetabData$Wtemp_Inst,
+           discharge = desoto_MetabData$Flow_Inst,
+           DO.obs = desoto_MetabData$DO_Inst,
+           DO.sat = desoto_MetabData$DO_percentsat,
+           depth = desoto_MetabData$depth,
+           light = desoto_MetabData$mean)
 
 # model fitting
     # using the basic MLE model
 mle_name <- mm_name(type='mle', ode_method = "trapezoid")
 mle_specs <- specs(mle_name)
-mle_specs <- revise(mle_specs, split_dates = FALSE, verbose = TRUE)
+mle_specs <- revise(mle_specs, day_start = 4, day_end = 28, required_timestep = NA,
+                    split_dates = TRUE, verbose = TRUE)
 mm_mle_desoto <- metab(mle_specs, data = desoto_MetabData)
 
 # model plotting
 plot_metab_preds(mm_mle_desoto)
 plot_DO_preds(mm_mle_desoto)
+# still having gapping between dates
 
 # view errors
 get_params(mm_mle_desoto) %>% select(date, warnings, errors)
