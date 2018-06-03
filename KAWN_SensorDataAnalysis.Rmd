@@ -847,7 +847,7 @@ ggsave(filename = "temp_comboplot.png", plot = comboTemp, dpi = 500,
 
 
 ## PAR plot (include in talk)
-```{r PARplotting, fig.height=3, fig.width=9, eval=FALSE}
+```{r PARplotting, fig.height=3, fig.width=9, eval=TRUE}
 # calculate sum of PAR mean values
 PAR$PARMean_sum <- cumsum(PAR$mean)
 
@@ -1118,7 +1118,7 @@ grid.arrange(
   geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00")) +
   geom_hline(yintercept = 0),
   
-  ggplot(ericN_daynightdiff, aes(x = `Date and time`, y = perc, color = "Site 4")) +
+  ggplot(ericN_daynightdiff, aes(x = `Date and time`, y = perc, color = "Site 2")) +
   geom_line(size = 2) +
   theme_classic() +
   xlab(NULL) +
@@ -1165,10 +1165,40 @@ grid.arrange(
 )
 
 ggsave(filename = "Ndiff.png", plot = ndiff_plot, dpi = 500)
+
 ```
+
+```{r smaller section of N diff, fig.height=5, fig.width=6}
+# smaller section
+ggplot(desotoN_daynightdiff, aes(x = dateTime, y = perc, color = "Site 4")) +
+  geom_line(size = 2) +
+  theme_classic() +
+  xlab(NULL) +
+  ylab(NULL) +
+  coord_cartesian(y = c(-2,2), x = c(mdy_hms("03-17-2018 00:00:00"),
+                                     mdy_hms("03-19-2018 12:00:00"))) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14),
+        legend.position = "none") +
+  scale_color_manual(breaks = "Site 4", values = colorBlindPalette[4]) +
+  scale_x_datetime(date_breaks = "day", date_labels = "%b %d") +
+  geom_vline(xintercept = mdy_hms("04/01/2018 00:00:00")) +
+  geom_hline(yintercept = 0)
+
+desotoPlot_N +
+    coord_cartesian(xlim = c(mdy_hms("03-17-2018 00:00:00"),
+                             mdy_hms("03-19-2018 12:00:00")),
+                    ylim = c(0,0.75)) +
+    scale_x_datetime(date_breaks = "day", date_labels = "%b %d") +
+    ylab(NULL) +
+    xlab(NULL) +
+    ggtitle(NULL) +
+    theme(axis.text = element_text(size = 14), axis.title = element_text(size = 14))
+```
+
 # Metabolism modeling
 
-```{r StreamMetabolizer, eval=FALSE}
+```{r StreamMetabolizer}
 # Desoto dataframe setup
 desoto_longitude <- -94.964616
 # calculate solar time
@@ -1543,7 +1573,7 @@ metabmodels_steve <-
     mar_14 = metab_timeperiods(steve_metab, "2018-03-13 09:00:00", "2018-03-15 09:00:00"), # Mar 13-15
     mar_19 = metab_timeperiods(steve_metab, "2018-03-17 09:00:00", "2018-03-19 09:00:00"), # Mar 18-20
     mar_23 = metab_timeperiods(steve_metab, "2018-03-22 00:00:00", "2018-03-24 00:00:00"), # Mar 22-24
-    mar_28 = metab_timeperiods(steve_metab, "2018-03-27 00:00:00", "2018-03-29 00:00:00"), # Mar 27-29
+    mar_29 = metab_timeperiods(steve_metab, "2018-03-28 12:00:00", "2018-03-30 12:00:00"), # Mar 28-30
     apr_10 = metab_timeperiods(steve_metab, "2018-04-09 13:00:00", "2018-04-10 23:30:00"), # Apr 9-10
     apr_12 = metab_timeperiods(steve_metab, "2018-04-11 17:30:00", "2018-04-13 17:30:00"), # Apr 11-13
     apr_15 = metab_timeperiods(steve_metab, "2018-04-14 00:00:00", "2018-04-16 00:00:00"), # Apr 14-16
@@ -1567,9 +1597,9 @@ metabmodels_desoto <-
     mar_08 = metab_timeperiods(desoto_metab, "2018-03-07 17:00:00", "2018-03-09 17:00:00"), # Mar 7-9
     mar_19 = metab_timeperiods(desoto_metab, "2018-03-18 09:00:00", "2018-03-20 09:00:00"), # Mar 18-20
     mar_23 = metab_timeperiods(desoto_metab, "2018-03-22 00:00:00", "2018-03-24 00:00:00"), # Mar 22-24
-    mar_28 = metab_timeperiods(desoto_metab, "2018-03-27 00:00:00", "2018-03-29 00:00:00"), # Mar 27-29
+    mar_30 = metab_timeperiods(desoto_metab, "2018-03-30 00:00:00", "2018-03-31 00:00:00"), # Mar 30-31
     apr_02 = metab_timeperiods(desoto_metab, "2018-04-01 00:00:00", "2018-04-03 00:00:00"), # Apr 1-3
-    apr_08 = metab_timeperiods(desoto_metab, "2018-04-07 00:00:00", "2018-04-09 00:00:00"), # Apr 7-9
+    apr_09 = metab_timeperiods(desoto_metab, "2018-04-08 12:00:00", "2018-04-09 12:00:00"), # Apr 8-9
     apr_15 = metab_timeperiods(desoto_metab, "2018-04-14 00:00:00", "2018-04-16 00:00:00"), # Apr 14-16
     apr_19 = metab_timeperiods(desoto_metab, "2018-04-18 00:00:00", "2018-04-20 00:00:00"), # Apr 18-20
     apr_23 = metab_timeperiods(desoto_metab, "2018-04-22 00:00:00", "2018-04-24 00:00:00"), # Apr 22-24
@@ -1648,25 +1678,45 @@ ggsave(filename = "ER.png", plot = ER_plot, dpi = 500, width = 9, height = 3)
 
 ```{r comparisonofNtoMetab, fig.width=5, fig.height=5}
 # GPP and ER and N data frames
+PAR$date <- date(PAR$dateTime)
 ericN_daynightdiff$date <- date(ericN_daynightdiff$`Date and time`)
 NMetabComp_eric <- merge(ericN_daynightdiff, metabmodels_eric_results, 
                          by = "date")
-NMetabComp_eric$perc <- abs(NMetabComp_eric$perc)
+NMetabComp_eric <- merge(NMetabComp_eric, PAR, by = "date")
+NMetabComp_eric_summary_perc <- 
+NMetabComp_eric %>%
+  group_by(date) %>%
+  summarise(mean_perc = mean(perc), sd_perc = sd(perc), 
+            GPP = mean(GPP), ER = mean(ER), sumPAR = mean(PARMean_sum), sd_sumPAR = sd(PARMean_sum))
 
 steveN_daynightdiff$date <- date(steveN_daynightdiff$`Date and time`)
 NMetabComp_steve <- merge(steveN_daynightdiff, metabmodels_steve_results, 
                           by = "date")
-NMetabComp_steve$perc <- abs(NMetabComp_steve$perc)
+NMetabComp_steve <- merge(NMetabComp_steve, PAR, by = "date")
+NMetabComp_steve_summary_perc <- 
+NMetabComp_steve %>%
+  group_by(date) %>%
+  summarise(mean_perc = mean(perc), sd_perc = sd(perc), 
+            GPP = mean(GPP), ER = mean(ER), sumPAR = mean(PARMean_sum), sd_sumPAR = sd(PARMean_sum))
 
 desotoN_daynightdiff$date <- date(desotoN_daynightdiff$dateTime)
 NMetabComp_desoto <- merge(desotoN_daynightdiff, metabmodels_desoto_results,
                            by = "date")
-NMetabComp_desoto$perc <- abs(NMetabComp_desoto$perc)
+NMetabComp_desoto <- merge(NMetabComp_desoto, PAR, by = "date")
+NMetabComp_desoto_summary_perc <- 
+NMetabComp_desoto %>%
+  group_by(date) %>%
+  summarise(mean_perc = mean(perc), sd_perc = sd(perc), 
+            GPP = mean(GPP), ER = mean(ER), sumPAR = mean(PARMean_sum), sd_sumPAR = sd(PARMean_sum))
+
+NMetabComp_eric_posperc <- NMetabComp_eric[NMetabComp_eric$perc>0,]
+NMetabComp_steve_posperc <- NMetabComp_steve[NMetabComp_steve$perc>0,]
+NMetabComp_desoto_posperc <- NMetabComp_desoto[NMetabComp_desoto$perc>0,]
 
 # linear models
 lm_data_GPP <- data.frame(
-  GPP = c(NMetabComp_eric$GPP, NMetabComp_steve$GPP, NMetabComp_desoto$GPP),
-  perc = c(NMetabComp_eric$perc, NMetabComp_steve$perc, NMetabComp_desoto$perc)
+  GPP = c(NMetabComp_eric_posperc$GPP, NMetabComp_steve_posperc$GPP, NMetabComp_desoto_posperc$GPP),
+  perc = c(NMetabComp_eric_posperc$perc, NMetabComp_steve_posperc$perc, NMetabComp_desoto_posperc$perc)
 )
 lm_data_ER <- data.frame(
   ER = c(NMetabComp_eric$ER, NMetabComp_steve$ER, NMetabComp_desoto$ER),
@@ -1681,38 +1731,134 @@ predicted_perc_ER <- data.frame(
   percpred = predict.lm(lm(lm_data_ER$perc~lm_data_ER$ER), lm_data_ER), 
   ER = lm_data_ER$ER
   )
+
+predicted_perc_GPP_eric <- data.frame(
+  percpred = predict.lm(lm(NMetabComp_eric_posperc$perc~NMetabComp_eric_posperc$GPP),
+                        NMetabComp_eric_posperc), 
+  GPP = NMetabComp_eric_posperc$GPP
+  )
+predicted_perc_GPP_steve <- data.frame(
+  percpred = predict.lm(lm(NMetabComp_steve_posperc$perc~NMetabComp_steve_posperc$GPP),
+                        NMetabComp_steve_posperc), 
+  GPP = NMetabComp_steve_posperc$GPP
+  )
+predicted_perc_GPP_desoto <- data.frame(
+  percpred = predict.lm(lm(NMetabComp_desoto_posperc$perc~NMetabComp_desoto_posperc$GPP),
+                        NMetabComp_desoto_posperc), 
+  GPP = NMetabComp_desoto_posperc$GPP
+  )
 # GPP plot
 ggplot(NULL) +
-  geom_point(data = NMetabComp_eric, 
+  geom_point(data = NMetabComp_eric_posperc, 
              aes(x = GPP, y = perc, color = "Site 2", shape = "19", size = 2), 
              show.legend = FALSE) +
-  geom_point(data = NMetabComp_steve, 
+  geom_point(data = NMetabComp_steve_posperc, 
              aes(x = GPP, y = perc, color = "Site 3", shape = "17", size = 2), 
              show.legend = FALSE) +
-  geom_point(data = NMetabComp_desoto, 
+  geom_point(data = NMetabComp_desoto_posperc, 
              aes(x = GPP, y = perc, color = "Site 4", shape = "15", size = 2), 
              show.legend = FALSE) +
-  geom_line(data = predicted_perc_GPP, aes(y = percpred, x = GPP)) +
+  geom_line(data = predicted_perc_GPP_eric, aes(y = percpred, x = GPP, color = "Site 2", size = 1.2)) +
+  geom_line(data = predicted_perc_GPP_steve, aes(y = percpred, x = GPP, color = "Site 3", size = 1.2)) +
+  geom_line(data = predicted_perc_GPP_desoto, aes(y = percpred, x = GPP, color = "Site 4", size = 1.2)) +
   theme_classic() +
   xlab("GPP (g O2 m-2 d-1)") +
   ylab("Change in NOX %") +
-  #coord_cartesian(x = c(0,5), y = c(-2,2)) +
+  coord_cartesian(x = c(0,5), y = c(0,2)) +
   ggtitle(NULL) +
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 14),
-        legend.title = element_blank(),
-        legend.text = element_text(size = 14)) +
+        legend.position = "none") +
   scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
                      values = colorBlindPalette[2:4])
 
+           # GPP: pre and post 1 Apr
+NMetabComp_eric_before1Apr <- NMetabComp_eric_posperc[NMetabComp_eric_posperc$date<mdy("04-01-2018"),]
+NMetabComp_steve_before1Apr <- NMetabComp_steve_posperc[NMetabComp_steve_posperc$date<mdy("04-01-2018"),]
+NMetabComp_desoto_before1Apr <- NMetabComp_desoto_posperc[NMetabComp_desoto_posperc$date<mdy("04-01-2018"),]
+
+NMetabComp_eric_after1Apr <- NMetabComp_eric_posperc[NMetabComp_eric_posperc$date>mdy("04-01-2018"),]
+NMetabComp_steve_after1Apr <- NMetabComp_steve_posperc[NMetabComp_steve_posperc$date>mdy("04-01-2018"),]
+NMetabComp_desoto_after1Apr <- NMetabComp_desoto_posperc[NMetabComp_desoto_posperc$date>mdy_hms("04-01-2018"),]
+
+lm_data_GPP_duringdisch <- data.frame(
+  GPP = c(NMetabComp_eric_before1Apr$GPP, 
+          NMetabComp_steve_before1Apr$GPP, 
+          NMetabComp_desoto_before1Apr$GPP),
+  perc = c(NMetabComp_eric_before1Apr$perc, 
+           NMetabComp_steve_before1Apr$perc, 
+           NMetabComp_desoto_before1Apr$perc)
+)
+predicted_perc_GPP_duringdisch <- data.frame(
+  percpred = predict.lm(lm(perc~GPP, data = lm_data_GPP_duringdisch),
+                        lm_data_GPP_duringdisch), 
+  GPP = lm_data_GPP_duringdisch$GPP
+  )
+
+lm_data_GPP_afterdisch <- data.frame(
+  GPP = c(NMetabComp_eric_after1Apr$GPP, 
+          NMetabComp_steve_after1Apr$GPP, 
+          NMetabComp_desoto_after1Apr$GPP),
+  perc = c(NMetabComp_eric_after1Apr$perc, 
+           NMetabComp_steve_after1Apr$perc, 
+           NMetabComp_desoto_after1Apr$perc)
+)
+predicted_perc_GPP_afterdisch <- data.frame(
+  percpred = predict.lm(lm(perc~GPP, data = lm_data_GPP_afterdisch),
+                        lm_data_GPP_afterdisch), 
+  GPP = lm_data_GPP_afterdisch$GPP
+  )
+
+ggplot(NULL) +
+  geom_point(data = NMetabComp_eric_before1Apr, 
+             aes(x = GPP, y = perc, color = "before", shape = "15", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_steve_before1Apr, 
+             aes(x = GPP, y = perc, color = "before", shape = "15", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_desoto_before1Apr, 
+             aes(x = GPP, y = perc, color = "before", shape = "15", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_eric_after1Apr, 
+             aes(x = GPP, y = perc, color = "after", shape = "15", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_steve_after1Apr, 
+             aes(x = GPP, y = perc, color = "after", shape = "15", size = 2), 
+             show.legend = FALSE) +
+  geom_point(data = NMetabComp_desoto_after1Apr, 
+             aes(x = GPP, y = perc, color = "after", shape = "15", size = 2), 
+             show.legend = FALSE) +
+  geom_line(data = predicted_perc_GPP_duringdisch, aes(y = percpred, x = GPP, color = "before")) +
+  geom_line(data = predicted_perc_GPP_afterdisch, aes(y = percpred, x = GPP, color = "after")) +
+  theme_classic() +
+  xlab("GPP (g O2 m-2 d-1)") +
+  ylab("Change in NOX %") +
+  coord_cartesian(x = c(0,5),y = c(0,2.0)) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        legend.position = "none") +
+  scale_color_manual(values = c("green", "dimgrey"))
+
+
+
 # ER
 ggplot(NULL) +
-  geom_point(data = NMetabComp_eric, aes(x = ER, y = perc, color = "Site 2",
-                                           shape = "19", size = 2), show.legend = FALSE) +
-  geom_point(data = NMetabComp_steve, aes(x = ER, y = perc, color = "Site 3",
-                                           shape = "17", size = 2), show.legend = FALSE) +
-  geom_point(data = NMetabComp_desoto, aes(x = ER, y = perc, color = "Site 4",
-                                           shape = "15", size = 2), show.legend = FALSE) +
+  geom_point(data = NMetabComp_eric_summary_perc, 
+             aes(x = ER, y = mean_perc, color = "Site 2",
+                 shape = "19", size = 2), show.legend = FALSE) +
+  geom_errorbar(data = NMetabComp_eric_summary_perc, 
+                aes(x = ER, ymin = mean_perc-sd_perc, ymax = mean_perc+sd_perc)) +
+  geom_point(data = NMetabComp_steve_summary_perc, 
+             aes(x = ER, y = mean_perc, color = "Site 3",
+                 shape = "17", size = 2), show.legend = FALSE) +
+  geom_errorbar(data = NMetabComp_steve_summary_perc, 
+                aes(x = ER, ymin = mean_perc-sd_perc, ymax = mean_perc+sd_perc)) +
+  geom_point(data = NMetabComp_desoto_summary_perc, 
+             aes(x = ER, y = mean_perc, color = "Site 4",
+                 shape = "15", size = 2), show.legend = FALSE) +
+  geom_errorbar(data = NMetabComp_desoto_summary_perc, 
+                aes(x = ER, ymin = mean_perc-sd_perc, ymax = mean_perc+sd_perc)) +
   geom_line(data = predicted_perc_ER, aes(y = percpred, x = ER)) +
   theme_classic() +
   xlab("ER (g O2 m-2 d-1)") +
@@ -1730,7 +1876,12 @@ ggplot(NULL) +
                        labels = c("Site 2", "Site 3", "Site 4")) +
   scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
                      values = colorBlindPalette[2:4])
+
+
+
 ```
+
+
 
 ```{r Metab and temp, fig.width=5, fig.height=5}
 eric_metab$date <- date(eric_metab$dateTime)
@@ -1773,8 +1924,8 @@ lm_data_ER_temp <- data.frame(
 )
 # notation: response~terms
 predicted_temp_GPP <- data.frame(
-  temppred = predict.lm(lm(lm_data_GPP_temp$temp~lm_data_GPP_temp$GPP), lm_data_GPP_temp), 
-  GPP = lm_data_GPP_temp$GPP
+  GPPpred = predict.lm(lm(lm_data_GPP_temp$GPP~lm_data_GPP_temp$temp), lm_data_GPP_temp), 
+  temp = lm_data_GPP_temp$temp
   )
 predicted_temp_ER <- data.frame(
   temppred = predict.lm(lm(lm_data_ER_temp$temp~lm_data_ER_temp$ER), lm_data_ER_temp), 
@@ -1784,25 +1935,25 @@ predicted_temp_ER <- data.frame(
 # GPP and temp plot
 ggplot(NULL) +
   geom_point(data = NMetabComp_eric_summary, 
-             aes(x = GPP, y = mean_temp, color = "Site 2", shape = "19", size = 2), 
+             aes(y = GPP, x = mean_temp, color = "Site 2", shape = "19", size = 2), 
              show.legend = FALSE) +
-  geom_errorbar(data = NMetabComp_eric_summary, 
-                aes(x = GPP, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
+  #geom_errorbar(data = NMetabComp_eric_summary, 
+                #aes(y = GPP, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
   geom_point(data = NMetabComp_steve_summary, 
-             aes(x = GPP, y = mean_temp, color = "Site 3", shape = "17", size = 2), 
+             aes(y = GPP, x = mean_temp, color = "Site 3", shape = "17", size = 2), 
              show.legend = FALSE) +
-  geom_errorbar(data = NMetabComp_steve_summary, 
-                aes(x = GPP, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
+  #geom_errorbar(data = NMetabComp_steve_summary, 
+                #aes(x = GPP, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
   geom_point(data = NMetabComp_desoto_summary, 
-             aes(x = GPP, y = mean_temp, color = "Site 4", shape = "15", size = 2), 
+             aes(y = GPP, x = mean_temp, color = "Site 4", shape = "15", size = 2), 
              show.legend = FALSE) +
-  geom_errorbar(data = NMetabComp_desoto_summary, 
-                aes(x = GPP, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
-  geom_line(data = predicted_temp_GPP, aes(y = temppred, x = GPP)) +
+  #geom_errorbar(data = NMetabComp_desoto_summary, 
+                #aes(x = GPP, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
+  geom_line(data = predicted_temp_GPP, aes(x = temp, y = GPPpred)) +
   theme_classic() +
-  xlab("gpp") +
-  ylab("temp") +
-  #coord_cartesian(x = c(0,5), y = c(-2,2)) +
+  xlab("temp") +
+  ylab("gpp") +
+  coord_cartesian(y = c(0,5), x = c(0,20)) +
   ggtitle(NULL) +
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 14),
@@ -1844,11 +1995,56 @@ ggplot(NULL) +
                      values = colorBlindPalette[2:4])
 ```
 
+```{r GPPandpar, fig.width=5, fig.height=5}
+lm_data_GPP_par <- data.frame(
+  GPP = c(NMetabComp_eric_summary$GPP, 
+          NMetabComp_steve_summary$GPP, 
+          NMetabComp_desoto_summary$GPP),
+  par = c(NMetabComp_eric_summary_perc$sumPAR, 
+           NMetabComp_steve_summary_perc$sumPAR, 
+           NMetabComp_desoto_summary_perc$sumPAR)
+)
+predicted_par_GPP <- data.frame(
+  GPPpred = predict.lm(lm(lm_data_GPP_par$GPP~lm_data_GPP_par$par), lm_data_GPP_par), 
+  par = lm_data_GPP_par$par*1.0E-6
+  )
+
+# par units: mol m-2 s-1
+ggplot(NULL) +
+  geom_point(data = NMetabComp_eric_summary_perc, 
+             aes(y = GPP, x = sumPAR*1.0E-6, color = "Site 2", shape = "19", size = 2), 
+             show.legend = FALSE) +
+  #geom_errorbar(data = NMetabComp_eric_summary_perc, 
+                #aes(y = GPP, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
+  geom_point(data = NMetabComp_steve_summary_perc, 
+             aes(y = GPP, x = sumPAR*1.0E-6, color = "Site 3", shape = "17", size = 2), 
+             show.legend = FALSE) +
+  #geom_errorbar(data = NMetabComp_steve_summary, 
+                #aes(x = GPP, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
+  geom_point(data = NMetabComp_desoto_summary_perc, 
+             aes(y = GPP, x = sumPAR*1.0E-6, color = "Site 4", shape = "15", size = 2), 
+             show.legend = FALSE) +
+  #geom_errorbar(data = NMetabComp_desoto_summary, 
+                #aes(x = GPP, ymin = mean_temp-sd_temp, ymax = mean_temp+sd_temp)) +
+  geom_line(data = predicted_par_GPP, aes(x = par, y = GPPpred)) +
+  theme_classic() +
+  xlab("PAR") +
+  ylab("gpp") +
+  coord_cartesian(y = c(0,5), x = c(0,0.5)) +
+  ggtitle(NULL) +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 14)) +
+  scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
+                     values = colorBlindPalette[2:4])
+```
+
 ```{r NtoMetabbyTime, fig.width=5, fig.height=5}
 # GPP plot: before 1 Apr
-NMetabComp_eric_before1Apr <- NMetabComp_eric[NMetabComp_eric$`Date and time`<mdy_hms("04-01-2018 00:00:00"),]
-NMetabComp_steve_before1Apr <- NMetabComp_steve[NMetabComp_steve$`Date and time`<mdy_hms("04-01-2018 00:00:00"),]
-NMetabComp_desoto_before1Apr <- NMetabComp_desoto[NMetabComp_desoto$dateTime<mdy_hms("04-01-2018 00:00:00"),]
+NMetabComp_eric_before1Apr <- NMetabComp_eric[NMetabComp_eric$date<mdy("04-01-2018"),]
+NMetabComp_steve_before1Apr <- NMetabComp_steve[NMetabComp_steve$date<mdy("04-01-2018"),]
+NMetabComp_desoto_before1Apr <- NMetabComp_desoto[NMetabComp_desoto$date<mdy_hms("04-01-2018"),]
 
 ggplot(NULL) +
   geom_point(data = NMetabComp_eric_before1Apr, 
@@ -1873,32 +2069,95 @@ ggplot(NULL) +
   scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
                      values = colorBlindPalette[2:4])
 
-# GPP: post 1 Apr
-NMetabComp_eric_after1Apr <- NMetabComp_eric[NMetabComp_eric$`Date and time`>mdy_hms("04-01-2018 00:00:00"),]
-NMetabComp_steve_after1Apr <- NMetabComp_steve[NMetabComp_steve$`Date and time`>mdy_hms("04-01-2018 00:00:00"),]
-NMetabComp_desoto_after1Apr <- NMetabComp_desoto[NMetabComp_desoto$dateTime>mdy_hms("04-01-2018 00:00:00"),]
+
+```
+
+```{r 24Hr and NO3 GPP, fig.width=5, fig.height=5}
+#30 mar, 9 apr
+unique(NMetabComp_eric_posperc$date) #29 mar, 9 apr
+unique(NMetabComp_steve_posperc$date) # 29 Mar, 10 Apr
+unique(NMetabComp_desoto_posperc$date) #29 mar, 2 apr
+
+hr24 <- 
+data.frame(
+  time = c("March", "March", "March", "April", "April", "April"),
+  location = c("2", "3", "4", "2", "3", "4"),
+  perc = c(
+    na.omit(unique(NMetabComp_eric_posperc$perc[NMetabComp_eric_posperc$date == ymd("2018-03-29")])),
+    na.omit(unique(NMetabComp_steve_posperc$perc[NMetabComp_steve_posperc$date == ymd("2018-03-29")])),
+    na.omit(unique(NMetabComp_desoto_posperc$perc[NMetabComp_desoto_posperc$date == ymd("2018-04-02")])),
+    na.omit(unique(NMetabComp_eric_posperc$perc[NMetabComp_eric_posperc$date == ymd("2018-04-09")])),
+    na.omit(unique(NMetabComp_steve_posperc$perc[NMetabComp_steve_posperc$date == ymd("2018-04-10")])),
+    na.omit(unique(NMetabComp_desoto_posperc$perc[NMetabComp_desoto_posperc$date == ymd("2018-04-09")]))[2]
+  ),
+  GPP = c(
+    na.omit(unique(NMetabComp_eric_posperc$GPP[NMetabComp_eric_posperc$date == ymd("2018-03-29")])),
+    na.omit(unique(NMetabComp_steve_posperc$GPP[NMetabComp_steve_posperc$date == ymd("2018-03-29")])),
+    na.omit(unique(NMetabComp_desoto_posperc$GPP[NMetabComp_desoto_posperc$date == ymd("2018-04-02")])),
+    na.omit(unique(NMetabComp_eric_posperc$GPP[NMetabComp_eric_posperc$date == ymd("2018-04-09")])),
+    na.omit(unique(NMetabComp_steve_posperc$GPP[NMetabComp_steve_posperc$date == ymd("2018-04-10")])),
+    na.omit(unique(NMetabComp_desoto_posperc$GPP[NMetabComp_desoto_posperc$date == ymd("2018-04-09")]))
+  )
+)
 
 ggplot(NULL) +
-  geom_point(data = NMetabComp_eric_after1Apr, 
-             aes(x = GPP, y = perc, color = "Site 2", shape = "19", size = 2), 
-             show.legend = FALSE) +
-  geom_point(data = NMetabComp_steve_after1Apr, 
-             aes(x = GPP, y = perc, color = "Site 3", shape = "17", size = 2), 
-             show.legend = FALSE) +
-  geom_point(data = NMetabComp_desoto_after1Apr, 
-             aes(x = GPP, y = perc, color = "Site 4", shape = "15", size = 2), 
-             show.legend = FALSE) +
-  #geom_line(data = predicted_perc_GPP, aes(y = percpred, x = GPP)) +
-  theme_classic() +
-  xlab("GPP (g O2 m-2 d-1)") +
-  ylab("Change in NOX %") +
-  coord_cartesian(y = c(0,1.5)) +
+  geom_point(data = hr24_March, aes(x = GPP, y = perc, color = "March", shape = "19", size = 2)) +
+  geom_point(data = hr24_Apr, aes(x = GPP, y = perc, color = "Apr", shape = "19", size = 2))
+
+
+ggplot(data = hr24, aes(fill = location)) +
+  geom_bar(aes(x = time, y = perc)) +
+  geom_point(aes(x = location, y = GPP/10, size = 2)) +
+  scale_y_continuous(sec.axis = sec_axis(~./10)) +
   ggtitle(NULL) +
-  theme(axis.text = element_text(size = 14),
+    theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 14),
         legend.title = element_blank(),
         legend.text = element_text(size = 14)) +
-  scale_color_manual(breaks = c("Site 2", "Site 3", "Site 4"),
-                     values = colorBlindPalette[2:4])
+    scale_color_manual(breaks = location,
+                     values = colorBlindPalette[2:4]) +
+  theme_classic()
+
+# this one
+ggplot(NULL) + 
+    geom_col(aes(fill = location, x = time, y = perc), data = hr24, position = "dodge") +
+    geom_boxplot(aes(fill = location, x = time, y = GPP), data = hr24) +
+    ggtitle(NULL) +
+    scale_color_manual(breaks = location,
+                     values = colorBlindPalette[2:4]) +
+    scale_x_discrete(limits=c("March", "April")) +
+    theme_classic() +
+    theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 14)) +
+    ylab("percent change (bars) or GPP (lines)") +
+    scale_color_manual(breaks = c(2,3,4), values = colorBlindPalette[2:4])
+
+ggplot(data = hr24, aes(x = time, y = GPP)) + 
+    geom_boxplot(aes(fill = location), position = "dodge") +
+    ggtitle(NULL) +
+    theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 14)) +
+    scale_color_manual(breaks = location,
+                     values = colorBlindPalette[2:4]) +
+  theme_classic()
+
+# red is march, blue is april
+ggplot(NULL) +
+  geom_point(data = hr24, aes(x = GPP, y = perc, color = time, shape = location, size = 3)) +
+  theme_classic() +
+  coord_cartesian(xlim = c(0,4), ylim = c(0,0.6)) +
+  scale_shape_manual(breaks = c("2", "3", "4"), values = c(15,17,19)) +
+  scale_color_manual(breaks = c("March, April"), values = c("blue", "red")) +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 14),
+        legend.position = "none")
+        
+
 
 ```
