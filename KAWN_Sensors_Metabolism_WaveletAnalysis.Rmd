@@ -1145,29 +1145,49 @@ plot(desoto.w.data$DO.sat)
 
 desoto.w.data.apr <- desoto.w.data[
   (desoto.w.data$date > ymd_hms("2018-04-01 00:00:00")) &
-  (desoto.w.data$date < ymd_hms("2018-04-08 00:00:00")),]
+  (desoto.w.data$date < ymd_hms("2018-04-30 00:00:00")),]
 
 plot(desoto.w.data.apr$DO)
 plot(desoto.w.data.apr$DO.sat)
+plot(desoto.w.data.apr$nitrateNitrite)
 
-str(desoto.w.data.apr)
 
 # start w/ DO data, that you know will have daily oscilations
 # dt = 4 observations each hour with one time unit = one day
-desoto.w <- 
+# DO, % saturation
+desoto.w.apr.DOsat <- 
 analyze.wavelet(desoto.w.data.apr, my.series = "DO.sat", 
-                dt = 1/(4*24), lowerPeriod = 0.125, upperPeriod = 3,
+                dt = 1/(4*24), lowerPeriod = 0.25, upperPeriod = 3,
+                make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
+wt.image(desoto.w.apr.DOsat, periodlab = "Period (days)", timelab = "Date", 
+         main = "Wavelet: DO % saturation",
+         label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
+#nitrateNitrite
+desoto.w.apr.N <- 
+analyze.wavelet(desoto.w.data.apr, my.series = "nitrateNitrite", 
+                dt = 1/(4*24), #lowerPeriod = 0.25, upperPeriod = 3,
+                make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
+wt.image(desoto.w.apr.N, periodlab = "Period (days)", timelab = "Date", 
+         main = "Wavelet: DO % saturation",
+         label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
+
+# longer time period
+desoto.w <- 
+analyze.wavelet(desoto.w.data, my.series = "DO.sat", 
+                dt = 1/(4*24), lowerPeriod = 0.25, upperPeriod = 4,
                 make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
 wt.image(desoto.w, periodlab = "Period (days)", timelab = "Date", 
          main = "Wavelet: DO % saturation",
          label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
 
 
-
-
-#cross wavelet power of 2 time series, first make combo dataframe and place into desoto.w.data.apr spot
-analyze.coherency(desoto.w.data.apr, my.pair = c(3,4), dt = 4, 
+#cross wavelet power of april N data and DOsat
+coher.apr.N.DOsat <- 
+analyze.coherency(desoto.w.data.apr, my.pair = c(3,4), dt = 1/(4*24), 
                   date.format = "%Y-%m-%d %H:%M:%S")
+wc.avg(coher.apr.N.DOsat, periodlab = "Period (days)")
+# analyzing the phase difference
+wc.sel.phases(coher.apr.N.DOsat, 
+              show.date = TRUE, date.format = "%d-%m", timelab = "Date")
 
-data.frame(desoto$nitrateNitrite)
 ```
