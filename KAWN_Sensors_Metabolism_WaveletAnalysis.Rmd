@@ -12,8 +12,8 @@ output:
 
 ```{r setup, echo = FALSE, warning=FALSE, error=FALSE, message=FALSE}
 ### Global options ###
-knitr::opts_chunk$set(fig.height = 8, 
-                      fig.width = 10, 
+knitr::opts_chunk$set(#fig.height = 8, 
+                      #fig.width = 10, 
                       cache=TRUE) # enable caching globally
 
 ### General packages ###
@@ -49,6 +49,9 @@ library(rstan)
 # install.packages("Rcpp")
 # library(Rcpp)
 # Rcpp::evalCpp("2+2")
+
+### wavelet analysis ###
+library(WaveletComp)
 ```
 
 ***  
@@ -428,30 +431,11 @@ desoto$nitrateNitrite[desoto$dateTime
 
 ```
 
-Pulling data from USGS stream gauge at Lawrence, for finding water balance
-```{r LawrencePullCleanup, include=FALSE, warning=FALSE}
-siteNoLawrence <- "06891080"
-pCodesLawrence <- c("00060","00065")
-
-lawrence <- readNWISuv(siteNumbers = siteNoLawrence, parameterCd = pCodesLawrence, 
-                       startDate = pullBegin, endDate = pullEnd, tz = "America/Chicago") 
-
-# Rename columns from codes to parameter names
-lawrence <- renameNWISColumns(lawrence)
-
-# convert from american to SI units
-lawrence$Flow_Inst <- ft3s_m3s(lawrence$Flow_Inst)
-
-lawrence$.Downstream.of.Bowersock.Dam._GH_Inst <- ft_m(lawrence$.Downstream.of.Bowersock.Dam._GH_Inst)
-
-lawrence$.Upstream.of.Bowersock.Dam._GH_Inst <- ft_m(lawrence$.Upstream.of.Bowersock.Dam._GH_Inst)
-```
-
 ***  
 
 ## NEON Data   
 
-```{r NEONpullCleanup, include=FALSE, eval=TRUE}
+```{r NEONpullCleanup, include=FALSE, eval=FALSE}
 downloadNEONfiles <- FALSE
 
 if (downloadNEONfiles == TRUE){
@@ -559,7 +543,7 @@ simplePlot <- function(dataset, xAxis, yAxis, plotBegin, plotEnd, yMin, yMax, xL
 }
 ```
 
-```{r DO_N_temp_Plots, echo=FALSE, warning=FALSE}
+```{r DO_N_temp_Plots, echo=FALSE, warning=FALSE, eval=FALSE}
 colorBlindPalette <- c("blue2", "red", "darkorchid1", "black")
 
 # bowersock
@@ -666,7 +650,7 @@ grid.arrange(desotoPlot_N, desotoPlot_DO, desotoPlot_temp, ncol = 1, nrow = 3)
 
 # Metabolism modeling
 
-```{r StreamMetabolizer}
+```{r StreamMetabolizer, eval=FALSE}
 # round datetime_solar
 #desoto$dateTime_solar <- round_date(desoto$dateTime_solar, "10 minutes")
 
@@ -733,7 +717,7 @@ kmodel_name <- mm_name(type = "Kmodel", engine = "mean")
 kmodel_desoto <- metab_Kmodel(specs = kmodel_name, data = desoto_MetabData)
 ```
 
-```{r MetabolismModel_HotchkissHall_Equations}
+```{r MetabolismModel_HotchkissHall_Equations, eval=FALSE}
 # simpler hotchkiss & hall approach, let's start with steve [supp materials from lamberti textbook]
 
 # [2] calculate oxygen saturation at temperature (the minidot already does this)
@@ -873,7 +857,7 @@ onestationplot <- function(GPP, ER, oxy, z, temp, K, light, bp, ts) {
 }
 ```
 
-```{r MetabolismModel_HotchkissHall_Evaluation}
+```{r MetabolismModel_HotchkissHall_Evaluation, eval=FALSE}
 # [1] load data, date and time must be in different columns
 eric_metab <- 
 data.frame(
@@ -1087,7 +1071,7 @@ metabmodels_desoto_results$date <- strptime(row.names(metabmodels_desoto_results
 metabmodels_desoto_results$date <- as.Date(metabmodels_desoto_results$date)
 ```
 
-```{r metabPlotting, fig.width=9, fig.height=3}
+```{r metabPlotting, fig.width=9, fig.height=3, eval=FALSE}
 GPP_plot <- 
 ggplot(NULL) +
   geom_point(data = metabmodels_eric_results, aes(x = date, y = GPP, color = "Site 2",
@@ -1151,3 +1135,39 @@ ggsave(filename = "ER.png", plot = ER_plot, dpi = 500, width = 9, height = 3)
 
 # Wavelet analysis
 
+```{r wavelet}
+desoto.w.data <- na.omit(data.frame(date = desoto$dateTime,
+                                    DO = desoto$DO_Inst,
+                                    DO.sat = desoto$DO_percentsat,
+                                    nitrateNitrite = desoto$nitrateNitrite))
+plot(desoto.w.data$DO)
+plot(desoto.w.data$DO.sat)
+
+desoto.w.data.apr <- desoto.w.data[
+  (desoto.w.data$date > ymd_hms("2018-04-01 00:00:00")) &
+  (desoto.w.data$date < ymd_hms("2018-04-08 00:00:00")),]
+
+plot(desoto.w.data.apr$DO)
+plot(desoto.w.data.apr$DO.sat)
+
+str(desoto.w.data.apr)
+
+# start w/ DO data, that you know will have daily oscilations
+# dt = 4 observations each hour with one time unit = one day
+desoto.w <- 
+analyze.wavelet(desoto.w.data.apr, my.series = "DO.sat", 
+                dt = 1/(4*24), lowerPeriod = 0.125, upperPeriod = 3,
+                make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
+wt.image(desoto.w, periodlab = "Period (days)", timelab = "Date", 
+         main = "Wavelet: DO % saturation",
+         label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
+
+
+
+
+#cross wavelet power of 2 time series, first make combo dataframe and place into desoto.w.data.apr spot
+analyze.coherency(desoto.w.data.apr, my.pair = c(3,4), dt = 4, 
+                  date.format = "%Y-%m-%d %H:%M:%S")
+
+data.frame(desoto$nitrateNitrite)
+```
