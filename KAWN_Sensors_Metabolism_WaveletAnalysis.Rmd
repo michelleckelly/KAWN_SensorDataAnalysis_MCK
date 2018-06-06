@@ -1135,7 +1135,7 @@ ggsave(filename = "ER.png", plot = ER_plot, dpi = 500, width = 9, height = 3)
 
 # Wavelet analysis
 
-```{r wavelet}
+```{r waveletSubsetting}
 desoto.w.data <- na.omit(data.frame(date = desoto$dateTime,
                                     DO = desoto$DO_Inst,
                                     DO.sat = desoto$DO_percentsat,
@@ -1150,44 +1150,133 @@ desoto.w.data.apr <- desoto.w.data[
 plot(desoto.w.data.apr$DO)
 plot(desoto.w.data.apr$DO.sat)
 plot(desoto.w.data.apr$nitrateNitrite)
+```
 
-
+```{r waveletComputation_April}
 # start w/ DO data, that you know will have daily oscilations
 # dt = 4 observations each hour with one time unit = one day
-# DO, % saturation
+
+### Basic wavelet analysis ###
+# April 2018
+# [DO]
+desoto.w.apr.DO <- 
+analyze.wavelet(desoto.w.data.apr, my.series = "DO", 
+                dt = 1/4, lowerPeriod = 6, upperPeriod = 60,
+                make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
+# DO % sat
 desoto.w.apr.DOsat <- 
 analyze.wavelet(desoto.w.data.apr, my.series = "DO.sat", 
-                dt = 1/(4*24), lowerPeriod = 0.25, upperPeriod = 3,
+                dt = 1/4, lowerPeriod = 6, upperPeriod = 60,
                 make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
-wt.image(desoto.w.apr.DOsat, periodlab = "Period (days)", timelab = "Date", 
-         main = "Wavelet: DO % saturation",
-         label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
-#nitrateNitrite
+# [nitrateNitrite]
 desoto.w.apr.N <- 
 analyze.wavelet(desoto.w.data.apr, my.series = "nitrateNitrite", 
-                dt = 1/(4*24), #lowerPeriod = 0.25, upperPeriod = 3,
+                dt = 1/4, lowerPeriod = 6, upperPeriod = 60,
                 make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
-wt.image(desoto.w.apr.N, periodlab = "Period (days)", timelab = "Date", 
-         main = "Wavelet: DO % saturation",
-         label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
 
-# longer time period
-desoto.w <- 
-analyze.wavelet(desoto.w.data, my.series = "DO.sat", 
-                dt = 1/(4*24), lowerPeriod = 0.25, upperPeriod = 4,
-                make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
-wt.image(desoto.w, periodlab = "Period (days)", timelab = "Date", 
-         main = "Wavelet: DO % saturation",
-         label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
-
-
-#cross wavelet power of april N data and DOsat
-coher.apr.N.DOsat <- 
-analyze.coherency(desoto.w.data.apr, my.pair = c(3,4), dt = 1/(4*24), 
+### Cross wavelet power ###
+# April 2018
+# [nitrateNitrite] and [DO]
+coher.apr.N.DO <- 
+analyze.coherency(desoto.w.data.apr, my.pair = c(2,4), dt = 1/4, 
+                  lowerPeriod = 6, upperPeriod = 60,
                   date.format = "%Y-%m-%d %H:%M:%S")
-wc.avg(coher.apr.N.DOsat, periodlab = "Period (days)")
-# analyzing the phase difference
-wc.sel.phases(coher.apr.N.DOsat, 
-              show.date = TRUE, date.format = "%d-%m", timelab = "Date")
+# [nitrateNitrite] and DO % sat
+coher.apr.N.DOsat <- 
+analyze.coherency(desoto.w.data.apr, my.pair = c(3,4), dt = 1/4, 
+                  lowerPeriod = 6, upperPeriod = 60,
+                  date.format = "%Y-%m-%d %H:%M:%S")
+```
 
+```{r waveletVisualizations_April}
+### Basic wavelet analysis ###
+# April 2018
+# [DO]
+wt.image(desoto.w.apr.DO, periodlab = "Period (hours)", timelab = "Date", 
+         main = "Wavelet: DO, April",
+         label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
+# DO % sat
+wt.image(desoto.w.apr.DOsat, periodlab = "Period (days)", timelab = "Date", 
+         main = "Wavelet: DO % saturation, April",
+         label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
+# nitrateNitrite
+wt.image(desoto.w.apr.N, periodlab = "Period (days)", timelab = "Date", 
+         main = "Wavelet: [NOx], April",
+         label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
+
+### Cross wavelet power ###
+# April 2018
+# [nitrateNitrite] and [DO]
+wc.avg(coher.apr.N.DO, periodlab = "Period (days)")
+wc.sel.phases(coher.apr.N.DO, main = "Cross wavelet power, April: [nitrate] and [DO]", 
+              show.date = TRUE, date.format = "%d-%m", timelab = "Date")
+# [nitrateNitrite] and DO % sat
+wc.avg(coher.apr.N.DOsat, periodlab = "Period (days)")
+wc.sel.phases(coher.apr.N.DOsat, 
+              main = "Cross wavelet power, April: [nitrate] and DOsat",
+              show.date = TRUE, date.format = "%d-%m", timelab = "Date")
+```
+
+```{r waveletComputation_Full}
+### Basic wavelet analysis ###
+# Full time series
+# [DO]
+desoto.w.DO <- 
+analyze.wavelet(desoto.w.data, my.series = "DO", 
+                dt = 1/4, lowerPeriod = 6, upperPeriod = 36,
+                make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
+# DO % sat
+desoto.w.DOsat <- 
+analyze.wavelet(desoto.w.data, my.series = "DO.sat", 
+                dt = 1/4, lowerPeriod = 6, upperPeriod = 36,
+                make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
+# [nitrateNitrite]
+desoto.w.N <- 
+analyze.wavelet(desoto.w.data, my.series = "nitrateNitrite", 
+                dt = 1/4, lowerPeriod = 6, upperPeriod = 36,
+                make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
+
+### Cross wavelet power ###
+# Full time series
+# [nitrateNitrite] and [DO]
+coher.N.DO <- 
+analyze.coherency(desoto.w.data, my.pair = c(2,4), dt = 1/4, 
+                  lowerPeriod = 6, upperPeriod = 36,
+                  date.format = "%Y-%m-%d %H:%M:%S")
+# [nitrateNitrite] and DO % sat
+coher.N.DOsat <- 
+analyze.coherency(desoto.w.data, my.pair = c(3,4), dt = 1/4, 
+                  lowerPeriod = 6, upperPeriod = 36,
+                  date.format = "%Y-%m-%d %H:%M:%S")
+```
+
+```{r waveletVisualizations_Full}
+### Basic wavelet analysis ###
+# Full time series
+# [DO]
+wt.image(desoto.w.DO, periodlab = "Period (hours)", timelab = "Date", 
+         main = "Wavelet: DO, full time series",
+         label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
+# DO % sat
+wt.image(desoto.w.DOsat, periodlab = "Period (hours)", timelab = "Date", 
+         main = "Wavelet: DO % saturation, full time series",
+         label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
+# nitrateNitrite
+wt.image(desoto.w.N, periodlab = "Period (hours)", timelab = "Date", 
+         main = "Wavelet: [NOx], April",
+         label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
+
+### Cross wavelet power ###
+# Full time series
+# [nitrateNitrite] and [DO]
+wc.avg(coher.N.DO, periodlab = "Period (hours)", 
+       main = "Cross wavelet power, [nitrate] and [DO]")
+wc.sel.phases(coher.N.DO, main = "Cross wavelet power, [nitrate] and [DO]", 
+              show.date = TRUE, date.format = "%d-%m", timelab = "Date")
+# [nitrateNitrite] and DO % sat
+wc.avg(coher.N.DOsat, periodlab = "Period (hours)",
+       main = "Cross wavelet power, [nitrate] and DOsat")
+wc.sel.phases(coher.N.DOsat, 
+              main = "Cross wavelet power, [nitrate] and DOsat",
+              show.date = TRUE, date.format = "%d-%m", timelab = "Date")
 ```
