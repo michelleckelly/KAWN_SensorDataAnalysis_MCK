@@ -1217,9 +1217,26 @@ wc.sel.phases(coher.apr.N.DO, main = "Cross wavelet power, April: [nitrate] and 
               show.date = TRUE, date.format = "%d-%m", timelab = "Date")
 # [nitrateNitrite] and DO % sat, phase difference at period of 24 hrs
 wc.avg(coher.apr.N.DOsat, periodlab = "Period (hours)")
+# convert axis from pi to hrs
+at.phase <- seq(-pi, pi, by = pi/6)
+labels.phase <- seq(-12, 12, by = 2)
 wc.sel.phases(coher.apr.N.DOsat, sel.period = 24,
+              spec.phase.axis = list(at = at.phase, labels = labels.phase),
+              phaselab = "phase (hours)",
               main = "Cross wavelet power, April: [nitrate] and DOsat",
               show.date = TRUE, date.format = "%d-%m", timelab = "Date")
+
+# extracting the time series of angles at the period of 24 hrs
+row.closest.to.24 <- which.min((coher.apr.N.DOsat$Period - 24)^2)
+# determine angle series
+angle.series <- coher.apr.N.DOsat$Angle[row.closest.to.24,]
+# convert to minutes
+# 2pi corresponds to 24 hrs, because period = 24
+lead.time.in.minutes <- 60*(24*(angle.series/(2*pi)))
+plot(lead.time.in.minutes)
+wc.phasediff.image(coher.apr.N.DOsat, 
+                   show.date = TRUE, date.format = "%d-%m", timelab = "Date",
+                   label.period.axis = TRUE)
 ```
 
 ```{r waveletComputation_Full}
