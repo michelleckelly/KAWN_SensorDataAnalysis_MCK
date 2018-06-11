@@ -1196,11 +1196,11 @@ wt.image(desoto.w.apr.DO, periodlab = "Period (hours)", timelab = "Date",
          main = "Wavelet: DO, April",
          label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
 # DO % sat
-wt.image(desoto.w.apr.DOsat, periodlab = "Period (days)", timelab = "Date", 
+wt.image(desoto.w.apr.DOsat, periodlab = "Period (hours)", timelab = "Date", 
          main = "Wavelet: DO % saturation, April",
          label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
 # nitrateNitrite
-wt.image(desoto.w.apr.N, periodlab = "Period (days)", timelab = "Date", 
+wt.image(desoto.w.apr.N, periodlab = "Period (hours)", timelab = "Date", 
          main = "Wavelet: [NOx], April",
          label.time.axis = TRUE, show.date = TRUE, date.format = "%Y-%m-%d")
 
@@ -1210,13 +1210,13 @@ wt.image(desoto.w.apr.N, periodlab = "Period (days)", timelab = "Date",
 at.pi <- seq(-pi, pi, by = pi/2)
 labels.pi <- seq(-12, 12, by = 1)
 # [nitrateNitrite] and [DO]
-wc.avg(coher.apr.N.DO, periodlab = "Period (days)")
+wc.avg(coher.apr.N.DO, periodlab = "Period (hours)")
 wc.sel.phases(coher.apr.N.DO, main = "Cross wavelet power, April: [nitrate] and [DO]", 
               sel.period = 24,
               spec.phase.axis = list(at = at.pi, labels = labels.pi),
               show.date = TRUE, date.format = "%d-%m", timelab = "Date")
 # [nitrateNitrite] and DO % sat, phase difference at period of 24 hrs
-wc.avg(coher.apr.N.DOsat, periodlab = "Period (days)")
+wc.avg(coher.apr.N.DOsat, periodlab = "Period (hours)")
 wc.sel.phases(coher.apr.N.DOsat, sel.period = 24,
               main = "Cross wavelet power, April: [nitrate] and DOsat",
               show.date = TRUE, date.format = "%d-%m", timelab = "Date")
@@ -1228,17 +1228,17 @@ wc.sel.phases(coher.apr.N.DOsat, sel.period = 24,
 # [DO]
 desoto.w.DO <- 
 analyze.wavelet(desoto.w.data, my.series = "DO", 
-                dt = 1/4, lowerPeriod = 6, upperPeriod = 36,
+                dt = 1/4, lowerPeriod = 6, upperPeriod = 60,
                 make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
 # DO % sat
 desoto.w.DOsat <- 
 analyze.wavelet(desoto.w.data, my.series = "DO.sat", 
-                dt = 1/4, lowerPeriod = 6, upperPeriod = 36,
+                dt = 1/4, lowerPeriod = 6, upperPeriod = 60,
                 make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
 # [nitrateNitrite]
 desoto.w.N <- 
 analyze.wavelet(desoto.w.data, my.series = "nitrateNitrite", 
-                dt = 1/4, lowerPeriod = 6, upperPeriod = 36,
+                dt = 1/4, lowerPeriod = 6, upperPeriod = 60,
                 make.pval = TRUE, date.format = "%Y-%m-%d %H:%M:%S")
 
 ### Cross wavelet power ###
@@ -1246,12 +1246,12 @@ analyze.wavelet(desoto.w.data, my.series = "nitrateNitrite",
 # [nitrateNitrite] and [DO]
 coher.N.DO <- 
 analyze.coherency(desoto.w.data, my.pair = c(2,4), dt = 1/4, 
-                  lowerPeriod = 6, upperPeriod = 36,
+                  lowerPeriod = 6, upperPeriod = 60,
                   date.format = "%Y-%m-%d %H:%M:%S")
 # [nitrateNitrite] and DO % sat
 coher.N.DOsat <- 
 analyze.coherency(desoto.w.data, my.pair = c(3,4), dt = 1/4, 
-                  lowerPeriod = 6, upperPeriod = 36,
+                  lowerPeriod = 6, upperPeriod = 60,
                   date.format = "%Y-%m-%d %H:%M:%S")
 ```
 
