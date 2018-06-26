@@ -1,0 +1,647 @@
+---
+title: 'KAWN: Data loading and cleaning'
+author: "Michelle Catherine Kelly"
+date: "3 June 2018"
+output:
+  html_document:
+    theme: yeti
+    df_print: paged
+    toc: yes
+    number_sections: true
+---
+
+```{r setup, echo = FALSE, warning=FALSE, error=FALSE, message=FALSE}
+### Global options ###
+knitr::opts_chunk$set(#fig.height = 8, 
+                      #fig.width = 10, 
+                      cache=TRUE) # enable caching globally
+
+### General packages ###
+library(XML)
+library(lubridate)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+library(dplyr)
+library(magrittr)
+library(zoo)
+library(wesanderson) # pallets
+library(chron)
+library(data.table)
+
+### USGS loading ###
+library(dataRetrieval)
+
+### NEON loading ###
+# library(devtools)
+# install_github("NEONScience/NEON-utilities/neonUtilities", dependencies = TRUE)
+library(neonUtilities)
+
+### Stream metabolism ###
+# install.packages("streamMetabolizer", dependencies = TRUE, repos = c("https://owi.usgs.gov/R", "https://cran.rstudio.com"))
+library(streamMetabolizer)
+library(rstan)
+# install.packages("installr")
+# library("installr")
+# install.Rtools()
+
+# check if Rtools is installed properly, output should be 4
+# install.packages("Rcpp")
+# library(Rcpp)
+# Rcpp::evalCpp("2+2")
+
+### wavelet analysis ###
+library(WaveletComp)
+```
+
+***  
+
+# Overview
+
+This is a **working document** for analyzing sensor data from the NSF RAPID Kansas River Nitrogen Cycling Project
+
+***  
+
+# Data Import  
+
+This section contains all data loading and cleanup chunks  
+
+Data pull = data is taken from an online host (USGS, NEON)
+Data load = data is taken from local file
+
+## Nitratax Data  
+
+**Nitratax_XMLtoCSV:** Function to convert raw-from-sensor .xml file to more convenient .csv file  
+```{r Nitratax_XMLtoCSV, include=FALSE}
+# Function name:
+      # Nitratax_XMLtoCSV
+# Function description:
+      # Convert output format from Nitratax sensor (.xml) into .csv file
+# Input variable definitions:
+      # filename = .xml file to be converted, character  string
+      # sensor = character string of sensor name, will be outputted in .csv file name
+      # deployDate = start date of sensor operation, YYYY-MM-DD character string
+# Outputs:
+      # .csv file titled "KansasR_Nitratax_<sensor>.csv"
+
+Nitratax_XMLtoCSV <- function(filename, sensor, deployDate){
+  
+  xmlData <- XML::xmlParse(file = filename)
+  xmlData <- XML::xmlToDataFrame(xmlData, homogeneous = F, stringsAsFactors = F)
+  xmlData <- xmlData[-(1:6),] # taking out text at top of dataframe
+  
+  for (count in 1:length(xmlData)){
+    names(xmlData)[count] <- as.character(xmlData[1,count])
+  }
+  
+  xmlData <- xmlData[-1,] # taking out character rows
+  xmlData <- xmlData[,-1] # taking out first blank column
+  
+  xmlData$`  TIME  ` <- lubridate::as_datetime(xmlData$`  TIME  `, 
+                                               tz = "America/Chicago", 
+                                               format = "%m/%d/%Y %H:%M:%S")
+  xmlData$`  NITRATE CONC.  ` <- as.numeric(xmlData$`  NITRATE CONC.  `)
+  xmlData$`  ER  ` <- as.numeric(xmlData$`  ER  `)
+  xmlData$`  EM  ` <- as.numeric(xmlData$`  EM  `)
+  
+  xml_trunkated <- xmlData[xmlData$`  TIME  `>ymd(deployDate),] # subset only data from deploy onwards
+  
+  xml_trunkated <- data.frame(xml_trunkated$`  TIME  `, 
+                              xml_trunkated$`  NITRATE CONC.  `)
+  names(xml_trunkated) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
+  CSV_filename <- paste("KansasR_Nitratax_", 
+                        sensor, 
+                        ".csv", sep = "")
+  
+  write.table(xml_trunkated, 
+              file = CSV_filename,
+              sep = ",", row.names = FALSE)
+  return(xml_trunkated)
+  
+}
+```
+
+Import of Nitratax data into R environment, cleanup
+```{r NitrataxLoadingCleanup, include=FALSE}
+# Variable descriptions:    
+      # loadfromCSV = logical vector, if TRUE data will be loaded from .csv files
+                                    # if FALSE data will be converted from .xml to .csv
+                                    # (computationally much faster to load from .csv)
+      # bowersock_N = Nitratax sensor located at the bowersock dam upstream of waste release
+      # eric_N = Nitratax sensor located at the waste release point
+      # steve_N = Nitratax sensor located about ~5 miles downstream of bowersock
+
+loadfromCSV <- TRUE
+
+if (loadfromCSV == TRUE){
+  bowersock_N <- read.csv(file = "KansasR_Nitratax_Bowersock.csv", 
+                          header = TRUE,
+                          colClasses = c("POSIXct", "numeric"))
+  eric_N <- read.csv(file = "KansasR_Nitratax_Eric.csv", 
+                     header = TRUE,
+                     colClasses = c("POSIXct", "numeric"))
+  steve_N <- read.csv(file = "KansasR_Nitratax_Steve.csv", 
+                      header = TRUE,
+                      colClasses = c("POSIXct", "numeric"))
+  
+  names(bowersock_N) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
+  names(eric_N) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
+  names(steve_N) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
+  
+  cat("data loaded from .csv file")
+}
+if (loadfromCSV == FALSE) {
+  bowersock_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Bowersock_Pulled05-07-2018.xml", 
+                                   sensor = "Bowersock", 
+                                   deployDate = "2018-01-13")
+  eric_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Eric_Pulled05-07-2018.xml", 
+                              sensor = "Eric", 
+                              deployDate = "2018-02-19")
+  steve_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Steve_Pulled05-07-2018.xml", 
+                               sensor = "Steve", 
+                               deployDate = "2018-01-31")
+  
+  cat("data loaded from .xml file")
+}
+# bowersock N cleanup
+bowersock_N$`Nitrate plus nitrite as mg-N/L`[bowersock_N$`Date and time` 
+                                             %between% 
+                                               c(ymd_hms("2018-02-05 21:30:00", tz = "America/Chicago"),
+                                                 ymd_hms("2018-02-07 15:30:00", tz = "America/Chicago"))] <- NA
+
+bowersock_N$`Nitrate plus nitrite as mg-N/L`[bowersock_N$`Date and time` 
+                                             %between% 
+                                               c(ymd_hms("2018-02-16 11:00:00", tz = "America/Chicago"),
+                                                 ymd_hms("2018-02-16 11:30:00", tz = "America/Chicago"))] <- NA
+# for purposes of sfs talk.....
+bowersock_N$`Nitrate plus nitrite as mg-N/L`[bowersock_N$`Date and time` 
+                                             %between% 
+                                               c(ymd_hms("2018-05-01 00:00:00", tz = "America/Chicago"),
+                                                 ymd_hms("2018-05-07 00:00:00", tz = "America/Chicago"))] <- NA
+
+# eric N cleanup
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-02-27 00:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-15 19:30:00", tz = "America/Chicago"))] <- NA
+# large precip events
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-18 10:15:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-18 13:15:00", tz = "America/Chicago"))] <- NA
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-19 04:15:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-19 06:00:00", tz = "America/Chicago"))] <- NA
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-19 08:15:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-19 10:15:00", tz = "America/Chicago"))] <- NA
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-19 11:15:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-19 18:45:00", tz = "America/Chicago"))] <- NA
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-26 07:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-26 10:30:00", tz = "America/Chicago"))] <- NA
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-26 11:45:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-26 19:45:00", tz = "America/Chicago"))] <- NA
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-04-26 11:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-04-26 13:00:00", tz = "America/Chicago"))] <- NA
+# for purposes of sfs talk.....
+eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
+                                        %between% 
+                                          c(ymd_hms("2018-05-01 00:00:00", tz = "America/Chicago"),
+                                            ymd_hms("2018-05-07 00:00:00", tz = "America/Chicago"))] <- NA
+
+# steve N cleanup
+steve_N$`Date and time` <- ymd_hms(steve_N$`Date and time`, tz = "America/Chicago")
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-02-13 13:15:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-02-13 18:45:00", tz = "America/Chicago"))] <- NA
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-02-14 11:45:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-02-14 14:45:00", tz = "America/Chicago"))] <- NA
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-02-22 12:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-02-27 20:45:00", tz = "America/Chicago"))] <- NA
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-01 14:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-01 14:30:00", tz = "America/Chicago"))] <- NA
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-03-09 00:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-03-27 11:30:00", tz = "America/Chicago"))] <- NA
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-04-12 09:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-04-12 09:30:00", tz = "America/Chicago"))] <- NA
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-04-20 15:15:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-04-20 15:45:00", tz = "America/Chicago"))] <- NA
+# for purposes of sfs talk.....
+steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
+                                         %between% 
+                                           c(ymd_hms("2018-05-01 00:00:00", tz = "America/Chicago"),
+                                             ymd_hms("2018-05-07 00:00:00", tz = "America/Chicago"))] <- NA
+```
+
+***  
+
+## miniDOT Data  
+
+Loading miniDOT sensor files: dissolved oxygen and temperature data  
+```{r DOloadingCleanup, include=FALSE}
+steve_DO <- read.table(file = "miniDOT_Steve_Pulled04-20-2018.txt", header = TRUE,
+                       sep = ",", skip = 8, stringsAsFactors = FALSE,
+                       colClasses = c("numeric", "POSIXct", "POSIXct", "numeric",
+                                      "numeric", "numeric", "numeric", "numeric"),
+                       col.names = c("unixTimestamp", "time_UTC", "time_CST", "battery_V",
+                                     "temp_C", "DO_mgL", "DO_sat", "Q"))
+
+eric_DO <- read.table(file = "miniDOT_Eric_Pulled05-07-2018.txt", header = TRUE,
+                       sep = ",", skip = 8, stringsAsFactors = FALSE,
+                       colClasses = c("numeric", "POSIXct", "POSIXct", "numeric",
+                                      "numeric", "numeric", "numeric", "numeric"),
+                       col.names = c("unixTimestamp", "time_UTC", "time_CST", "battery_V",
+                                     "temp_C", "DO_mgL", "DO_sat", "Q"))
+
+# Eric DO cleanup
+# 19 - 25 Feb
+eric_DO$DO_mgL[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-02-19 10:38:00", tz = "America/Chicago"),
+                   ymd_hms("2018-02-25 01:28:00", tz = "America/Chicago"))] <- NA
+eric_DO$temp_C[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-02-19 10:38:00", tz = "America/Chicago"),
+                   ymd_hms("2018-02-25 01:28:00", tz = "America/Chicago"))] <- NA
+# 5 - 15 Mar
+eric_DO$DO_mgL[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-03-05 09:58:00", tz = "America/Chicago"),
+                   ymd_hms("2018-03-15 11:08:00", tz = "America/Chicago"))] <- NA
+eric_DO$temp_C[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-03-05 09:58:00", tz = "America/Chicago"),
+                   ymd_hms("2018-03-15 11:08:00", tz = "America/Chicago"))] <- NA
+# 28 Mar
+eric_DO$DO_mgL[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-03-28 04:25:00", tz = "America/Chicago"),
+                   ymd_hms("2018-03-28 21:25:00", tz = "America/Chicago"))] <- NA
+eric_DO$temp_C[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-03-28 04:25:00", tz = "America/Chicago"),
+                   ymd_hms("2018-03-28 21:25:00", tz = "America/Chicago"))] <- NA
+# 30 Mar - 5 Apr
+eric_DO$DO_mgL[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-03-30 23:35:00", tz = "America/Chicago"),
+                   ymd_hms("2018-04-05 12:00:00", tz = "America/Chicago"))] <- NA
+eric_DO$temp_C[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-03-30 23:35:00", tz = "America/Chicago"),
+                   ymd_hms("2018-04-05 12:00:00", tz = "America/Chicago"))] <- NA
+# 14-18 Apr
+eric_DO$DO_mgL[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-04-14 12:23:00", tz = "America/Chicago"),
+                   ymd_hms("2018-04-18 00:00:00", tz = "America/Chicago"))] <- NA
+eric_DO$temp_C[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-04-14 12:23:00", tz = "America/Chicago"),
+                   ymd_hms("2018-04-18 00:00:00", tz = "America/Chicago"))] <- NA
+# 25-30 Apr
+eric_DO$DO_mgL[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-04-25 19:33:00", tz = "America/Chicago"),
+                   ymd_hms("2018-04-30 15:53:00", tz = "America/Chicago"))] <- NA
+eric_DO$temp_C[eric_DO$time_CST 
+               %between% 
+                 c(ymd_hms("2018-04-25 19:33:00", tz = "America/Chicago"),
+                   ymd_hms("2018-04-30 15:53:00", tz = "America/Chicago"))] <- NA
+
+# Steve
+# 30 Jan
+steve_DO$DO_mgL[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-01-30 15:24:00", tz = "America/Chicago"),
+                  ymd_hms("2018-01-30 16:54:00", tz = "America/Chicago"))] <- NA
+steve_DO$temp_C[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-01-30 15:24:00", tz = "America/Chicago"),
+                  ymd_hms("2018-01-30 16:54:00", tz = "America/Chicago"))] <- NA
+# 9-12 Mar
+steve_DO$DO_mgL[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-03-09 17:17:00", tz = "America/Chicago"),
+                  ymd_hms("2018-03-12 10:47:00", tz = "America/Chicago"))] <- NA
+steve_DO$temp_C[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-03-09 17:17:00", tz = "America/Chicago"),
+                  ymd_hms("2018-03-12 10:47:00", tz = "America/Chicago"))] <- NA
+# 13 Mar
+steve_DO$DO_mgL[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-03-13 05:09:00", tz = "America/Chicago"),
+                  ymd_hms("2018-03-13 08:49:00", tz = "America/Chicago"))] <- NA
+steve_DO$temp_C[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-03-13 05:09:00", tz = "America/Chicago"),
+                  ymd_hms("2018-03-13 08:49:00", tz = "America/Chicago"))] <- NA
+# 19-20 Mar
+steve_DO$DO_mgL[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-04-19 23:37:00", tz = "America/Chicago"),
+                  ymd_hms("2018-04-20 08:17:00", tz = "America/Chicago"))] <- NA
+steve_DO$temp_C[steve_DO$time_CST 
+                %between% 
+                c(ymd_hms("2018-04-19 23:37:00", tz = "America/Chicago"),
+                  ymd_hms("2018-04-20 08:17:00", tz = "America/Chicago"))] <- NA
+```
+
+***
+
+## USGS Data  
+
+Pulling data from USGS server for sensor at Desoto KS (fourth core site)  
+```{r DesotoPullCleanup, include=FALSE, warning=FALSE}
+siteNoDesoto <- "06892350" # USGS code for Kansas River site at Desoto, KS
+pCode <- c("99133", "00060", "00065", "00300", "00301","00010") 
+  # USGS parameter codes:
+    # 99133 = nitrate + nitrite [mg-N/L]
+    # 00060 = discharge [cfs]
+    # 00065 = gage height [ft]
+    # 00300 = dissolved oxygen [mg/L]
+    # 00301 = dissolved oxygen [% saturation]
+    # 00010 = water temperature [C]
+pullBegin <- as.POSIXct("2018-02-01", format = "%Y-%m-%d") # Date for start of data pull
+pullEnd <- as.POSIXct("2018-04-30", format = "%Y-%m-%d") # Date for end of data pull
+
+# USGS data pull
+desoto <- readNWISuv(siteNumbers = siteNoDesoto, parameterCd = pCode, 
+                     startDate = pullBegin, endDate = pullEnd, tz = "America/Chicago") 
+
+# Rename columns from codes to parameter names
+desoto <- renameNWISColumns(desoto)
+# Fix remaining names that are still parameter codes
+names(desoto)[names(desoto)=="00301_Inst"] <- "DO_percentsat" 
+names(desoto)[names(desoto)=="00301_Inst_cd"] <- "DO_percentsat_cd"
+names(desoto)[names(desoto)=="99133_Inst"] <- "nitrateNitrite"
+names(desoto)[names(desoto)=="99133_Inst_cd"] <- "nitrateNitrite_cd"
+
+# Convert from American to SI units
+# cubic foot per second to liters per second
+ft3s_m3s <- function(ft3s){
+  m3s <- ft3s*0.0283168
+  return(m3s)
+}
+# foot to meters
+ft_m <- function(ft){
+  m <- 0.3048*ft
+  return(m)
+}
+desoto$Flow_Inst <- ft3s_m3s(desoto$Flow_Inst)
+desoto$GH_Inst <- ft_m(desoto$GH_Inst)
+
+# large precipitation events
+desoto$nitrateNitrite[desoto$dateTime
+                      %between%
+                        c(ymd_hms("2018-03-19 20:30:00", tz = "America/Chicago"),
+                          ymd_hms("2018-03-21 16:45:00", tz = "America/Chicago"))] <- NA
+desoto$nitrateNitrite[desoto$dateTime
+                      %between%
+                        c(ymd_hms("2018-03-25 00:00:00", tz = "America/Chicago"),
+                          ymd_hms("2018-03-30 11:30:00", tz = "America/Chicago"))] <- NA
+desoto$nitrateNitrite[desoto$dateTime
+                      %between%
+                        c(ymd_hms("2018-04-14 13:30:00", tz = "America/Chicago"),
+                          ymd_hms("2018-04-14 20:45:00", tz = "America/Chicago"))] <- NA
+
+```
+
+***  
+
+## NEON Data   
+
+```{r NEONpullCleanup, include=FALSE, eval=FALSE}
+downloadNEONfiles <- FALSE
+
+if (downloadNEONfiles == TRUE){
+  dir.create(paste0(getwd(), "/NEONfiles"))
+  
+  ######## PAR ############
+  getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
+           year_month = "2018-02", package = "basic",
+           savepath = paste(getwd(), "NEONfiles", sep = "/")) # Feb at KU field station
+  getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
+           year_month = "2018-03", package = "basic",
+           savepath = paste(getwd(), "NEONfiles", sep = "/")) # March at KU field station
+  #getPackage(dpID = "DP1.00024.001", site_code = "UKFS",
+           #year_month = "2018-04", package = "basic",
+           #savepath = getwd()) # April at KU field station 
+  stackByTable(dpID = "DP1.00024.001", 
+               filepath = paste0(getwd(), "/NEONfiles"), 
+               savepath = paste0(getwd(), "/NEONfiles"), 
+               folder = TRUE)
+  
+  ######## Barometric pressure ############
+  getPackage(dpID = "DP1.00004.001", site_code = "UKFS",
+           year_month = "2018-02", package = "basic",
+           savepath = paste(getwd(), "NEONfiles", sep = "/")) # Feb at KU field station
+  getPackage(dpID = "DP1.00004.001", site_code = "UKFS",
+           year_month = "2018-03", package = "basic",
+           savepath = paste(getwd(), "NEONfiles", sep = "/")) # March
+  #getPackage(dpID = "DP1.00004.001", site_code = "UKFS",
+           #year_month = "2018-04", package = "basic",
+           #savepath = paste(getwd(), "NEONfiles", sep = "/")) # April
+  stackByTable(dpID = "DP1.00004.001", 
+               filepath = paste0(getwd(), "/NEONfiles"), 
+               savepath = paste0(getwd(), "/NEONfiles"), 
+               folder = TRUE)
+}
+
+PAR <- read.csv(file = paste0(getwd(), "/NEONfiles", "/stackedFiles", 
+                              "/PARPAR_1min.csv"), header = TRUE)
+PAR <- subset(PAR, subset = PAR$verticalPosition == 10) # take measurements that are closest to ground
+PAR$startDateTime <- ymd_hms(PAR$startDateTime, tz = "America/Chicago")
+PAR <- data.frame(
+    dateTime = PAR$startDateTime,
+    mean = PAR$PARMean,
+    min = PAR$PARMinimum,
+    max = PAR$PARMaximum,
+    var = PAR$PARVariance
+)
+
+# PAR units are micromoles per m^2 per second
+
+#### Barometric pressure, units are kPa
+BarPress <- read.csv(file = paste0(getwd(), "/NEONfiles", "/stackedFiles", 
+                              "/BP_30min.csv"), header = TRUE)
+BarPress$startDateTime <- ymd_hms(BarPress$startDateTime, tz = "America/Chicago")
+BarPress <- data.frame(
+  dateTime = BarPress$startDateTime,
+  mean = BarPress$staPresMean,
+  min = BarPress$staPresMinimum,
+  max = BarPress$staPresMaximum,
+  var = BarPress$staPresVariance
+)
+# convert to mmHg
+kpa_mmhg <- function(kpa){
+  mmhg <- kpa*7.5006156130264
+  return(mmhg)
+}
+BarPress$mean <- kpa_mmhg(BarPress$mean)
+BarPress$min <- kpa_mmhg(BarPress$min)
+BarPress$max <- kpa_mmhg(BarPress$max)
+BarPress$var <- kpa_mmhg(BarPress$var)
+```
+
+***  
+
+## DO, Temp, N Plots  
+
+Function setup for individual, simple plots for each site  
+```{r simplePlotFunction, include=FALSE}
+# Function name:
+      # simplePlot
+# Function description:
+      # function to output a simple plot from specified input variables
+# Input variable definitions:
+      # dataset = the time series dataset from which the plot will be generated, dataframe
+      # xAxis = variable to be plotted on the x axis, POSIXct format
+      # yAxis = variable to be plotted on the y axis, numeric
+      # plotBegin = date that plot should start, POSIXct format
+      # plotEnd = date that plot should end, POSIXct format
+      # yMin = minimum value of y axis, numeric
+      # yMax = maximum value of y axis, numeric
+      # yLabel = desired label of y axis, character string
+      # xLabel = desired label of x axis, character string
+      # title = desired title of plot, character string
+# Outputs:
+      # time series plot
+
+simplePlot <- function(dataset, xAxis, yAxis, plotBegin, plotEnd, yMin, yMax, xLabel, yLabel, title){
+  ggplot(NULL) + 
+    geom_point(data = dataset, aes(x = xAxis, y = yAxis, color = title), 
+               show.legend = FALSE, size = 1) +
+    coord_cartesian(xlim = c(plotBegin, plotEnd), 
+                    ylim = c(yMin, yMax)) +
+    labs(y = yLabel, x = xLabel, title = title) +
+    theme_classic()
+}
+```
+
+```{r DO_N_temp_Plots, echo=FALSE, warning=FALSE, eval=FALSE}
+colorBlindPalette <- c("blue2", "red", "darkorchid1", "black")
+
+# bowersock
+bowersockPlot_N <- simplePlot(dataset = bowersock_N, 
+                              xAxis = bowersock_N$`Date and time`, 
+                              yAxis = bowersock_N$`Nitrate plus nitrite as mg-N/L`,
+                              plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
+                              yMin = 0, yMax = 1.5, 
+                              yLabel = "Nitrate plus nitrite [mg-N/L]",
+                              title = "Upstream") +
+  scale_color_manual(values=colorBlindPalette[1])
+
+bowersockPlot_N
+
+# Eric
+ericPlot_N <- simplePlot(dataset = eric_N, 
+                         xAxis = eric_N$`Date and time`,
+                         yAxis = eric_N$`Nitrate plus nitrite as mg-N/L`,
+                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NULL,
+                         yMin = 0, yMax = 20, yLabel = "Nitrate plus nitrite [mg-N/L]",
+                         title = "Discharge point") +
+  scale_color_manual(values=colorBlindPalette[2])
+
+ericPlot_DO <- simplePlot(dataset = eric_DO, 
+                         xAxis = eric_DO$time_CST,
+                         yAxis = eric_DO$DO_mgL,
+                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NULL,
+                         yMin = 0, yMax = 20, yLabel = "Dissolved oxygen [mg/L]",
+                         title = "Discharge point") +
+  theme(plot.title = element_blank()) +
+  scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[2])
+
+ericPlot_temp <- simplePlot(dataset = eric_DO, 
+                         xAxis = eric_DO$time_CST,
+                         yAxis = eric_DO$temp_C,
+                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
+                         yMin = -5, yMax = 25, yLabel = "Temperature [C]",
+                         title = "Discharge point") +
+  theme(plot.title = element_blank()) +
+  scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[3])
+
+grid.arrange(ericPlot_N, ericPlot_DO, ericPlot_temp, ncol = 1, nrow = 3)
+
+# Steve (downstream)
+stevePlot_N <- simplePlot(dataset = steve_N, 
+                          xAxis = steve_N$`Date and time`,
+                          yAxis = steve_N$`Nitrate plus nitrite as mg-N/L`,
+                          plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NULL,
+                          yMin = 0, yMax = 1.5, yLabel = "Nitrate plus nitrite [mg-N/L]",
+                          title = "Downstream (5 km)") + 
+  scale_color_manual(values=colorBlindPalette[3])
+
+stevePlot_DO <- simplePlot(dataset = steve_DO, 
+                         xAxis = steve_DO$time_CST,
+                         yAxis = steve_DO$DO_mgL,
+                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NULL,
+                         yMin = 0, yMax = 20, yLabel = "Dissolved oxygen [mg/L]",
+                         title = "Downstream (5 km)") +
+  theme(plot.title = element_blank()) +
+  scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[2])
+
+stevePlot_temp <- ericPlot_temp <- simplePlot(dataset = steve_DO, 
+                         xAxis = steve_DO$time_CST,
+                         yAxis = steve_DO$temp_C,
+                         plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
+                         yMin = -5, yMax = 25, yLabel = "Temperature [C]",
+                         title = "Downstream (5 km)") +
+  theme(plot.title = element_blank()) +
+  scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[3])
+
+grid.arrange(stevePlot_N, stevePlot_DO, stevePlot_temp, ncol = 1, nrow = 3)
+
+# Desoto
+desotoPlot_N <- simplePlot(dataset = desoto, 
+                           xAxis = desoto$dateTime,
+                           yAxis = desoto$nitrateNitrite,
+                           plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NULL,
+                           yMin = 0, yMax = 1.5, yLabel = "Nitrate plus nitrite [mg-N/L]",
+                           title = "Far downstream (30 km)") +
+  scale_color_manual(values=colorBlindPalette[4])
+
+desotoPlot_DO <- simplePlot(dataset = desoto, 
+                           xAxis = desoto$dateTime,
+                           yAxis = desoto$DO_Inst,
+                           plotBegin = pullBegin, plotEnd = pullEnd, xLabel = NULL,
+                           yMin = 0, yMax = 20, yLabel = "Dissolved oxygen [mg/L]",
+                           title = "Far downstream (30 km)") +
+  theme(plot.title = element_blank()) +
+  scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[2])
+
+desotoPlot_temp <- simplePlot(dataset = desoto, 
+                              xAxis = desoto$dateTime,
+                              yAxis = desoto$Wtemp_Inst,
+                              plotBegin = pullBegin, plotEnd = pullEnd, xLabel = "Date",
+                              yMin = -5, yMax = 25, yLabel = "Temperature [C]",
+                              title = "Far downstream (30 km)") +
+  theme(plot.title = element_blank()) +
+  scale_color_manual(values=wes_palette(n=3, name="Darjeeling")[3])
+
+grid.arrange(desotoPlot_N, desotoPlot_DO, desotoPlot_temp, ncol = 1, nrow = 3)
+```
