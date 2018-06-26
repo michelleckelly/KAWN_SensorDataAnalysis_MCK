@@ -3,123 +3,149 @@ title: 'KAWN: Data loading and cleaning'
 author: "Michelle Catherine Kelly"
 date: "3 June 2018"
 output:
-  html_document:
-    theme: yeti
-    df_print: paged
-    toc: yes
-    number_sections: true
+  html_notebook
 ---
 
 ```{r setup, echo = FALSE, warning=FALSE, error=FALSE, message=FALSE}
-### Global options ###
-knitr::opts_chunk$set(#fig.height = 8, 
-                      #fig.width = 10, 
-                      cache=TRUE) # enable caching globally
+knitr::opts_chunk$set(cache=TRUE)
 
-### General packages ###
 library(XML)
 library(lubridate)
-library(ggplot2)
-library(gridExtra)
-library(grid)
-library(dplyr)
-library(magrittr)
-library(zoo)
-library(wesanderson) # pallets
-library(chron)
 library(data.table)
-
-### USGS loading ###
-library(dataRetrieval)
-
-### NEON loading ###
+library(dataRetrieval) # USGS loading
+# NEON loading
 # library(devtools)
 # install_github("NEONScience/NEON-utilities/neonUtilities", dependencies = TRUE)
 library(neonUtilities)
 
-### Stream metabolism ###
-# install.packages("streamMetabolizer", dependencies = TRUE, repos = c("https://owi.usgs.gov/R", "https://cran.rstudio.com"))
-library(streamMetabolizer)
-library(rstan)
-# install.packages("installr")
-# library("installr")
-# install.Rtools()
-
-# check if Rtools is installed properly, output should be 4
-# install.packages("Rcpp")
-# library(Rcpp)
-# Rcpp::evalCpp("2+2")
-
-### wavelet analysis ###
-library(WaveletComp)
+#library(gridExtra)
+#library(grid)
+#library(dplyr)
+#library(magrittr)
+#library(zoo)
+#library(chron)
 ```
 
-***  
+```{r dataLoad}
+# masterFile
+  # concatenates local nitratax, miniDOT files into a single master .csv (if no master exists). If data is located on USGS database, pulls from USGS database and saves local master. If local master is present, script loads from file
+  # sitename = character vector with proper capitalization
+  # USGS = logical vector, if TRUE data should is pulled from USGS, if FALSE data is loaded from local files
 
-# Overview
-
-This is a **working document** for analyzing sensor data from the NSF RAPID Kansas River Nitrogen Cycling Project
-
-***  
-
-# Data Import  
-
-This section contains all data loading and cleanup chunks  
-
-Data pull = data is taken from an online host (USGS, NEON)
-Data load = data is taken from local file
-
-## Nitratax Data  
-
-**Nitratax_XMLtoCSV:** Function to convert raw-from-sensor .xml file to more convenient .csv file  
-```{r Nitratax_XMLtoCSV, include=FALSE}
-# Function name:
-      # Nitratax_XMLtoCSV
-# Function description:
-      # Convert output format from Nitratax sensor (.xml) into .csv file
-# Input variable definitions:
-      # filename = .xml file to be converted, character  string
-      # sensor = character string of sensor name, will be outputted in .csv file name
-      # deployDate = start date of sensor operation, YYYY-MM-DD character string
-# Outputs:
-      # .csv file titled "KansasR_Nitratax_<sensor>.csv"
-
-Nitratax_XMLtoCSV <- function(filename, sensor, deployDate){
+masterFile <- function(sitename, USGS){
   
-  xmlData <- XML::xmlParse(file = filename)
-  xmlData <- XML::xmlToDataFrame(xmlData, homogeneous = F, stringsAsFactors = F)
-  xmlData <- xmlData[-(1:6),] # taking out text at top of dataframe
-  
-  for (count in 1:length(xmlData)){
-    names(xmlData)[count] <- as.character(xmlData[1,count])
+  if(file.exists(paste("KAWN_SensorData_", sitename, ".csv", sep = ""))){
+    # if master file exists, load from master file
+    dataframe <- read.csv(paste("KAWN_SensorData_", sitename, ".csv", sep = ""), 
+                          header = TRUE)
   }
   
-  xmlData <- xmlData[-1,] # taking out character rows
-  xmlData <- xmlData[,-1] # taking out first blank column
-  
-  xmlData$`  TIME  ` <- lubridate::as_datetime(xmlData$`  TIME  `, 
-                                               tz = "America/Chicago", 
-                                               format = "%m/%d/%Y %H:%M:%S")
-  xmlData$`  NITRATE CONC.  ` <- as.numeric(xmlData$`  NITRATE CONC.  `)
-  xmlData$`  ER  ` <- as.numeric(xmlData$`  ER  `)
-  xmlData$`  EM  ` <- as.numeric(xmlData$`  EM  `)
-  
-  xml_trunkated <- xmlData[xmlData$`  TIME  `>ymd(deployDate),] # subset only data from deploy onwards
-  
-  xml_trunkated <- data.frame(xml_trunkated$`  TIME  `, 
-                              xml_trunkated$`  NITRATE CONC.  `)
-  names(xml_trunkated) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
-  CSV_filename <- paste("KansasR_Nitratax_", 
-                        sensor, 
-                        ".csv", sep = "")
-  
-  write.table(xml_trunkated, 
-              file = CSV_filename,
-              sep = ",", row.names = FALSE)
-  return(xml_trunkated)
-  
-}
+  if(!file.exists(paste("KAWN_SensorData_", sitename, ".csv", sep = ""))){ 
+    # if master file doesn't exist, compile master file
+    if(USGS == FALSE){ 
+      # load in nitratax data
+      nitratax_XMLtoCSV <- function(filename){
+        xmlData <- XML::xmlParse(file = filename)
+        xmlData <- XML::xmlToDataFrame(xmlData, homogeneous = F, stringsAsFactors = F)
+        xmlData <- xmlData[-(1:6),] # taking out text at top of dataframe
+        for (count in 1:length(xmlData)){
+          names(xmlData)[count] <- as.character(xmlData[1,count])
+        }
+        xmlData <- xmlData[-1,] # taking out character rows
+        xmlData <- xmlData[,-1] # taking out first blank column
+        xmlData$`  TIME  ` <- lubridate::as_datetime(xmlData$`  TIME  `, 
+                                                     tz = "America/Chicago",
+                                                     format = "%m/%d/%Y %H:%M:%S")
+        xmlData$`  NITRATE CONC.  ` <- as.numeric(xmlData$`  NITRATE CONC.  `)
+        xmlData$`  ER  ` <- as.numeric(xmlData$`  ER  `)
+        xmlData$`  EM  ` <- as.numeric(xmlData$`  EM  `)
+        
+        xmlData <- data.frame(xmlData$`  TIME  `, xmlData$`  NITRATE CONC.  `)
+        names(xmlData) <- c("dateTime", "nitrateNitrite")
+        return(xmlData)
+      }
+      
+      nitratax <- nitratax_XMLtoCSV(paste("NITRATAX_", sitename, ".xml", sep = ""))
+      
+      if(file.exists(paste("miniDOT_", sitename, ".txt", sep = ""))){
+      # load in minidot data
+        DO <- read.table(file = paste("miniDOT_", sitename, ".txt", sep = ""), 
+                         header = TRUE, sep = ",", skip = 8, stringsAsFactors = FALSE, 
+                         colClasses = c("numeric", "POSIXct", "POSIXct", "numeric", 
+                                        "numeric", "numeric", "numeric", "numeric"),
+                         col.names = c("unixTimestamp", "time_UTC", "time_CST", 
+                                       "battery_V", "temp_C", "DO_mgL", "DO_sat", "Q"))
+        DO <- DO[c(-1, -2, -4, -8)] #drop unix timestamp, time UTC, battery volts, Q
+        DO$time_CST <- round_date(DO$time_CST, unit = "5 mins") # round time to nearest 5 min
+        
+        # merge minidot with nitratax by datetime
+        dataframe <- merge(nitratax, DO, by.x = "dateTime", by.y = "time_CST", all = TRUE)
+        # save master file
+        write.csv(dataframe, row.names = FALSE,
+                  file = paste("KAWN_SensorData_", sitename, ".csv", sep = ""))
+        
+        } else{
+          # save master file with just nitratax
+          dataframe <- nitratax
+          write.csv(dataframe, row.names = FALSE,
+                    file = paste("KAWN_SensorData_", sitename, ".csv", sep = ""))
+          }
+      } else{ # use USGS package to pull data from web, then save locally
+        start <- ymd_hms("2018-01-01 00:00:00")
+        end <- ymd_hms("2018-06-15 00:00:00")
+        
+        if(sitename == "Desoto"){
+          siteNo <- "06892350"
+          pCodes <- c("99133", "00060", "00065", "00300", "00301","00010", 
+                      "00095", "00400", "32295", "32318")
+          data <- readNWISuv(siteNumbers = siteNo, parameterCd = pCodes, 
+                           startDate = start, endDate = end, tz = "America/Chicago")
+        
+          # Rename columns from codes to readable names
+          data <- renameNWISColumns(data)
+          # Fix remaining names that are still parameter codes
+          names(data)[names(data)=="00301_Inst"] <- "DO_percentsat" 
+          names(data)[names(data)=="00301_Inst_cd"] <- "DO_percentsat_cd"
+          names(data)[names(data)=="99133_Inst"] <- "nitrateNitrite"
+          names(data)[names(data)=="99133_Inst_cd"] <- "nitrateNitrite_cd"
+          
+          # Convert from American to SI units
+          # cubic foot per second to liters per second
+          ft3s_m3s <- function(ft3s){
+            m3s <- ft3s*0.0283168
+            return(m3s)
+          }
+          # foot to meters
+          ft_m <- function(ft){
+            m <- 0.3048*ft
+            return(m)
+          }
+          data$Flow_Inst <- ft3s_m3s(data$Flow_Inst)
+          data$GH_Inst <- ft_m(data$GH_Inst)
+          
+          # drop agency code, siteNo, various quality codes
+          dataframe <- data[c(-1,-2,-5,-7,-9,-11,-13,-15,-17,-19,-21,-22)]
+        }
+        # save the USGS data locally
+        write.csv(dataframe, row.names = FALSE,
+                  file = paste("KAWN_SensorData_", sitename, ".csv", sep = ""))
+      }
+  }
+  return(dataframe)
+  }
+
+bowersock <- masterFile(sitename = "Bowersock", USGS = FALSE)
+eric <- masterFile(sitename = "Eric", USGS = FALSE)
+steve <- masterFile(sitename = "Steve", USGS = FALSE)
+desoto <- masterFile(sitename = "Desoto", USGS = TRUE)
 ```
+
+
+
+
+
+
+
 
 Import of Nitratax data into R environment, cleanup
 ```{r NitrataxLoadingCleanup, include=FALSE}
@@ -373,65 +399,7 @@ steve_DO$temp_C[steve_DO$time_CST
 
 ***
 
-## USGS Data  
 
-Pulling data from USGS server for sensor at Desoto KS (fourth core site)  
-```{r DesotoPullCleanup, include=FALSE, warning=FALSE}
-siteNoDesoto <- "06892350" # USGS code for Kansas River site at Desoto, KS
-pCode <- c("99133", "00060", "00065", "00300", "00301","00010") 
-  # USGS parameter codes:
-    # 99133 = nitrate + nitrite [mg-N/L]
-    # 00060 = discharge [cfs]
-    # 00065 = gage height [ft]
-    # 00300 = dissolved oxygen [mg/L]
-    # 00301 = dissolved oxygen [% saturation]
-    # 00010 = water temperature [C]
-pullBegin <- as.POSIXct("2018-02-01", format = "%Y-%m-%d") # Date for start of data pull
-pullEnd <- as.POSIXct("2018-04-30", format = "%Y-%m-%d") # Date for end of data pull
-
-# USGS data pull
-desoto <- readNWISuv(siteNumbers = siteNoDesoto, parameterCd = pCode, 
-                     startDate = pullBegin, endDate = pullEnd, tz = "America/Chicago") 
-
-# Rename columns from codes to parameter names
-desoto <- renameNWISColumns(desoto)
-# Fix remaining names that are still parameter codes
-names(desoto)[names(desoto)=="00301_Inst"] <- "DO_percentsat" 
-names(desoto)[names(desoto)=="00301_Inst_cd"] <- "DO_percentsat_cd"
-names(desoto)[names(desoto)=="99133_Inst"] <- "nitrateNitrite"
-names(desoto)[names(desoto)=="99133_Inst_cd"] <- "nitrateNitrite_cd"
-
-# Convert from American to SI units
-# cubic foot per second to liters per second
-ft3s_m3s <- function(ft3s){
-  m3s <- ft3s*0.0283168
-  return(m3s)
-}
-# foot to meters
-ft_m <- function(ft){
-  m <- 0.3048*ft
-  return(m)
-}
-desoto$Flow_Inst <- ft3s_m3s(desoto$Flow_Inst)
-desoto$GH_Inst <- ft_m(desoto$GH_Inst)
-
-# large precipitation events
-desoto$nitrateNitrite[desoto$dateTime
-                      %between%
-                        c(ymd_hms("2018-03-19 20:30:00", tz = "America/Chicago"),
-                          ymd_hms("2018-03-21 16:45:00", tz = "America/Chicago"))] <- NA
-desoto$nitrateNitrite[desoto$dateTime
-                      %between%
-                        c(ymd_hms("2018-03-25 00:00:00", tz = "America/Chicago"),
-                          ymd_hms("2018-03-30 11:30:00", tz = "America/Chicago"))] <- NA
-desoto$nitrateNitrite[desoto$dateTime
-                      %between%
-                        c(ymd_hms("2018-04-14 13:30:00", tz = "America/Chicago"),
-                          ymd_hms("2018-04-14 20:45:00", tz = "America/Chicago"))] <- NA
-
-```
-
-***  
 
 ## NEON Data   
 
