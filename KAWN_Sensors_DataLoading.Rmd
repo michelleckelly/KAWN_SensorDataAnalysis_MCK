@@ -19,7 +19,6 @@ library(dataRetrieval) # USGS loading
 # library(devtools)
 # install_github("NEONScience/NEON-utilities/neonUtilities", dependencies = TRUE)
 library(neonUtilities)
-
 ```
 
 ```{r dataLoad}
@@ -200,17 +199,26 @@ Qdata.avg$upstreamSum <- Qdata.avg$Q1.lawrence + Qdata.avg$Q2.Farmland + Qdata.a
 
 Qdata.avg$waterBal_percentDev <- ((Qdata.avg$Q5.desoto - Qdata.avg$upstreamSum) /
                                     Qdata.avg$upstreamSum)*100
-plot(x = Qdata.avg$day, y = Qdata.avg$waterBal_percentDev)
-```
-percent deviation = ((downstream Q - upstream Q) / upstream Q) * 100%
 
-negative values: upstream (sum Lawrence gauge, Farmland flow, Wakarusa R., Stranger Creek) has greater Q  
+plot(y = Qdata.avg$Q5.desoto, x = Qdata.avg$upstreamSum, main = "Sum upstream Q vs downstream Q")
+lm.Q <- summary(lm(Q5.desoto ~ upstreamSum, data = Qdata.avg))
+
+plot(x = Qdata.avg$day, y = Qdata.avg$waterBal_percentDev, main = "Percent error of water balance")
+```
+percent deviation = ((downstream Q - upstream Q) / upstream Q) * 100%  
+where downstream Q = desoto gage measurement  
+      upstream Q = sum (sum Lawrence gauge, Farmland flow, Wakarusa R. gage, Stranger Creek gage)  
+
+negative values: upstream has greater Q  
 
 positive values: downstream (desoto gauge) has greater Q  
 - if precipitation was entering reach, this will happen  
 - gages on wakarusa and stranger are pretty far upstream, unaccounting for any gains below the gage (therefore, water balance will tend to predict positive percent deviations)  
 
-mean = `r mean(na.omit(Qdata.avg$waterBal_percentDev))` percent of Q unaccounted for in water balance
+mean = `r mean(na.omit(Qdata.avg$waterBal_percentDev))` percent of Q unaccounted for in water balance  
+
+linear model of sum upstream Q vs downstream Q: R2 = `r lm.Q$r.squared` 
+
 
 ```{r dischargeEstimate}
 Qdata <- spread(Qdata, site_no, Flow_Inst)
@@ -229,8 +237,6 @@ Qdata$Q1.lawrence + Qdata$
 
 # NEXT STEPS: write function to ask if you want daily averaged data or not. save local file
 ```
-
-
 
 
 ```{r NEONpullCleanup, include=FALSE, eval=FALSE}
