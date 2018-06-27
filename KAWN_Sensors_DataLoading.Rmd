@@ -12,12 +12,14 @@ knitr::opts_chunk$set(cache=TRUE)
 library(XML)
 library(lubridate)
 library(data.table)
+library(dplyr)
+library(tidyr)
 library(dataRetrieval) # USGS loading
 # NEON loading
 # library(devtools)
 # install_github("NEONScience/NEON-utilities/neonUtilities", dependencies = TRUE)
 library(neonUtilities)
-library(SWATmodel)
+
 ```
 
 ```{r dataLoad}
@@ -135,7 +137,7 @@ steve <- masterFile(sitename = "Steve", USGS = FALSE)
 desoto <- masterFile(sitename = "Desoto", USGS = TRUE)
 ```
 
-```{r discharge_estimation}
+```{r reachQ}
 # assemble data frame of water balance Q's
 Q1.lawrence <- "06891080"
 #Q2.farmland
@@ -149,14 +151,84 @@ end <- ymd_hms("2018-06-15 00:00:00")
 
 Qdata <- readNWISuv(siteNumbers = sites, parameterCd = "00060", # discharge 
                     startDate = start, endDate = end, tz = "America/Chicago")
+Qdata <- renameNWISColumns(Qdata)
 
+ft3s_m3s <- function(ft3s){
+            m3s <- ft3s*0.0283168
+            return(m3s)
+}
+Qdata$Flow_Inst <- ft3s_m3s(Qdata$Flow_Inst)
+Qdata <- Qdata[c(-1,-5,-6)]
+
+# take average flow for each day
+Qdata.avg <- 
+  Qdata %>%
+    group_by(site_no, day = floor_date(dateTime, "day")) %>%
+    summarize(mean.Q = mean(Flow_Inst))
+
+Qdata.avg <- spread(Qdata.avg, site_no, mean.Q)
+Qdata.avg$day <- ymd(Qdata.avg$day)
+names(Qdata.avg)[names(Qdata.avg)=="06891080"] <- "Q1.lawrence" 
+names(Qdata.avg)[names(Qdata.avg)=="06891500"] <- "Q3.wakarusa" 
+names(Qdata.avg)[names(Qdata.avg)=="06892000"] <- "Q4.stranger" 
+names(Qdata.avg)[names(Qdata.avg)=="06892350"] <- "Q5.desoto" 
+
+# load in farmland Q
+FarmlandReport <- read.csv("FarmlandDailyReport_MCKformatted.csv", 
+                           header = TRUE, stringsAsFactors = FALSE)
+Q2.Farmland <- FarmlandReport[c(-2:-8, -10:-11)]
+Q2.Farmland$Date <- mdy(Q2.Farmland$Date)
+Q2.Farmland <- Q2.Farmland[Q2.Farmland$Date >= ymd("2018-01-01"),] # only look at Jan 1 onwards
+
+# convert from gpm to m3s
+gpm_m3s <- function(gpm){
+            m3s <- gpm*0.000063090196
+            return(m3s)
+}
+Q2.Farmland$flowRate_Outfall001A_gpm <- gpm_m3s(Q2.Farmland$flowRate_Outfall001A_gpm)
+
+# merge Q2 with rest of Qdata.avg
+Qdata.avg <- merge(Qdata.avg, Q2.Farmland, by.x = "day", by.y = "Date", all = TRUE)
+names(Qdata.avg)[names(Qdata.avg)=="flowRate_Outfall001A_gpm"] <- "Q2.Farmland"
+
+# pumping stops on apr 1
+Qdata.avg$Q2.Farmland[Qdata.avg$day > ymd("2018-04-01")] <- 0
+
+# balance equation: Q5.desoto = Q1.lawrence + Q2.farmland + Q3.wakarusa + Q4.stranger
+# calculate amount off that the sum of upstream values is from downstream value
+Qdata.avg$upstreamSum <- Qdata.avg$Q1.lawrence + Qdata.avg$Q2.Farmland + Qdata.avg$Q3.wakarusa + Qdata.avg$Q4.stranger
+
+Qdata.avg$waterBal_percentDev <- ((Qdata.avg$Q5.desoto - Qdata.avg$upstreamSum) /
+                                    Qdata.avg$upstreamSum)*100
+plot(x = Qdata.avg$day, y = Qdata.avg$waterBal_percentDev)
 ```
+percent deviation = ((downstream Q - upstream Q) / upstream Q) * 100%
 
+negative values: upstream (sum Lawrence gauge, Farmland flow, Wakarusa R., Stranger Creek) has greater Q  
 
+positive values: downstream (desoto gauge) has greater Q  
+- if precipitation was entering reach, this will happen  
+- gages on wakarusa and stranger are pretty far upstream, unaccounting for any gains below the gage (therefore, water balance will tend to predict positive percent deviations)  
 
+mean = `r mean(na.omit(Qdata.avg$waterBal_percentDev))` percent of Q unaccounted for in water balance
 
+```{r dischargeEstimate}
+Qdata <- spread(Qdata, site_no, Flow_Inst)
+names(Qdata)[names(Qdata)=="06891080"] <- "Q1.lawrence" 
+names(Qdata)[names(Qdata)=="06891500"] <- "Q3.wakarusa" 
+names(Qdata)[names(Qdata)=="06892000"] <- "Q4.stranger" 
+names(Qdata)[names(Qdata)=="06892350"] <- "Q5.desoto" 
 
+# approximate discharge at site 2
+# Q.site2 <- Q1.lawrence + Q2.farmland
+Qdata$Q1.lawrence + Qdata$
+# Q.site2 <- Qdata[c(1,)]
 
+# approximate discharge at site 3
+# Q.site3 <- Q1.lawrence + Q2.farmland
+
+# NEXT STEPS: write function to ask if you want daily averaged data or not. save local file
+```
 
 
 
