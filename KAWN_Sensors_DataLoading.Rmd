@@ -17,6 +17,7 @@ library(dataRetrieval) # USGS loading
 # library(devtools)
 # install_github("NEONScience/NEON-utilities/neonUtilities", dependencies = TRUE)
 library(neonUtilities)
+library(SWATmodel)
 ```
 
 ```{r dataLoad}
@@ -90,7 +91,7 @@ masterFile <- function(sitename, USGS){
         if(sitename == "Desoto"){
           siteNo <- "06892350"
           pCodes <- c("99133", "00060", "00065", "00300", "00301","00010", 
-                      "00095", "00400", "32295", "32318")
+                      "00095", "00400", "32295")
           data <- readNWISuv(siteNumbers = siteNo, parameterCd = pCodes, 
                            startDate = start, endDate = end, tz = "America/Chicago")
         
@@ -98,12 +99,10 @@ masterFile <- function(sitename, USGS){
           data <- renameNWISColumns(data)
           # Fix remaining names that are still parameter codes
           names(data)[names(data)=="00301_Inst"] <- "DO_percentsat" 
-          names(data)[names(data)=="00301_Inst_cd"] <- "DO_percentsat_cd"
           names(data)[names(data)=="99133_Inst"] <- "nitrateNitrite"
-          names(data)[names(data)=="99133_Inst_cd"] <- "nitrateNitrite_cd"
           
           # Convert from American to SI units
-          # cubic foot per second to liters per second
+          # cubic foot per second to m3 per second
           ft3s_m3s <- function(ft3s){
             m3s <- ft3s*0.0283168
             return(m3s)
@@ -118,6 +117,9 @@ masterFile <- function(sitename, USGS){
           
           # drop agency code, siteNo, various quality codes
           dataframe <- data[c(-1,-2,-5,-7,-9,-11,-13,-15,-17,-19,-21,-22)]
+          
+          # add column for UTC time
+          dataframe$dateTime_UTC <- dataframe$dateTime + hours(5)
         }
         # save the USGS data locally
         write.csv(dataframe, row.names = FALSE,
@@ -133,268 +135,31 @@ steve <- masterFile(sitename = "Steve", USGS = FALSE)
 desoto <- masterFile(sitename = "Desoto", USGS = TRUE)
 ```
 
+```{r discharge_estimation}
+# assemble data frame of water balance Q's
+Q1.lawrence <- "06891080"
+#Q2.farmland
+Q3.wakarusa <- "06891500"
+Q4.stranger <- "06892000"
+Q5.desoto <- "06892350"
+sites <- c(Q1.lawrence, Q3.wakarusa, Q4.stranger, Q5.desoto)
 
+start <- ymd_hms("2018-01-01 00:00:00")
+end <- ymd_hms("2018-06-15 00:00:00")
 
+Qdata <- readNWISuv(siteNumbers = sites, parameterCd = "00060", # discharge 
+                    startDate = start, endDate = end, tz = "America/Chicago")
 
-
-
-
-
-Import of Nitratax data into R environment, cleanup
-```{r NitrataxLoadingCleanup, include=FALSE}
-# Variable descriptions:    
-      # loadfromCSV = logical vector, if TRUE data will be loaded from .csv files
-                                    # if FALSE data will be converted from .xml to .csv
-                                    # (computationally much faster to load from .csv)
-      # bowersock_N = Nitratax sensor located at the bowersock dam upstream of waste release
-      # eric_N = Nitratax sensor located at the waste release point
-      # steve_N = Nitratax sensor located about ~5 miles downstream of bowersock
-
-loadfromCSV <- TRUE
-
-if (loadfromCSV == TRUE){
-  bowersock_N <- read.csv(file = "KansasR_Nitratax_Bowersock.csv", 
-                          header = TRUE,
-                          colClasses = c("POSIXct", "numeric"))
-  eric_N <- read.csv(file = "KansasR_Nitratax_Eric.csv", 
-                     header = TRUE,
-                     colClasses = c("POSIXct", "numeric"))
-  steve_N <- read.csv(file = "KansasR_Nitratax_Steve.csv", 
-                      header = TRUE,
-                      colClasses = c("POSIXct", "numeric"))
-  
-  names(bowersock_N) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
-  names(eric_N) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
-  names(steve_N) <- c("Date and time", "Nitrate plus nitrite as mg-N/L")
-  
-  cat("data loaded from .csv file")
-}
-if (loadfromCSV == FALSE) {
-  bowersock_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Bowersock_Pulled05-07-2018.xml", 
-                                   sensor = "Bowersock", 
-                                   deployDate = "2018-01-13")
-  eric_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Eric_Pulled05-07-2018.xml", 
-                              sensor = "Eric", 
-                              deployDate = "2018-02-19")
-  steve_N <- Nitratax_XMLtoCSV(filename = "NITRATAX_Steve_Pulled05-07-2018.xml", 
-                               sensor = "Steve", 
-                               deployDate = "2018-01-31")
-  
-  cat("data loaded from .xml file")
-}
-# bowersock N cleanup
-bowersock_N$`Nitrate plus nitrite as mg-N/L`[bowersock_N$`Date and time` 
-                                             %between% 
-                                               c(ymd_hms("2018-02-05 21:30:00", tz = "America/Chicago"),
-                                                 ymd_hms("2018-02-07 15:30:00", tz = "America/Chicago"))] <- NA
-
-bowersock_N$`Nitrate plus nitrite as mg-N/L`[bowersock_N$`Date and time` 
-                                             %between% 
-                                               c(ymd_hms("2018-02-16 11:00:00", tz = "America/Chicago"),
-                                                 ymd_hms("2018-02-16 11:30:00", tz = "America/Chicago"))] <- NA
-# for purposes of sfs talk.....
-bowersock_N$`Nitrate plus nitrite as mg-N/L`[bowersock_N$`Date and time` 
-                                             %between% 
-                                               c(ymd_hms("2018-05-01 00:00:00", tz = "America/Chicago"),
-                                                 ymd_hms("2018-05-07 00:00:00", tz = "America/Chicago"))] <- NA
-
-# eric N cleanup
-eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-02-27 00:00:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-03-15 19:30:00", tz = "America/Chicago"))] <- NA
-# large precip events
-eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-03-18 10:15:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-03-18 13:15:00", tz = "America/Chicago"))] <- NA
-eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-03-19 04:15:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-03-19 06:00:00", tz = "America/Chicago"))] <- NA
-eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-03-19 08:15:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-03-19 10:15:00", tz = "America/Chicago"))] <- NA
-eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-03-19 11:15:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-03-19 18:45:00", tz = "America/Chicago"))] <- NA
-eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-03-26 07:00:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-03-26 10:30:00", tz = "America/Chicago"))] <- NA
-eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-03-26 11:45:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-03-26 19:45:00", tz = "America/Chicago"))] <- NA
-eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-04-26 11:00:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-04-26 13:00:00", tz = "America/Chicago"))] <- NA
-# for purposes of sfs talk.....
-eric_N$`Nitrate plus nitrite as mg-N/L`[eric_N$`Date and time` 
-                                        %between% 
-                                          c(ymd_hms("2018-05-01 00:00:00", tz = "America/Chicago"),
-                                            ymd_hms("2018-05-07 00:00:00", tz = "America/Chicago"))] <- NA
-
-# steve N cleanup
-steve_N$`Date and time` <- ymd_hms(steve_N$`Date and time`, tz = "America/Chicago")
-steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-02-13 13:15:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-02-13 18:45:00", tz = "America/Chicago"))] <- NA
-steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-02-14 11:45:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-02-14 14:45:00", tz = "America/Chicago"))] <- NA
-steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-02-22 12:00:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-02-27 20:45:00", tz = "America/Chicago"))] <- NA
-steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-03-01 14:00:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-03-01 14:30:00", tz = "America/Chicago"))] <- NA
-steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-03-09 00:00:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-03-27 11:30:00", tz = "America/Chicago"))] <- NA
-steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-04-12 09:00:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-04-12 09:30:00", tz = "America/Chicago"))] <- NA
-steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-04-20 15:15:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-04-20 15:45:00", tz = "America/Chicago"))] <- NA
-# for purposes of sfs talk.....
-steve_N$`Nitrate plus nitrite as mg-N/L`[steve_N$`Date and time` 
-                                         %between% 
-                                           c(ymd_hms("2018-05-01 00:00:00", tz = "America/Chicago"),
-                                             ymd_hms("2018-05-07 00:00:00", tz = "America/Chicago"))] <- NA
 ```
 
-***  
-
-## miniDOT Data  
-
-Loading miniDOT sensor files: dissolved oxygen and temperature data  
-```{r DOloadingCleanup, include=FALSE}
-steve_DO <- read.table(file = "miniDOT_Steve_Pulled04-20-2018.txt", header = TRUE,
-                       sep = ",", skip = 8, stringsAsFactors = FALSE,
-                       colClasses = c("numeric", "POSIXct", "POSIXct", "numeric",
-                                      "numeric", "numeric", "numeric", "numeric"),
-                       col.names = c("unixTimestamp", "time_UTC", "time_CST", "battery_V",
-                                     "temp_C", "DO_mgL", "DO_sat", "Q"))
-
-eric_DO <- read.table(file = "miniDOT_Eric_Pulled05-07-2018.txt", header = TRUE,
-                       sep = ",", skip = 8, stringsAsFactors = FALSE,
-                       colClasses = c("numeric", "POSIXct", "POSIXct", "numeric",
-                                      "numeric", "numeric", "numeric", "numeric"),
-                       col.names = c("unixTimestamp", "time_UTC", "time_CST", "battery_V",
-                                     "temp_C", "DO_mgL", "DO_sat", "Q"))
-
-# Eric DO cleanup
-# 19 - 25 Feb
-eric_DO$DO_mgL[eric_DO$time_CST 
-               %between% 
-                 c(ymd_hms("2018-02-19 10:38:00", tz = "America/Chicago"),
-                   ymd_hms("2018-02-25 01:28:00", tz = "America/Chicago"))] <- NA
-eric_DO$temp_C[eric_DO$time_CST 
-               %between% 
-                 c(ymd_hms("2018-02-19 10:38:00", tz = "America/Chicago"),
-                   ymd_hms("2018-02-25 01:28:00", tz = "America/Chicago"))] <- NA
-# 5 - 15 Mar
-eric_DO$DO_mgL[eric_DO$time_CST 
-               %between% 
-                 c(ymd_hms("2018-03-05 09:58:00", tz = "America/Chicago"),
-                   ymd_hms("2018-03-15 11:08:00", tz = "America/Chicago"))] <- NA
-eric_DO$temp_C[eric_DO$time_CST 
-               %between% 
-                 c(ymd_hms("2018-03-05 09:58:00", tz = "America/Chicago"),
-                   ymd_hms("2018-03-15 11:08:00", tz = "America/Chicago"))] <- NA
-# 28 Mar
-eric_DO$DO_mgL[eric_DO$time_CST 
-               %between% 
-                 c(ymd_hms("2018-03-28 04:25:00", tz = "America/Chicago"),
-                   ymd_hms("2018-03-28 21:25:00", tz = "America/Chicago"))] <- NA
-eric_DO$temp_C[eric_DO$time_CST 
-               %between% 
-                 c(ymd_hms("2018-03-28 04:25:00", tz = "America/Chicago"),
-                   ymd_hms("2018-03-28 21:25:00", tz = "America/Chicago"))] <- NA
-# 30 Mar - 5 Apr
-eric_DO$DO_mgL[eric_DO$time_CST 
-               %between% 
-                 c(ymd_hms("2018-03-30 23:35:00", tz = "America/Chicago"),
-                   ymd_hms("2018-04-05 12:00:00", tz = "America/Chicago"))] <- NA
-eric_DO$temp_C[eric_DO$time_CST 
-               %between% 
-                 c(ymd_hms("2018-03-30 23:35:00", tz = "America/Chicago"),
-                   ymd_hms("2018-04-05 12:00:00", tz = "America/Chicago"))] <- NA
-# 14-18 Apr
-eric_DO$DO_mgL[eric_DO$time_CST 
-               %between% 
-                 c(ymd_hms("2018-04-14 12:23:00", tz = "America/Chicago"),
-                   ymd_hms("2018-04-18 00:00:00", tz = "America/Chicago"))] <- NA
-eric_DO$temp_C[eric_DO$time_CST 
-               %between% 
-                 c(ymd_hms("2018-04-14 12:23:00", tz = "America/Chicago"),
-                   ymd_hms("2018-04-18 00:00:00", tz = "America/Chicago"))] <- NA
-# 25-30 Apr
-eric_DO$DO_mgL[eric_DO$time_CST 
-               %between% 
-                 c(ymd_hms("2018-04-25 19:33:00", tz = "America/Chicago"),
-                   ymd_hms("2018-04-30 15:53:00", tz = "America/Chicago"))] <- NA
-eric_DO$temp_C[eric_DO$time_CST 
-               %between% 
-                 c(ymd_hms("2018-04-25 19:33:00", tz = "America/Chicago"),
-                   ymd_hms("2018-04-30 15:53:00", tz = "America/Chicago"))] <- NA
-
-# Steve
-# 30 Jan
-steve_DO$DO_mgL[steve_DO$time_CST 
-                %between% 
-                c(ymd_hms("2018-01-30 15:24:00", tz = "America/Chicago"),
-                  ymd_hms("2018-01-30 16:54:00", tz = "America/Chicago"))] <- NA
-steve_DO$temp_C[steve_DO$time_CST 
-                %between% 
-                c(ymd_hms("2018-01-30 15:24:00", tz = "America/Chicago"),
-                  ymd_hms("2018-01-30 16:54:00", tz = "America/Chicago"))] <- NA
-# 9-12 Mar
-steve_DO$DO_mgL[steve_DO$time_CST 
-                %between% 
-                c(ymd_hms("2018-03-09 17:17:00", tz = "America/Chicago"),
-                  ymd_hms("2018-03-12 10:47:00", tz = "America/Chicago"))] <- NA
-steve_DO$temp_C[steve_DO$time_CST 
-                %between% 
-                c(ymd_hms("2018-03-09 17:17:00", tz = "America/Chicago"),
-                  ymd_hms("2018-03-12 10:47:00", tz = "America/Chicago"))] <- NA
-# 13 Mar
-steve_DO$DO_mgL[steve_DO$time_CST 
-                %between% 
-                c(ymd_hms("2018-03-13 05:09:00", tz = "America/Chicago"),
-                  ymd_hms("2018-03-13 08:49:00", tz = "America/Chicago"))] <- NA
-steve_DO$temp_C[steve_DO$time_CST 
-                %between% 
-                c(ymd_hms("2018-03-13 05:09:00", tz = "America/Chicago"),
-                  ymd_hms("2018-03-13 08:49:00", tz = "America/Chicago"))] <- NA
-# 19-20 Mar
-steve_DO$DO_mgL[steve_DO$time_CST 
-                %between% 
-                c(ymd_hms("2018-04-19 23:37:00", tz = "America/Chicago"),
-                  ymd_hms("2018-04-20 08:17:00", tz = "America/Chicago"))] <- NA
-steve_DO$temp_C[steve_DO$time_CST 
-                %between% 
-                c(ymd_hms("2018-04-19 23:37:00", tz = "America/Chicago"),
-                  ymd_hms("2018-04-20 08:17:00", tz = "America/Chicago"))] <- NA
-```
-
-***
 
 
 
-## NEON Data   
+
+
+
+
+
 
 ```{r NEONpullCleanup, include=FALSE, eval=FALSE}
 downloadNEONfiles <- FALSE

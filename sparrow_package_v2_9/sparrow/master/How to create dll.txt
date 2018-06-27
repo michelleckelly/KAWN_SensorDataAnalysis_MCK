@@ -1,0 +1,194 @@
+How to create a DLL and use it in SAS
+
+1. Write one or more subroutines in FORTRAN,
+     - In each subroutine, make sure the input arguements are declared INTENT(IN) and the output arguement is
+       declared as INTENT(OUT) or INTENT(IN OUT).
+     - Note also that you should not initialize variables in the declaration statements 
+       (i.e., INTEGER, :: i_e=1) as this only initializes on the first invocation the subroutine.
+     - Include the command dll_export routine_name after each subroutine declaration line, where
+       routine_name is the name of the subroutine.
+
+2. Save the collection of subroutines with the name you want to use for the DLL module name (e.g.,
+   if you want the name of the module to be sparoutn.dll, then name the collected subroutines, 
+   sparoutn.for. (See example 1)
+
+3. Determine the required stack of memory by embedding the subroutine in a main program that calls the
+   subroutine and specifies argument dimensions that will approximate those that will be applied in
+   practice. Compiling this program without the stack switch will generally cause Lahey to respond with
+   a message that determines the minimum amount of stack required to run the program. (See example 2).
+
+3. Compile the subroutines usin the following switch settings:
+   lf90 "<name>" -nwrap -dll -win -ml winapi -s 50000000
+   where the <name> is the name of the collection of subroutines source code (e.g., sparoutn.for),
+   and the s switch refers to the number of bytes of memory to reserve for the stack in order for
+   the program to run.
+
+   The compiled dll MUST be stored in a directory that is included in the path search (the current setting
+   of the path can be determined by entering the command PATH at a DOS prompt. To set the path in Windows XP,
+   click on start, control panel, select system, advanced, environment variables, and select 'path' for edit.
+   Add the path containing the sparrow dll program and click OK. Computer must be restarted for new path
+   definition to be invoked.
+
+4. Write the sascbtbl file. This file contains information necessary to pass arguements to the DLL. The
+   critical elements can be determined from the following example:
+
+routine tnode_a minarg=4 maxarg=4
+  CALLSEQ=BYADDR
+  STACKORDER=R2L
+  STACKPOP=CALLED
+  TRANSPOSE=YES
+  MODULE=tnode_a
+  RETURNS=LONG ;
+ARG 1 NUM INPUT format=ib4. ;
+ARG 2 NUM INPUT format=ib4. ;
+ARG 3 NUM INPUT format=rb8. ;
+ARG 4 NUM UPDATE format=rb8. ; 
+routine test minarg=1 maxarg=1
+  CALLSEQ=BYADDR
+  STACKORDER=R2L
+  STACKPOP=CALLED
+  TRANSPOSE=YES
+  MODULE=tnode_a
+  RETURNS=LONG ;
+ARG 1 NUM INPUT format=rb8. ;
+
+  This sascbtbl specifies arguements for two routines, tnode_a and test. The first routine requires 4
+  arguements and the second only 1. Both routines are located in the tnode_a module (the tnode_a.dll).
+  The call sequence is byaddr (by address - as opposed to by value). The stack order is reac right-to-
+  left. The called routine pops the stack and initiates the loading of arguements. Because the routine
+  is written in FORTRAN, which passes arrays in column-major order (i.e., elements of the first (left-
+  most) column column are passed first, followed by the second column, etc. - as opposed to C language
+  where row-major order is used - first row is passed (top, left-to-right), followed by the second, etc.),
+  the passed array must be transposed. Passes to C language routines do not require transpositioning.
+
+  The returns statement allows the routine to be called using the rc convention (e.g., rc = modulein())
+
+  The four arguement specifications designate each arguement as INPUT, OUTPUT or UPDATE. Use INPUT for 
+  arguements that do not change value after execution of the routine. Designate the arguement as UPDATE
+  for a variable that is updated by the routine. Note that an OUTPUT or UPDATE arguement must be 
+  a variable name and the dimensions of the variable should match what is expected from the output.
+
+  The data type specification should be rb8. for arguements that send and receive double precision values.
+  Note that an arguement may be double precision in SAS IML but can be passed to the routine as integer
+  (ib4. or ib2.). The FORTRAN variable specification must comply with these formats.
+
+5. The SAS program must include:
+
+   - The sascbtbl statement. E.G.:
+
+     filename sascbtbl 'd:\greg\sparrow\model\test\tnode_a_at.txt' ;
+
+     where 'd:\greg\sparrow\model\test\tnode_a_at.txt' is the name of the file containing the 
+     attribute specification table.
+
+   - Call the routine using the IML commands call modulei(.) or rc = modulein(.), where the arguements are:
+
+     call modulei(<'*IEH'>,'routine_name',arg_1,...,arg_N) ;
+
+     where '*IEH' is optional and are switches that request various outputs - always preceded by the *. The
+     I switch specifies detailed description of the arguements passed to the loaded routine, E specifies
+     detailed error messages, and H specifies Help information on the modulei command.
+
+   - Note, the SAS documentation claims that only three arguements can be passed for IML but I had
+     no trouble passing four.
+
+   - Note, in testing the program it might help to write arguements to make sure they are being passed
+     correctly. Compile the subroutine using write commands - see example 2.
+
+Example 1:
+
+      subroutine tnode_a (ndef,ftnode,indata,e)
+        dll_export tnode_a
+        INTEGER, INTENT(IN) :: ndef(4)
+        INTEGER, INTENT(IN) :: ftnode(ndef(1),3)
+        INTEGER :: i,k,i_e
+        DOUBLE PRECISION, INTENT(IN) :: indata(ndef(1),3*ndef(3))
+        DOUBLE PRECISION, INTENT(OUT) :: e(ndef(4))
+        DOUBLE PRECISION :: node(ndef(2),ndef(3)),rch
+        i_e=1
+        do i=1,ndef(2)
+          do k=1,ndef(3)
+            node(i,k)=0
+          end do
+        end do
+        do i=1,ndef(1)
+          do k=1,ndef(3)
+            rch=indata(i,k)+indata(i,ndef(3)+k)*node(ftnode(i,1),k)
+            if (indata(i,2*ndef(3)+k).gt.0) then
+              e(i_e)=LOG(indata(i,2*ndef(3)+k)/rch)
+              rch=indata(i,2*ndef(3)+k)
+              i_e=i_e+1
+            end if
+            node(ftnode(i,2),k)=node(ftnode(i,2),k)+ftnode(i,3)*rch
+          end do
+        end do
+      end subroutine tnode_a
+      subroutine test (a)
+        dll_export test
+        DOUBLE PRECISION, INTENT(IN) :: a(5)
+        OPEN(6, FILE='d:\greg\sparrow\model\test\testita.txt',POSITION=
+     1   'append')
+        WRITE(6,*) 'A',a
+        CLOSE(6)
+      end subroutine
+
+Example 2:
+
+C     Last change:  GES  10 Jun 2002   11:03 am
+      program main
+        INTEGER :: i,k,nreach=10,ndep=1,ndef(4)
+        DOUBLE PRECISION :: DATA(10,6),RESULT(10,1)
+        ndef(1)=nreach
+        ndef(2)=nreach+1
+        ndef(3)=ndep
+        ndef(4)=nreach
+        do i=1,nreach
+          DATA(i,1)=i
+          DATA(i,2)=i+1
+          DATA(i,3)=1
+          do k=1,ndep
+            DATA(i,3+k)=1
+            DATA(i,3+ndep+k)=1
+            DATA(i,3+2*ndep+k)=i
+          end do
+        end do
+        call timer(ibegin)
+        call node_accum(DATA,ndef,result)
+        call timer(iend)
+        PRINT*, "Result"
+        PRINT*, MAXVAL(abs(RESULT)),(real(iend-ibegin)/100)
+      end program
+
+      subroutine node_accum (indata,ndef,e)
+c        dll_export node_accum
+        INTEGER, INTENT(IN) :: ndef(4)
+        INTEGER :: i,k,i_e=1
+        DOUBLE PRECISION :: node(ndef(2),ndef(3)),rch
+        double precision,  INTENT(IN) :: indata(ndef(1),3+3*ndef(3))
+        double precision,  INTENT(OUT) :: e(ndef(4))
+        OPEN(6, FILE='d:\greg\sparrow\model\test\testit.txt',status=
+     1   'append')
+        WRITE(6,*) 'ndef',ndef
+        CLOSE(6)
+        OPEN(7, FILE='d:\greg\sparrow\model\test\testit2.txt')
+        WRITE(7,*) 'Indata',indata
+        CLOSE(7)
+        do i=1,ndef(2)
+          do k=1,ndef(3)
+            node(i,k)=0
+          end do
+        end do
+        do i=1,ndef(1)
+          do k=1,ndef(3)
+            rch=indata(i,3+k)+indata(i,3+ndef(3)+k)*
+     1       node(INT(indata(i,1)),k)
+            if (indata(i,3+2*ndef(3)+k).ge.0) then
+              e(i_e)=LOG(indata(i,3+2*ndef(3)+k)/rch)
+              rch=indata(i,3+2*ndef(3)+k)
+              i_e=i_e+1
+            end if
+            node(INT(indata(i,2)),k)=node(INT(indata(i,2)),k)+
+     1       indata(i,3)*rch
+          end do
+        end do
+      end subroutine node_accum

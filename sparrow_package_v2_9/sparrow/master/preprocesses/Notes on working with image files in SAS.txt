@@ -1,0 +1,39 @@
+Notes on working with image files in SAS:
+
+The preprocesses package includes two programs for working with image files in SAS: 
+aggregate_data_from_images.sas and allocate_data_to_ws_by_image.sas. These two programs
+perform almost all the computations necessary for creating watershed data from data
+available at high resolution or data available for spatial units other than watersheds.
+
+The program aggregate_data_from_images.sas takes image file information (e.g., land use
+information), aggregates across classes, and accumulates to form summary class totals
+by watershed. The program allocate_data_to_ws_by_images.sas takes tabular data for some
+arbitrarily defined spatial unit (e.g., counties or STATSGO map units), and allocates
+it to watersheds using image information for a set of allocation variables (e.g., land 
+use information). The program allocates data defined as either sums or as averages. The
+zip file allocate_data_to_ws_by_image.zip contains all the files necessary to execute
+an example application involving county population data allocated to e2rf1 watersheds
+using NLCD image information for medium and high intensity residential use.
+
+The files created by these programs can be merged with other reach-level information
+to create the data1 file needed for a SPARROW application.
+
+
+Technical Notes:
+
+There is a complication with reading image files into SAS when the image file contains
+0/1 data. In creating an image file, ARC assigns only a single bit to each pixel. However,
+the minimum pixel size that SAS can read is 1 byte (i.e., 8 bits). Therefore, in order
+for SAS to read a 0/1 image file, it is necessary for ARC to create a file that contains
+at least one byte for each pixel. This can be done by transforming the data to 0/100 prior
+to outputing to an image. This forces ARC to allocate 1 byte to each pixel, which allows
+SAS to reach a single pixel value. In reading the pixel, it is then necessary for SAS
+to transform the data by dividing by 100.
+
+The alternative is to code SAS to convert a single byte into 8 bits of data. For example,
+in SAS/IML, the value of the pixel can be converted to a series of eight 0/1 values by
+
+  y = putn(x,"binary8.") ;
+
+But how you go from this to 8 separate values is yet to be determined.
+

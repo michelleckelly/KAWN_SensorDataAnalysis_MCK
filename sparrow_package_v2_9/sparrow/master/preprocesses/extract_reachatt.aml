@@ -1,0 +1,54 @@
+/*----------------------------------------------------------------------
+/*
+/*  Command name: EXTRACT_REACHAAT.AML
+/*  Language: AML
+/*
+/*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/*
+/* Purpose: Extracts necessary attributes from the 
+/* arc attribute table (aat) of the ArcInfo reach coverage 
+/*          for input to assign_hydseq FORTRAN program
+/*
+/*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/*
+/* Comments:
+/*
+
+/* History:
+/*     Author/Site,      Date,        Event
+/*     ------------------------------------------------------------
+/*     R. Alexander      09/10/03     Created
+/*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+/* Edit the pathname for the directory containing the ArcInfo reach coverage as necessary
+&workspace D:\sparrow\data
+
+&DATA arc info
+ARC
+CALC $NM = 1
+CALC $COMMA-SWITCH = -1
+CALC $PRINTER-SIZE = 200
+
+/* Edit the name of the aat as necessary
+SEL ERF1_2_L.AAT
+/* Edit the name of the attribute for the unique reach identifier
+/* as necessary
+SORT E2RF1
+RESEL E2RF1 LT 80000
+
+/************************************
+/* Output reach attributes for non-coastal reaches
+/* Edit the path for the output file as necessary, but retain the
+/* name reach.dat for the output file.
+/* Edit attribute names as necessary.
+/************************************
+OUTPUT D:\sparrow\data\reach.dat INIT
+PRINT E2RF1,FNODE#,TNODE#,DEMIAREA,FRAC,HUC2
+
+ASEL/* Edit the aat file name as necessary (retain the # symbol)
+SORT ERF1_2_L#
+Q STOP
+&END
+&RETURN
+
+ 

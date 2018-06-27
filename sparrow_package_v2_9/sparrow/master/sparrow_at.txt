@@ -1,0 +1,14 @@
+routine tnode_a minarg=7 maxarg=7
+  CALLSEQ=BYADDR
+  STACKORDER=R2L
+  STACKPOP=CALLED
+  TRANSPOSE=YES
+  MODULE=sparrow
+  RETURNS=LONG ;
+ARG 1 NUM INPUT format=ib4. ;
+ARG 2 NUM INPUT format=ib4. ;
+ARG 3 NUM INPUT format=ib2. ;
+ARG 4 NUM INPUT format=rb8. ;
+ARG 5 NUM INPUT format=rb8. ;
+ARG 6 NUM INPUT format=rb8. ;
+ARG 7 NUM UPDATE format=rb8. ;
