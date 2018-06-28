@@ -3,7 +3,7 @@ title: 'KAWN: Data loading and cleaning'
 author: "Michelle Catherine Kelly"
 date: "3 June 2018"
 output:
-  html_notebook
+  html_document
 ---
 
 ```{r setup, echo = FALSE, warning=FALSE, error=FALSE, message=FALSE}
@@ -137,68 +137,116 @@ desoto <- masterFile(sitename = "Desoto", USGS = TRUE)
 ```
 
 ```{r reachQ}
-# assemble data frame of water balance Q's
-Q1.lawrence <- "06891080"
-#Q2.farmland
-Q3.wakarusa <- "06891500"
-Q4.stranger <- "06892000"
-Q5.desoto <- "06892350"
-sites <- c(Q1.lawrence, Q3.wakarusa, Q4.stranger, Q5.desoto)
+#if(Q.avg = TRUE && Qdata.avg file exists){
+  #loadfile
+#}
+#if(Q.avg = FALSE && Qdata file exists){
+  #load file
+#}
+#if(!Qdata.avg file exists | !Qdata file exists){
+  #if (Q.avg = TRUE){
+    #create Q.avg file
+    #save Q.avg
+  #}
+  #if(Q.avg = FALSE){
+    #create Q file
+    #save Q file
+  #}
+#}
 
-start <- ymd_hms("2018-01-01 00:00:00")
-end <- ymd_hms("2018-06-15 00:00:00")
+# avg.Q: logical, TRUE returns dataframe of mean daily Q at all sites, FALSE returns all measurements of Q at all sites
+# load from file: logical, if TRUE loads appropriate dataframe from file
+Q.dataframe <- function(avg.Q){
+  if(avg.Q == "TRUE" && file.exists("KAWN_USGSDischarge_dailymeans.csv")){
+    Qdata <- read.csv("KAWN_USGSDischarge_dailymeans.csv", header = TRUE)
+  }
+  if(avg.Q == "FALSE" && file.exists("KAWN_USGSDischarge_instantaneous.csv")){
+    Qdata <- read.csv("KAWN_USGSDischarge_instantaneous.csv", header = TRUE)
+  }
+  if(!file.exists("KAWN_USGSDischarge_dailymeans.csv") | !file.exists(file.exists("KAWN_USGSDischarge_dailymeans.csv"))){
+    Q1.lawrence <- "06891080" # USGS identifier codes for gauges of interest
+    Q3.wakarusa <- "06891500"
+    Q4.stranger <- "06892000"
+    Q5.desoto <- "06892350"
+    sites <- c(Q1.lawrence, Q3.wakarusa, Q4.stranger, Q5.desoto)
+    
+    start <- ymd_hms("2018-01-01 00:00:00") # start date of data
+    end <- ymd_hms("2018-06-15 00:00:00") # end date of data
+    
+    #pull from USGS server
+    Qdata <- readNWISuv(siteNumbers = sites, parameterCd = "00060", # discharge 
+                          startDate = start, endDate = end, tz = "America/Chicago")
+    Qdata <- renameNWISColumns(Qdata)
+    
+    ft3s_m3s <- function(ft3s){
+      m3s <- ft3s*0.0283168
+    return(m3s)
+      }
+    Qdata$Flow_Inst <- ft3s_m3s(Qdata$Flow_Inst) # convert to SI units
+    
+    Qdata$dateTime <- ymd_hms(Qdata$dateTime) # report date in lubridate format
+    Qdata <- Qdata[c(-1,-5,-6)] # take out the columns that report data quality codes
+    
+    if(avg.Q == "TRUE"){
+      Qdata <- # if daily averages are requested, take the flow data and compute an average value for each day
+        Qdata %>% 
+        group_by(site_no, dateTime = floor_date(dateTime, "day")) %>%
+          summarize(mean.Q = mean(Flow_Inst))
+      
+      Qdata <- ymd(Qdata$dateTime) # report date in lubridate format
+    }
+    
+    Qdata <- spread(Qdata, site_no, mean.Q) #reorganize the dataframe so each site is in its own column
+    
+    names(Qdata)[names(Qdata)=="06891080"] <- "Q1.lawrence" 
+    names(Qdata)[names(Qdata)=="06891500"] <- "Q3.wakarusa" 
+    names(Qdata)[names(Qdata)=="06892000"] <- "Q4.stranger" 
+    names(Qdata)[names(Qdata)=="06892350"] <- "Q5.desoto" 
+    
+    # read in flow data from farmland report
+    FarmlandReport <- read.csv("FarmlandDailyReport_MCKformatted.csv", header = TRUE, stringsAsFactors = FALSE)
+    Q2.Farmland <- FarmlandReport[c(-2:-8, -10:-11)]
+    Q2.Farmland$Date <- mdy(Q2.Farmland$Date)
+    Q2.Farmland <- Q2.Farmland[Q2.Farmland$Date >= ymd("2018-01-01"),] # only look at Jan 1 onwards
+    
+    # convert from gpm to m3s
+    gpm_m3s <- function(gpm){
+                m3s <- gpm*0.000063090196
+                return(m3s)
+    }
+    Q2.Farmland$flowRate_Outfall001A_gpm <- gpm_m3s(Q2.Farmland$flowRate_Outfall001A_gpm)
+    
+    # merge Q2 with rest of Qdata.avg
+    Qdata <- merge(Qdata, Q2.Farmland, by.x = "dateTime", by.y = "Date", all = TRUE)
+    names(Qdata)[names(Qdata)=="flowRate_Outfall001A_gpm"] <- "Q2.Farmland"
+    
+    # pumping stops on apr 1
+    Qdata$Q2.Farmland[Qdata$day > ymd("2018-04-01")] <- NULL
+    
+    #change na values to null
+    Qdata[is.na(Qdata)] <- NULL
+    
+    # balance equation: Q5.desoto = Q1.lawrence + Q2.farmland + Q3.wakarusa + Q4.stranger
+    Qdata$upstreamSum <- Qdata$Q1.lawrence + Qdata$Q2.Farmland + Qdata$Q3.wakarusa + Qdata$Q4.stranger
+    # calculate amount off that the sum of upstream values is from downstream value
+    Qdata$waterBal_percentDev <- ((Qdata$Q5.desoto - Qdata$upstreamSum) / Qdata$upstreamSum)*100
+    
+    if(Q.avg == "TRUE"){
+      write.csv(Qdata, "KAWN_USGSDischarge_dailymeans.csv", row.names = FALSE)
+    } else{
+      write.csv(Qdata, "KAWN_USGSDischarge_instantaneous.csv", row.names = FALSE)
+    }
+  }
+  return(Qdata)
+  }
+    
+Qdata.avg <- Q.dataframe(Q.avg = TRUE)
+Qdata.instant <- Q.dataframe(Q.avg = FALSE)
 
-Qdata <- readNWISuv(siteNumbers = sites, parameterCd = "00060", # discharge 
-                    startDate = start, endDate = end, tz = "America/Chicago")
-Qdata <- renameNWISColumns(Qdata)
 
-ft3s_m3s <- function(ft3s){
-            m3s <- ft3s*0.0283168
-            return(m3s)
-}
-Qdata$Flow_Inst <- ft3s_m3s(Qdata$Flow_Inst)
-Qdata <- Qdata[c(-1,-5,-6)]
 
-# take average flow for each day
-Qdata.avg <- 
-  Qdata %>%
-    group_by(site_no, day = floor_date(dateTime, "day")) %>%
-    summarize(mean.Q = mean(Flow_Inst))
 
-Qdata.avg <- spread(Qdata.avg, site_no, mean.Q)
-Qdata.avg$day <- ymd(Qdata.avg$day)
-names(Qdata.avg)[names(Qdata.avg)=="06891080"] <- "Q1.lawrence" 
-names(Qdata.avg)[names(Qdata.avg)=="06891500"] <- "Q3.wakarusa" 
-names(Qdata.avg)[names(Qdata.avg)=="06892000"] <- "Q4.stranger" 
-names(Qdata.avg)[names(Qdata.avg)=="06892350"] <- "Q5.desoto" 
 
-# load in farmland Q
-FarmlandReport <- read.csv("FarmlandDailyReport_MCKformatted.csv", 
-                           header = TRUE, stringsAsFactors = FALSE)
-Q2.Farmland <- FarmlandReport[c(-2:-8, -10:-11)]
-Q2.Farmland$Date <- mdy(Q2.Farmland$Date)
-Q2.Farmland <- Q2.Farmland[Q2.Farmland$Date >= ymd("2018-01-01"),] # only look at Jan 1 onwards
-
-# convert from gpm to m3s
-gpm_m3s <- function(gpm){
-            m3s <- gpm*0.000063090196
-            return(m3s)
-}
-Q2.Farmland$flowRate_Outfall001A_gpm <- gpm_m3s(Q2.Farmland$flowRate_Outfall001A_gpm)
-
-# merge Q2 with rest of Qdata.avg
-Qdata.avg <- merge(Qdata.avg, Q2.Farmland, by.x = "day", by.y = "Date", all = TRUE)
-names(Qdata.avg)[names(Qdata.avg)=="flowRate_Outfall001A_gpm"] <- "Q2.Farmland"
-
-# pumping stops on apr 1
-Qdata.avg$Q2.Farmland[Qdata.avg$day > ymd("2018-04-01")] <- 0
-
-# balance equation: Q5.desoto = Q1.lawrence + Q2.farmland + Q3.wakarusa + Q4.stranger
-# calculate amount off that the sum of upstream values is from downstream value
-Qdata.avg$upstreamSum <- Qdata.avg$Q1.lawrence + Qdata.avg$Q2.Farmland + Qdata.avg$Q3.wakarusa + Qdata.avg$Q4.stranger
-
-Qdata.avg$waterBal_percentDev <- ((Qdata.avg$Q5.desoto - Qdata.avg$upstreamSum) /
-                                    Qdata.avg$upstreamSum)*100
 
 plot(y = Qdata.avg$Q5.desoto, x = Qdata.avg$upstreamSum, main = "Sum upstream Q vs downstream Q")
 lm.Q <- summary(lm(Q5.desoto ~ upstreamSum, data = Qdata.avg))
