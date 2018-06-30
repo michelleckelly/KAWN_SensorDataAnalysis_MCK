@@ -11,6 +11,7 @@ knitr::opts_chunk$set(cache=TRUE)
 
 library(XML)
 library(lubridate)
+library(ggplot2)
 library(data.table)
 library(dplyr)
 library(tidyr)
@@ -137,23 +138,6 @@ desoto <- masterFile(sitename = "Desoto", USGS = TRUE)
 ```
 
 ```{r reachQ}
-#if(Q.avg = TRUE && Qdata.avg file exists){
-  #loadfile
-#}
-#if(Q.avg = FALSE && Qdata file exists){
-  #load file
-#}
-#if(!Qdata.avg file exists | !Qdata file exists){
-  #if (Q.avg = TRUE){
-    #create Q.avg file
-    #save Q.avg
-  #}
-  #if(Q.avg = FALSE){
-    #create Q file
-    #save Q file
-  #}
-#}
-
 # avg.Q: logical, TRUE returns dataframe of mean daily Q at all sites, FALSE returns all measurements of Q at all sites
 # load from file: logical, if TRUE loads appropriate dataframe from file
 Q.dataframe <- function(avg.Q){
@@ -244,7 +228,14 @@ Q.dataframe <- function(avg.Q){
 Qdata.avg <- Q.dataframe(avg.Q = TRUE)
 Qdata.instant <- Q.dataframe(avg.Q = FALSE) # comb through this - a lot of na's throwing off the numbers
 
-#plot(y = Qdata.avg$Q5.desoto, x = Qdata.avg$upstreamSum, main = "Sum upstream Q vs downstream Q")
+# plot estimate vs actual
+plot(x = -1*Qdata.avg$Q5.desoto, y = rowSums(Qdata.avg[c(2,3,4,6)], na.rm = TRUE), 
+     ylab = "Estimated discharge at Desoto, m3/s",
+     xlab = "Gauged discharge at desoto, m3/s",
+     main = "Basic water balance estimates")
+y <- rowSums(Qdata.avg[c(2,3,4,6)])
+x <- -1*Qdata.avg$Q5.desoto
+abline(y ~ x, na.action = na.omit)
 #lm.Q <- summary(lm(Q5.desoto ~ upstreamSum, data = Qdata.avg))
 
 #plot(x = Qdata.avg$day, y = Qdata.avg$waterBal_percentDev, main = "Percent error of water balance")
