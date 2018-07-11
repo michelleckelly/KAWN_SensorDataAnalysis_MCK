@@ -1,0 +1,122 @@
+---
+title: 'KAWN: Metabolism Calculations'
+author: "Michelle Catherine Kelly"
+date: "10 July 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup}
+# grab streamPULSE pipeline tools
+#library(devtools)
+#install_github('streampulse/StreamPULSE', dependencies=TRUE)
+
+# grab latest version of streamMetabolizer
+#install.packages("streamMetabolizer", dependencies = TRUE, 
+#                 repos = c("https://owi.usgs.gov/R", "https://cran.rstudio.com"))
+
+# load packages
+library(StreamPULSE)
+library(streamMetabolizer)
+library(ggplot2)
+
+# create folder to save model results and plots in
+dir.create("./StreamMetabolismModels")
+```
+
+```{r streammetab.desoto}
+site_code.desoto <- "KS_KANSASR" # Region_SiteName https://data.streampulse.org/sitelist
+user_token <- "a1a704245e5fda8ac9b4" # unique user token for user michelleckelly
+
+desoto_data <- request_data(site_code.desoto, token = user_token)
+
+model_type <-  "bayes" # model type for stream metabolizer to use
+model_name <-  "streamMetabolizer" # default modeling framework
+
+# formatting data for metabolism modeling
+# this function filters flagged data and extrapolates missing data points, estimates additonal variables if necessary
+fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, model = model_name,
+                                  rm_flagged = "Bad Data", fillgaps = "interpolation")
+
+# use streamMetabolizer to fit model
+modelfit.desoto <- fit_metabolism(fitdata.desoto) # automatically pushes model to database
+# save model results to folder
+saveRDS(modelfit.desoto, file = "./StreamMetabolismModels/MetabResults_Desoto.RData") 
+
+# plot model predictions
+desoto.metabplot <- 
+  ggplot(data = modelfit.desoto$predictions, aes(x = date)) +
+    geom_line(aes(y = GPP, color = "GPP")) +
+    geom_line(aes(y = ER, color = "ER")) +
+    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
+    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+    labs(x = "Date", y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
+    scale_x_date(limits = as.Date(c("2018-01-31 00:00:00", "2018-06-01 00:00:00"))) +
+    scale_color_discrete(name = NULL) + 
+    scale_fill_discrete(name = "95% CI", labels = NULL) + 
+    theme_classic() + theme(legend.position = "top")
+# save plot to folder
+ggsave("./StreamMetabolismModels/MetabPlot_Desoto.png", 
+       height = 3, width = 8, units = "in")
+```
+
+```{r stream.metab.steve}
+site_code.steve <- "KS_KANSASRFALLLEAF" # site code for steve's
+steve_data <- request_data(site_code.steve, token = user_token) # request data from API
+
+# format data for modeling
+fitdata.steve <- prep_metabolism(steve_data, type = model_type, model = model_name,
+                                  rm_flagged = "Bad Data", fillgaps = "interpolation")
+
+# fit metabolism model (about 1hr of run time)
+modelfit.steve <- fit_metabolism(fitdata.steve)
+# save model results to folder
+saveRDS(modelfit.steve, file = "./StreamMetabolismModels/MetabResults_Steve.RData") 
+
+#plot predictions
+steve.metabplot <- 
+  ggplot(data = modelfit.steve$predictions, aes(x = date)) +
+    geom_line(aes(y = GPP, color = "GPP")) +
+    geom_line(aes(y = ER, color = "ER")) +
+    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
+    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+    labs(x = "Date", y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
+    scale_x_date(limits = as.Date(c("2018-01-31 00:00:00", "2018-06-01 00:00:00"))) +
+    scale_color_discrete(name = NULL) + 
+    scale_fill_discrete(name = "95% CI", labels = NULL) + 
+    theme_classic() + theme(legend.position = "top")
+# save plot to folder
+ggsave("./StreamMetabolismModels/MetabPlot_Steve.png", 
+       height = 3, width = 8, units = "in")
+```
+
+```{r stream.metab.eric}
+site_code.eric <- "KS_KANSASREASTLAWRENCE" # site code for eric's
+eric_data <- request_data(site_code.eric, token = user_token) # request data from API
+
+# format data for modeling
+fitdata.eric <- prep_metabolism(eric_data, type = model_type, model = model_name,
+                                rm_flagged = "Bad Data", fillgaps = "interpolation")
+
+# fit metabolism model (about 1hr of run time)
+modelfit.eric <- fit_metabolism(fitdata.eric)
+# save model results to folder
+saveRDS(modelfit.eric, file = "./StreamMetabolismModels/MetabResults_Eric.RData") 
+
+#plot predictions
+eric.metabplot <- 
+  ggplot(data = modelfit.eric$predictions, aes(x = date)) +
+    geom_line(aes(y = GPP, color = "GPP")) +
+    geom_line(aes(y = ER, color = "ER")) +
+    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
+    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+    labs(x = "Date", y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
+    scale_x_date(limits = as.Date(c("2018-01-31 00:00:00", "2018-06-01 00:00:00"))) +
+    scale_color_discrete(name = NULL) + 
+    scale_fill_discrete(name = "95% CI", labels = NULL) + 
+    theme_classic() + theme(legend.position = "top")
+# save plot to folder
+ggsave("./StreamMetabolismModels/MetabPlot_Eric.png", 
+       height = 3, width = 8, units = "in")
+```
