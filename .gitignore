@@ -16,3 +16,6 @@
 
 # Ignore metabolism model output .RData files, which are huge 
 /StreamMetabolismModels/*.RData
+
+# Ignore streamPULSE formatted sensor data files, which are already uploaded to streamPULSE server
+/SensorData_StreamPULSEformatting
