@@ -1,0 +1,18 @@
+# Ignore history files
+.Rhistory
+
+# Ignore session data files
+.RData
+
+# Ignore Rmd default cache directory
+/cache/
+
+# Ignore any temp files that are created by Rmd
+*.utf9.md
+*.knit.md
+
+# Ignore NEON files folder containing giant .csv files
+/NEONfiles/
+
+# Ignore metabolism model output .RData files, which are huge 
+/StreamMetabolismModels/*.RData
