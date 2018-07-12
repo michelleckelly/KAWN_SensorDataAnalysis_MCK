@@ -33,14 +33,17 @@ library(neonUtilities)
 
 masterFile <- function(sitename, USGS){
   
-  if(file.exists(paste("KAWN_SensorData_", sitename, ".csv", sep = ""))){
+  if(file.exists(paste("./SensorData_CompiledFiles/KAWN_SensorData_", 
+                       sitename, ".csv", sep = ""))){
     # if master file exists, load from master file
-    dataframe <- read.csv(paste("KAWN_SensorData_", sitename, ".csv", sep = ""), 
+    dataframe <- read.csv(paste("./SensorData_CompiledFiles/KAWN_SensorData_", 
+                                sitename, ".csv", sep = ""), 
                           header = TRUE)
     dataframe$dateTime <- ymd_hms(dataframe$dateTime, tz = "America/Chicago")
   }
   
-  if(!file.exists(paste("KAWN_SensorData_", sitename, ".csv", sep = ""))){ 
+  if(!file.exists(paste("./SensorData_CompiledFiles/KAWN_SensorData_", 
+                        sitename, ".csv", sep = ""))){ 
     # if master file doesn't exist, compile master file
     if(USGS == FALSE){ 
       # load in nitratax data
@@ -65,11 +68,14 @@ masterFile <- function(sitename, USGS){
         return(xmlData)
       }
       
-      nitratax <- nitratax_XMLtoCSV(paste("NITRATAX_", sitename, ".xml", sep = ""))
+      nitratax <- nitratax_XMLtoCSV(paste("./SensorData_RawFiles/NITRATAX_", 
+                                          sitename, ".xml", sep = ""))
       
-      if(file.exists(paste("miniDOT_", sitename, ".txt", sep = ""))){
+      if(file.exists(paste("./SensorData_RawFiles/miniDOT_", 
+                           sitename, ".txt", sep = ""))){
       # load in minidot data
-        DO <- read.table(file = paste("miniDOT_", sitename, ".txt", sep = ""), 
+        DO <- read.table(file = paste("./SensorData_RawFiles/miniDOT_", 
+                                      sitename, ".txt", sep = ""), 
                          header = TRUE, sep = ",", skip = 8, stringsAsFactors = FALSE, 
                          colClasses = c("numeric", "POSIXct", "POSIXct", "numeric", 
                                         "numeric", "numeric", "numeric", "numeric"),
@@ -84,7 +90,8 @@ masterFile <- function(sitename, USGS){
         
         # save master file
         write.csv(dataframe, row.names = FALSE,
-                  file = paste("KAWN_SensorData_", sitename, ".csv", sep = ""))
+                  file = paste("./SensorData_CompiledFiles/KAWN_SensorData_", 
+                               sitename, ".csv", sep = ""))
         
         } else{
           # save master file with just nitratax
@@ -131,7 +138,8 @@ masterFile <- function(sitename, USGS){
         }
         # save the USGS data locally
         write.csv(dataframe, row.names = FALSE,
-                  file = paste("KAWN_SensorData_", sitename, ".csv", sep = ""))
+                  file = paste("./SensorData_CompiledFiles/KAWN_SensorData_", 
+                               sitename, ".csv", sep = ""))
       }
   }
   return(dataframe)
@@ -147,16 +155,20 @@ desoto <- masterFile(sitename = "Desoto", USGS = TRUE)
 # avg.Q: logical, TRUE returns dataframe of mean daily Q at all sites, FALSE returns all measurements of Q at all sites
 # load from file: logical, if TRUE loads appropriate dataframe from file
 Q.dataframe <- function(avg.Q){
-  if(avg.Q == TRUE & file.exists("KAWN_USGSDischarge_dailymeans.csv")){
-    Qdata <- read.csv("KAWN_USGSDischarge_dailymeans.csv", header = TRUE)
+  if(avg.Q == TRUE & 
+     file.exists("./SensorData_CompiledFiles/KAWN_USGSDischarge_dailymeans.csv")){
+    Qdata <- read.csv("./SensorData_CompiledFiles/KAWN_USGSDischarge_dailymeans.csv",
+                      header = TRUE)
   }
   
-  if(avg.Q == FALSE & file.exists("KAWN_USGSDischarge_instantaneous.csv")){
-    Qdata <- read.csv("KAWN_USGSDischarge_instantaneous.csv", header = TRUE)
+  if(avg.Q == FALSE & 
+     file.exists("./SensorData_CompiledFiles/KAWN_USGSDischarge_instantaneous.csv")){
+    Qdata <- read.csv("./SensorData_CompiledFiles/KAWN_USGSDischarge_instantaneous.csv",
+                      header = TRUE)
   }
   
-  if(!file.exists("KAWN_USGSDischarge_dailymeans.csv") |
-     !file.exists("KAWN_USGSDischarge_instantaneous.csv")){
+  if(!file.exists("./SensorData_CompiledFiles/KAWN_USGSDischarge_dailymeans.csv") |
+     !file.exists("./SensorData_CompiledFiles/KAWN_USGSDischarge_instantaneous.csv")){
     Q1.lawrence <- "06891080" # USGS identifier codes for gauges of interest
     Q3.wakarusa <- "06891500"
     Q4.stranger <- "06892000"
@@ -194,7 +206,7 @@ Q.dataframe <- function(avg.Q){
     names(Qdata)[names(Qdata)=="06892350"] <- "Q5.desoto" 
     
     # read in flow data from farmland report
-    Q2.Farmland <- read.csv("FarmlandDailyReport_MCKformatted.csv", 
+    Q2.Farmland <- read.csv("./SensorData_RawFiles/FarmlandDailyReport_MCKformatted.csv", 
                             header = TRUE, stringsAsFactors = FALSE)
     Q2.Farmland <- Q2.Farmland[c(-2:-8, -10:-11)]
     Q2.Farmland$Date <- mdy_hms(paste(Q2.Farmland$Date, "00:00:00", sep = " "))
@@ -225,9 +237,11 @@ Q.dataframe <- function(avg.Q){
     Qdata <- Qdata[Qdata$difference != 0.00,]# if row sum = 0, drop row
     
     if(avg.Q == "TRUE"){
-      write.csv(Qdata, "KAWN_USGSDischarge_dailymeans.csv", row.names = FALSE)
+      write.csv(Qdata, "./SensorData_CompiledFiles/KAWN_USGSDischarge_dailymeans.csv",
+                row.names = FALSE)
     } else{
-      write.csv(Qdata, "KAWN_USGSDischarge_instantaneous.csv", row.names = FALSE)
+      write.csv(Qdata, "./SensorData_CompiledFiles/KAWN_USGSDischarge_instantaneous.csv",
+                row.names = FALSE)
     }
   }
   return(Qdata)
@@ -297,9 +311,11 @@ dischargeEstimate <- function(dataframe, timeStart){
 }
 
 steve <- dischargeEstimate(steve, 
-                           timeStart = ymd_hms("2018-01-30 17:00:00", tz = "America/Chicago"))
+                           timeStart = ymd_hms("2018-01-30 17:00:00", 
+                                               tz = "America/Chicago"))
 eric <- dischargeEstimate(eric, 
-                          timeStart = ymd_hms("2018-02-19 13:00:00", tz = "America/Chicago"))
+                          timeStart = ymd_hms("2018-02-19 13:00:00", 
+                                              tz = "America/Chicago"))
 ```
 
 
