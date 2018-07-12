@@ -4,6 +4,9 @@
 # Ignore session data files
 .RData
 
+# Ignore Word files
+*.docx
+
 # Ignore Rmd default cache directory
 /cache/
 

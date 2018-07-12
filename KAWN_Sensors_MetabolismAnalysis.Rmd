@@ -20,6 +20,7 @@ editor_options:
 library(StreamPULSE)
 library(streamMetabolizer)
 library(ggplot2)
+library(dplyr)
 
 # create folder to save model results and plots in
 dir.create("./StreamMetabolismModels")
@@ -43,6 +44,11 @@ fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, model = model_
 modelfit.desoto <- fit_metabolism(fitdata.desoto) # automatically pushes model to database
 # save model results to folder
 saveRDS(modelfit.desoto, file = "./StreamMetabolismModels/MetabResults_Desoto.RData") 
+# to load .RData file, use readRDS()
+
+# filter out reservoir release dates
+perryLakeRelease.start <- as.Date("2018-02-23")
+perryLakeRelease.end <- as.Date("2018-03-07")
 
 # plot model predictions
 desoto.metabplot <- 
@@ -51,8 +57,11 @@ desoto.metabplot <-
     geom_line(aes(y = ER, color = "ER")) +
     geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
     geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+    geom_rect(aes(xmin = perryLakeRelease.start, xmax = perryLakeRelease.end,
+                  ymin = -10, ymax = 10), fill = "white") +
+    geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
     labs(x = "Date", y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
-    scale_x_date(limits = as.Date(c("2018-01-31 00:00:00", "2018-06-01 00:00:00"))) +
+    scale_x_date(limits = as.Date(c("2018-01-31 00:00:00", "2018-05-01 00:00:00"))) +
     scale_color_discrete(name = NULL) + 
     scale_fill_discrete(name = "95% CI", labels = NULL) + 
     theme_classic() + theme(legend.position = "top")
@@ -81,8 +90,11 @@ steve.metabplot <-
     geom_line(aes(y = ER, color = "ER")) +
     geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
     geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+    geom_rect(aes(xmin = perryLakeRelease.start, xmax = perryLakeRelease.end,
+                  ymin = -15, ymax = 15), fill = "white") +
+    geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
     labs(x = "Date", y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
-    scale_x_date(limits = as.Date(c("2018-01-31 00:00:00", "2018-06-01 00:00:00"))) +
+    scale_x_date(limits = as.Date(c("2018-01-31 00:00:00", "2018-05-01 00:00:00"))) +
     scale_color_discrete(name = NULL) + 
     scale_fill_discrete(name = "95% CI", labels = NULL) + 
     theme_classic() + theme(legend.position = "top")
@@ -103,6 +115,7 @@ fitdata.eric <- prep_metabolism(eric_data, type = model_type, model = model_name
 modelfit.eric <- fit_metabolism(fitdata.eric)
 # save model results to folder
 saveRDS(modelfit.eric, file = "./StreamMetabolismModels/MetabResults_Eric.RData") 
+# to load .RData file, use readRDS()
 
 #plot predictions
 eric.metabplot <- 
@@ -111,8 +124,11 @@ eric.metabplot <-
     geom_line(aes(y = ER, color = "ER")) +
     geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
     geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+    geom_rect(aes(xmin = perryLakeRelease.start, xmax = perryLakeRelease.end,
+                  ymin = -15, ymax = 10), fill = "white") +
+    geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
     labs(x = "Date", y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
-    scale_x_date(limits = as.Date(c("2018-01-31 00:00:00", "2018-06-01 00:00:00"))) +
+    scale_x_date(limits = as.Date(c("2018-01-31 00:00:00", "2018-05-01 00:00:00"))) +
     scale_color_discrete(name = NULL) + 
     scale_fill_discrete(name = "95% CI", labels = NULL) + 
     theme_classic() + theme(legend.position = "top")
