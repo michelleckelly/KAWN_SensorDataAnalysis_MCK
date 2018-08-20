@@ -13,6 +13,7 @@
 # Ignore any temp files that are created by Rmd
 *.utf9.md
 *.knit.md
+*.tmp
 
 # Ignore folder of compiled raw sensor data files (script is still reproducable without this folder, run DataCleanup to generate)
 /SensorData_CompiledFiles/
