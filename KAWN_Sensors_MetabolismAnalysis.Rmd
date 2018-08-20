@@ -1,7 +1,7 @@
 ---
 title: 'KAWN: Metabolism Calculations'
 author: "Michelle Catherine Kelly"
-date: "10 July 2018"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -76,6 +76,7 @@ NEP_plotter <- function(NEP_dataframe, legend_pos){
 ```
 
 ```{r stream.metab.eric}
+user_token <- "a1a704245e5fda8ac9b4" # unique user token for user michelleckelly
 site_code.eric <- "KS_KANSASREASTLAWRENCE" # site code for eric's
 eric_data <- request_data(site_code.eric, token = user_token) # request data from API
 
@@ -177,8 +178,6 @@ ggsave("./StreamMetabolismModels/MetabPlot_Steve.png", steveGrob,
 
 ```{r streammetab.desoto}
 site_code.desoto <- "KS_KANSASR" # Region_SiteName https://data.streampulse.org/sitelist
-user_token <- "a1a704245e5fda8ac9b4" # unique user token for user michelleckelly
-
 desoto_data <- request_data(site_code.desoto, token = user_token)
 
 model_type <-  "bayes" # model type for stream metabolizer to use
