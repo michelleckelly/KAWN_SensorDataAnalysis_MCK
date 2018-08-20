@@ -21,9 +21,158 @@ library(StreamPULSE)
 library(streamMetabolizer)
 library(ggplot2)
 library(dplyr)
+library(gridExtra)
 
 # create folder to save model results and plots in
 dir.create("./StreamMetabolismModels")
+```
+
+```{r NEP}
+# Calculate Net Ecosystem Production (NEP) from metabolism model output
+#
+# Arguments
+# model_output    dataframe returned by metabolismModeling
+# Returns
+# dataframe of date, cumulative NEP, cumulative GPP, and cumulative ER for site
+NEP_calcs <- function(model_output){
+  NEP_data <- data.frame(date = model_output$date,
+                         GPP = model_output$GPP,
+                         ER = model_output$ER)
+  # to perform cumulative sum correctly, any NA values must be set to 0
+  NEP_data[is.na(NEP_data)] <- 0
+  # take cumulative sum
+  NEP_data <- data.frame(date = NEP_data$date,
+                         GPP_sum = cumsum(NEP_data$GPP),
+                         ER_sum = cumsum(NEP_data$ER))
+  # GPP + ER = NEP
+  NEP_data$NEP <- rowSums(NEP_data[, c(2,3)])
+  return(NEP_data)
+}
+
+# plot NEP results
+#
+# Arguments
+# NEP_dataframe   dataframe returned by NEP_calcs
+# legend_pos      character string, see theme() within ggplot. "top", "bottom", "left", "right" or "none"
+# ...             intended so user can specify their own y-limits
+#
+# Returns
+# time series plot of cumulative ER, GPP, and NEP
+#
+NEP_plotter <- function(NEP_dataframe, legend_pos){
+  NEP_dataframe$date <- lubridate::ymd(NEP_dataframe$date)
+  ggplot(data = NEP_dataframe) +
+    geom_line(aes(x = date, y = GPP_sum, color = "GPP"), size = 1.2) +
+    geom_line(aes(x = date, y = ER_sum, color = "ER"), size = 1.2) +
+    geom_line(aes(x = date, y = NEP, color = "NEP"), size = 1.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey") +
+    scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+    labs(x = NULL, y = bquote("Cumulative"~ O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
+    scale_color_manual(name = NULL, 
+                       values = c("NEP" = "#7CAE00", "ER" = "#F8766D", "GPP" = "#00BFC4")) +
+    guides(color = guide_legend(override.aes = list(size = 4))) +
+    theme_classic() + theme(legend.position = legend_pos)
+}
+```
+
+```{r stream.metab.eric}
+site_code.eric <- "KS_KANSASREASTLAWRENCE" # site code for eric's
+eric_data <- request_data(site_code.eric, token = user_token) # request data from API
+
+# format data for modeling
+fitdata.eric <- prep_metabolism(eric_data, type = model_type, model = model_name,
+                                rm_flagged = "Bad Data", fillgaps = "interpolation")
+
+# fit metabolism model (about 1hr of run time)
+modelfit.eric <- fit_metabolism(fitdata.eric)
+
+# save model results to folder
+saveRDS(modelfit.eric, file = "./StreamMetabolismModels/MetabResults_Eric.RData") 
+write.csv(modelfit.eric$predictions, file = "./StreamMetabolismModels/MetabResults_Eric.csv")
+
+# to load .RData file, use readRDS()
+#modelfit.eric <- readRDS("./StreamMetabolismModels/MetabResults_Eric.RData")
+
+# NEP calculations
+NEP.eric <- NEP_calcs(modelfit.eric$predictions)
+
+# plot predictions
+eric.metabplot <- 
+  ggplot(data = modelfit.eric$predictions, aes(x = date)) +
+    geom_line(aes(y = GPP, color = "GPP")) +
+    geom_line(aes(y = ER, color = "ER")) +
+    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
+    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+    #geom_rect(aes(xmin = perryLakeRelease.start, xmax = perryLakeRelease.end,
+                  #ymin = -15, ymax = 10), fill = "white") +
+    geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
+    labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)"), tag = "A") +
+    scale_x_date(date_breaks = "2 weeks", date_labels = "%e %b") +
+    scale_color_discrete(name = NULL) + 
+    scale_fill_discrete(name = "95% CI", labels = NULL) + 
+    theme_classic() + theme(legend.position = "top")
+
+# NEP plot
+NEPplot.eric <- 
+  NEP_plotter(NEP.eric, legend_pos = "top") +
+  labs(tag = "B")
+
+# arrange plots
+lay <- rbind(c(1,1,1,2))
+ericGrob <- arrangeGrob(eric.metabplot, NEPplot.eric, layout_matrix = lay)
+
+# save plot to folder
+ggsave("./StreamMetabolismModels/MetabPlot_Eric.png", ericGrob,
+       height = 3, width = 12, units = "in")
+```
+
+```{r stream.metab.steve}
+site_code.steve <- "KS_KANSASRFALLLEAF" # site code for steve's
+steve_data <- request_data(site_code.steve, token = user_token) # request data from API
+
+# format data for modeling
+fitdata.steve <- prep_metabolism(steve_data, type = model_type, model = model_name,
+                                  rm_flagged = "Bad Data", fillgaps = "interpolation")
+
+# fit metabolism model (about 1hr of run time)
+modelfit.steve <- fit_metabolism(fitdata.steve)
+# save model results to folder
+saveRDS(modelfit.steve, file = "./StreamMetabolismModels/MetabResults_Steve.RData") 
+write.csv(modelfit.steve$predictions, file = "./StreamMetabolismModels/MetabResults_Steve.csv")
+
+# to load .RData file, use readRDS()
+#modelfit.steve <- readRDS("./StreamMetabolismModels/MetabResults_Steve.RData")
+
+# NEP calculations
+NEP.steve <- NEP_calcs(modelfit.steve$predictions)
+
+# plot predictions
+steve.metabplot <- 
+  ggplot(data = modelfit.steve$predictions, aes(x = date)) +
+    geom_line(aes(y = GPP, color = "GPP")) +
+    geom_line(aes(y = ER, color = "ER")) +
+    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
+    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+    #geom_rect(aes(xmin = perryLakeRelease.start, xmax = perryLakeRelease.end,
+                  #ymin = -15, ymax = 15), fill = "white") +
+    geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
+    labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)"), tag = "C") +
+    scale_x_date(date_breaks = "2 weeks", date_labels = "%e %b") +
+    scale_color_discrete(name = NULL) + 
+    scale_fill_discrete(name = "95% CI", labels = NULL) + 
+    theme_classic() + theme(legend.position = "top")
+
+# NEP plot
+NEPplot.steve <- 
+  NEP_plotter(NEP.steve, legend_pos = "top") +
+  labs(tag = "D")
+
+# arrange plots
+steveGrob <- arrangeGrob(steve.metabplot, NEPplot.steve, layout_matrix = lay)
+
+# save plot to folder
+ggsave("./StreamMetabolismModels/MetabPlot_Steve.png", steveGrob,
+       height = 3, width = 12, units = "in")
 ```
 
 ```{r streammetab.desoto}
@@ -42,97 +191,56 @@ fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, model = model_
 
 # use streamMetabolizer to fit model
 modelfit.desoto <- fit_metabolism(fitdata.desoto) # automatically pushes model to database
-# save model results to folder
+
+# save model results to folder, as .RData and as .csv
 saveRDS(modelfit.desoto, file = "./StreamMetabolismModels/MetabResults_Desoto.RData") 
+write.csv(modelfit.desoto$predictions, file = "./StreamMetabolismModels/MetabResults_Desoto.csv")
+
 # to load .RData file, use readRDS()
+#modelfit.desoto <- readRDS("./StreamMetabolismModels/MetabResults_Desoto.RData")
 
-# filter out reservoir release dates
-perryLakeRelease.start <- as.Date("2018-02-23")
-perryLakeRelease.end <- as.Date("2018-03-07")
+# NEP calculations
+NEP.desoto <- NEP_calcs(modelfit.desoto$predictions)
 
-# plot model predictions
+# use these if you'd like to filter out reservoir release dates
+#perryLakeRelease.start <- as.Date("2018-02-23")
+#perryLakeRelease.end <- as.Date("2018-03-07")
+
+# plot metabolism predictions
 desoto.metabplot <- 
   ggplot(data = modelfit.desoto$predictions, aes(x = date)) +
     geom_line(aes(y = GPP, color = "GPP")) +
     geom_line(aes(y = ER, color = "ER")) +
     geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
     geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
-    geom_rect(aes(xmin = perryLakeRelease.start, xmax = perryLakeRelease.end,
-                  ymin = -10, ymax = 10), fill = "white") +
+    #geom_rect(aes(xmin = perryLakeRelease.start, xmax = perryLakeRelease.end,
+                  #ymin = -10, ymax = 10), fill = "white") +
     geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
-    labs(x = "Date", y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
-    scale_x_date(limits = as.Date(c("2018-01-31 00:00:00", "2018-05-01 00:00:00"))) +
+    labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)"), tag = "E") +
+    scale_x_date(date_breaks = "2 weeks", date_labels = "%e %b") +
     scale_color_discrete(name = NULL) + 
     scale_fill_discrete(name = "95% CI", labels = NULL) + 
     theme_classic() + theme(legend.position = "top")
+
+# NEP plot
+NEPplot.desoto <- 
+  NEP_plotter(NEP.desoto, legend_pos = "top") +
+  labs(tag = "F")
+
+# arrange plots
+desotoGrob <- arrangeGrob(desoto.metabplot, NEPplot.desoto, layout_matrix = lay)
+
 # save plot to folder
-ggsave("./StreamMetabolismModels/MetabPlot_Desoto.png", 
-       height = 3, width = 8, units = "in")
+ggsave("./StreamMetabolismModels/MetabPlot_Desoto.png", desotoGrob, 
+       height = 3, width = 12, units = "in")
 ```
 
-```{r stream.metab.steve}
-site_code.steve <- "KS_KANSASRFALLLEAF" # site code for steve's
-steve_data <- request_data(site_code.steve, token = user_token) # request data from API
+```{r metab_arrange}
+# arrange all of the metabolism plots
+allGrob <- grid.arrange(ericGrob, steveGrob, desotoGrob)
 
-# format data for modeling
-fitdata.steve <- prep_metabolism(steve_data, type = model_type, model = model_name,
-                                  rm_flagged = "Bad Data", fillgaps = "interpolation")
-
-# fit metabolism model (about 1hr of run time)
-modelfit.steve <- fit_metabolism(fitdata.steve)
-# save model results to folder
-saveRDS(modelfit.steve, file = "./StreamMetabolismModels/MetabResults_Steve.RData") 
-
-#plot predictions
-steve.metabplot <- 
-  ggplot(data = modelfit.steve$predictions, aes(x = date)) +
-    geom_line(aes(y = GPP, color = "GPP")) +
-    geom_line(aes(y = ER, color = "ER")) +
-    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
-    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
-    geom_rect(aes(xmin = perryLakeRelease.start, xmax = perryLakeRelease.end,
-                  ymin = -15, ymax = 15), fill = "white") +
-    geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
-    labs(x = "Date", y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
-    scale_x_date(limits = as.Date(c("2018-01-31 00:00:00", "2018-05-01 00:00:00"))) +
-    scale_color_discrete(name = NULL) + 
-    scale_fill_discrete(name = "95% CI", labels = NULL) + 
-    theme_classic() + theme(legend.position = "top")
-# save plot to folder
-ggsave("./StreamMetabolismModels/MetabPlot_Steve.png", 
-       height = 3, width = 8, units = "in")
+# save the big plot
+ggsave("./StreamMetabolismModels/MetabPlot.png", allGrob,
+       height = 8, width = 11, units = "in")
 ```
 
-```{r stream.metab.eric}
-site_code.eric <- "KS_KANSASREASTLAWRENCE" # site code for eric's
-eric_data <- request_data(site_code.eric, token = user_token) # request data from API
-
-# format data for modeling
-fitdata.eric <- prep_metabolism(eric_data, type = model_type, model = model_name,
-                                rm_flagged = "Bad Data", fillgaps = "interpolation")
-
-# fit metabolism model (about 1hr of run time)
-modelfit.eric <- fit_metabolism(fitdata.eric)
-# save model results to folder
-saveRDS(modelfit.eric, file = "./StreamMetabolismModels/MetabResults_Eric.RData") 
-# to load .RData file, use readRDS()
-
-#plot predictions
-eric.metabplot <- 
-  ggplot(data = modelfit.eric$predictions, aes(x = date)) +
-    geom_line(aes(y = GPP, color = "GPP")) +
-    geom_line(aes(y = ER, color = "ER")) +
-    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
-    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
-    geom_rect(aes(xmin = perryLakeRelease.start, xmax = perryLakeRelease.end,
-                  ymin = -15, ymax = 10), fill = "white") +
-    geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
-    labs(x = "Date", y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
-    scale_x_date(limits = as.Date(c("2018-01-31 00:00:00", "2018-05-01 00:00:00"))) +
-    scale_color_discrete(name = NULL) + 
-    scale_fill_discrete(name = "95% CI", labels = NULL) + 
-    theme_classic() + theme(legend.position = "top")
-# save plot to folder
-ggsave("./StreamMetabolismModels/MetabPlot_Eric.png", 
-       height = 3, width = 8, units = "in")
-```
