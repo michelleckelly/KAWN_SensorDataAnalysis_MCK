@@ -1,0 +1,141 @@
+---
+title: 'KAWN: Metabolism Calculations'
+author: "Michelle Catherine Kelly"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup}
+library(StreamPULSE)
+library(lubridate)
+library(tidyr)
+library(grid)
+```
+
+```{r dataload}
+# pulling from the streamPULSE API will just pull in data that's useful for metabolism modeling, but we're interested in all data available. Therefore, download data from streamPULSE and load in these .csv files. 
+
+# load sensor data from local files (same files as can be downloaded from streamPULSE)
+eric_data <- read.csv("./SensorData_StreamPULSE_Downloaded/KS_KANSASREASTLAWRENCE_sensorData.csv",
+                      header = TRUE)
+steve_data <- read.csv("./SensorData_StreamPULSE_Downloaded/KS_KANSASRFALLLEAF_sensorData.csv", 
+                      header = TRUE)
+desoto_data <- read.csv("./SensorData_StreamPULSE_Downloaded/KS_KANSASR_sensorData.csv", 
+                        header = TRUE)
+
+# make sure datetime is of correct class
+eric_data$DateTime_UTC <- lubridate::ymd_hms(eric_data$DateTime_UTC)
+steve_data$DateTime_UTC <- lubridate::ymd_hms(steve_data$DateTime_UTC)
+desoto_data$DateTime_UTC <- lubridate::ymd_hms(desoto_data$DateTime_UTC)
+
+# load in metabolism model results
+modelfit.eric <- readRDS("./StreamMetabolismModels/MetabResults_Eric.RData")$predictions
+modelfit.steve <- readRDS("./StreamMetabolismModels/MetabResults_Steve.RData")$predictions
+modelfit.desoto <- readRDS("./StreamMetabolismModels/MetabResults_Desoto.RData")$predictions
+
+# create directory to save results
+dir.create("./DailyAverageData/")
+```
+
+```{r dailyavg}
+# calculates a dataframe of daily average values of sensor data, merges with metabolism dataframe, and returns merged dataframe
+#
+# metabolism_model  dataframe returned by metabolism modeling
+# sensor_data       dataframe from StreamPULSE API
+#
+dailyavg <- function(sensor_data, metabolism_model){
+  # if sensor data has a "bad data" flag, set value to NA
+  eric_data$value[eric_data$flagtype %in% c("Bad Data")] <- NA
+  # reshape sensor data from long format to wide format
+  sensor_data <- tidyr::spread(sensor_data, key = variable, value = value)
+  # if 
+  # sort data file and find daily averages
+  sensor_data <- sensor_data %>%
+    group_by(date = lubridate::date(DateTime_UTC)) %>% 
+    summarise(Q_m3s.mean = mean(na.omit(Discharge_m3s)),
+              DO_mgL.mean = mean(na.omit(DO_mgL)),
+              DOsat_pct.mean = mean(na.omit(DOsat_pct)),
+              Light_PAR.mean = mean(na.omit(Light_PAR)),
+              WaterTemp_C.mean = mean(na.omit(WaterTemp_C)),
+              Nitrate_mgL.mean = mean(na.omit(Nitrate_mgL)))
+  # combine with metabolism model predictions
+  dailyavgs <- merge(sensor_data, metabolism_model, by = "date")
+  return(dailyavgs)
+}
+
+eric.dailyavg <- dailyavg(eric_data, modelfit.eric)
+steve.dailyavg <- dailyavg(steve_data, modelfit.steve)
+desoto.dailyavg <- dailyavg(desoto_data, modelfit.desoto)
+```
+
+```{r plotting}
+# axis labels -----------------------------------------------
+# y axis label for GPP
+ylabel_GPP <- textGrob(expression(paste("GPP (g ", ~O[2]~m^-2~d^-1, ")")),
+                       rot = 90, gp = gpar(cex = 0.9))
+# y axis label for ER
+ylabel_ER <- textGrob(expression(paste("ER (g ", ~O[2]~m^-2~d^-1, ")")),
+                      rot = 90, gp = gpar(cex = 0.9))
+# x axis label for Q
+xlabelQ <- textGrob(expression(paste("Q (", m^3, " ", s^-1, ")")), 
+                    gp = gpar(cex = 0.9))
+# DO mg/L
+xlabelDO_mgL <- textGrob(expression(paste("DO (mg ", L^-1, ")")), 
+                         gp = gpar(cex = 0.9))
+# mean light
+xlabelPAR <- textGrob(expression(paste("PAR")), 
+                      gp = gpar(cex = 0.9))
+# water temp
+xlabelWaterTemp_C <- textGrob(expression(paste("T (", degree~C, ")")), 
+                              gp = gpar(cex = 0.9))
+# NO3
+xlabelNO3_mgL <- textGrob(expression(paste("NO3 ( mg", L^-1, ")")), 
+                          gp = gpar(cex = 0.9))
+
+# Plotting -----------------------------------------------------------
+# xvariable       character string, what you want to graph on the xaxis
+# xlabel          textGrob for xaxis label
+dailyavg_plots <- function(xvariable, xlabel){
+  a <- ggplot(data = eric.dailyavg) +
+    geom_point(aes_string(x = xvariable, y = "GPP"), shape = 1) +
+    theme_classic() + labs(x = NULL, y = NULL, tag = "A")
+  b <- ggplot(data = steve.dailyavg) +
+    geom_point(aes_string(x = xvariable, y = "GPP"), shape = 1) +
+    theme_classic() + labs(x = NULL, y = NULL, tag = "B")
+  c <- ggplot(data = desoto.dailyavg) +
+    geom_point(aes_string(x = xvariable, y = "GPP"), shape = 1) +
+    theme_classic() + labs(x = NULL, y = NULL, tag = "C")
+  d <- ggplot(data = eric.dailyavg) +
+    geom_point(aes_string(x = xvariable, y = "ER"), shape = 1) +
+    theme_classic() + labs(x = NULL, y = NULL, tag = "D")
+  e <- ggplot(data = steve.dailyavg) +
+    geom_point(aes_string(x = xvariable, y = "ER"), shape = 1) +
+    theme_classic() + labs(x = NULL, y = NULL, tag = "E")
+  f <- ggplot(data = desoto.dailyavg) +
+    geom_point(aes_string(x = xvariable, y = "ER"), shape = 1) +
+    theme_classic() + labs(x = NULL, y = NULL, tag = "F")
+  #
+  grid.arrange(arrangeGrob(a, b, c, left = ylabel_GPP, ncol = 3, nrow = 1),
+             arrangeGrob(d, e, f, left = ylabel_ER, ncol = 3, nrow = 1),
+             bottom = xlabel)
+}
+
+# [A] [D] eric
+# [B] [E] steve
+# [C] [F] desoto
+
+p1 <- dailyavg_plots(xvariable = "Q_m3s.mean", xlabel = xlabelQ)
+p2 <- dailyavg_plots(xvariable = "DO_mgL.mean", xlabel = xlabelDO_mgL)
+p3 <- dailyavg_plots(xvariable = "Light_PAR.mean", xlabel = xlabelPAR)
+p4 <- dailyavg_plots(xvariable = "WaterTemp_C.mean", xlabel = xlabelWaterTemp_C)
+p5 <- dailyavg_plots(xvariable = "Nitrate_mgL.mean", xlabel = xlabelNO3_mgL)
+
+# save to file
+ggsave(file = "./DailyAverageData/Q_GPPERplot.png", p1, width = 6, height = 4)
+ggsave(file = "./DailyAverageData/DO_GPPERplot.png", p2, width = 6, height = 4)
+ggsave(file = "./DailyAverageData/PAR_GPPERplot.png", p3, width = 6, height = 4)
+ggsave(file = "./DailyAverageData/Temp_GPPERplot.png", p4, width = 6, height = 4)
+ggsave(file = "./DailyAverageData/N_GPPERplot.png", p5, width = 6, height = 4)
+```
