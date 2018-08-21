@@ -17,6 +17,7 @@ library(ggplot2)
 library(ggpmisc)
 ```
 
+
 ```{r dataload}
 # pulling from the streamPULSE API will just pull in data that's useful for metabolism modeling, but we're interested in all data available. Therefore, download data from streamPULSE and load in these .csv files. 
 
@@ -41,6 +42,7 @@ modelfit.desoto <- readRDS("./StreamMetabolismModels/MetabResults_Desoto.RData")
 # create directory to save results
 #dir.create("./DailyAverageData/")
 ```
+
 
 ```{r dailyavg}
 # calculates a dataframe of daily average values of sensor data, merges with metabolism dataframe, and returns merged dataframe
@@ -106,18 +108,6 @@ xlabelNO3_mgL <- textGrob(expression(paste("NO3 ( mg", L^-1, ")")),
 # Plotting -----------------------------------------------------------
 # xvariable       character string, what you want to graph on the xaxis
 # xlabel          textGrob for xaxis label
-
-fit <- lm(eric.dailyavg$GPP ~ eric.dailyavg$"Q_m3s.mean")
-signif(summary(fit)$coef[2,4], 3)
-eric.dailyavg[[xvariable]]
-xvariable
-
-# linear fit
-fita <- lm(eric.dailyavg$GPP ~ eric.dailyavg$xvariable)
-fit <- summary(lm(eric.dailyavg[["GPP"]] ~ eric.dailyavg[[xvariable]]))
-fit$coefficients[2,4]
-min(na.omit(eric.dailyavg$GPP))
-max(na.omit(eric.dailyavg[[xvariable]]))*2/3
 
 dailyavg_plots <- function(xvariable, xlabel){
   # lm fit
