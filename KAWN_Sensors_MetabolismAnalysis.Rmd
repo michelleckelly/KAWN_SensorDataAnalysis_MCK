@@ -66,7 +66,9 @@ NEP_plotter <- function(NEP_dataframe, legend_pos){
     geom_line(aes(x = date, y = ER_sum, color = "ER"), size = 1.2) +
     geom_line(aes(x = date, y = NEP, color = "NEP"), size = 1.2) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "grey") +
-    scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+    ylim(c(-400,500)) +
+    scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-06-01")),
+                 date_breaks = "1 month", date_labels = "%b") +
     labs(x = NULL, y = bquote("Cumulative"~ O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
     scale_color_manual(name = NULL, 
                        values = c("NEP" = "#7CAE00", "ER" = "#F8766D", "GPP" = "#00BFC4")) +
@@ -78,6 +80,10 @@ NEP_plotter <- function(NEP_dataframe, legend_pos){
 ```{r stream.metab.eric}
 user_token <- "a1a704245e5fda8ac9b4" # unique user token for user michelleckelly
 site_code.eric <- "KS_KANSASREASTLAWRENCE" # site code for eric's
+
+model_type <-  "bayes" # model type for stream metabolizer to use
+model_name <-  "streamMetabolizer" # default modeling framework
+
 eric_data <- request_data(site_code.eric, token = user_token) # request data from API
 
 # format data for modeling
@@ -108,7 +114,9 @@ eric.metabplot <-
                   #ymin = -15, ymax = 10), fill = "white") +
     geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
     labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)"), tag = "A") +
-    scale_x_date(date_breaks = "2 weeks", date_labels = "%e %b") +
+    ylim(c(-20,20)) +
+    scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-06-01")), 
+                 date_breaks = "2 weeks", date_labels = "%e %b") +
     scale_color_discrete(name = NULL) + 
     scale_fill_discrete(name = "95% CI", labels = NULL) + 
     theme_classic() + theme(legend.position = "top")
@@ -158,7 +166,9 @@ steve.metabplot <-
                   #ymin = -15, ymax = 15), fill = "white") +
     geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
     labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)"), tag = "C") +
-    scale_x_date(date_breaks = "2 weeks", date_labels = "%e %b") +
+    ylim(c(-20,20)) +
+    scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-06-01")), 
+                 date_breaks = "2 weeks", date_labels = "%e %b") +
     scale_color_discrete(name = NULL) + 
     scale_fill_discrete(name = "95% CI", labels = NULL) + 
     theme_classic() + theme(legend.position = "top")
@@ -179,9 +189,6 @@ ggsave("./StreamMetabolismModels/MetabPlot_Steve.png", steveGrob,
 ```{r streammetab.desoto}
 site_code.desoto <- "KS_KANSASR" # Region_SiteName https://data.streampulse.org/sitelist
 desoto_data <- request_data(site_code.desoto, token = user_token)
-
-model_type <-  "bayes" # model type for stream metabolizer to use
-model_name <-  "streamMetabolizer" # default modeling framework
 
 # formatting data for metabolism modeling
 # this function filters flagged data and extrapolates missing data points, estimates additonal variables if necessary
@@ -216,7 +223,9 @@ desoto.metabplot <-
                   #ymin = -10, ymax = 10), fill = "white") +
     geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
     labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)"), tag = "E") +
-    scale_x_date(date_breaks = "2 weeks", date_labels = "%e %b") +
+    ylim(c(-20,20)) +
+    scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-06-01")), 
+                 date_breaks = "2 weeks", date_labels = "%e %b") +
     scale_color_discrete(name = NULL) + 
     scale_fill_discrete(name = "95% CI", labels = NULL) + 
     theme_classic() + theme(legend.position = "top")
