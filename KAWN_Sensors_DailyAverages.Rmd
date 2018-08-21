@@ -8,10 +8,13 @@ editor_options:
 ---
 
 ```{r setup}
-library(StreamPULSE)
 library(lubridate)
 library(tidyr)
 library(grid)
+library(gridExtra)
+library(dplyr)
+library(ggplot2)
+library(ggpmisc)
 ```
 
 ```{r dataload}
@@ -26,9 +29,9 @@ desoto_data <- read.csv("./SensorData_StreamPULSE_Downloaded/KS_KANSASR_sensorDa
                         header = TRUE)
 
 # make sure datetime is of correct class
-eric_data$DateTime_UTC <- lubridate::ymd_hms(eric_data$DateTime_UTC)
-steve_data$DateTime_UTC <- lubridate::ymd_hms(steve_data$DateTime_UTC)
-desoto_data$DateTime_UTC <- lubridate::ymd_hms(desoto_data$DateTime_UTC)
+eric_data$DateTime_UTC <- lubridate::mdy_hm(eric_data$DateTime_UTC)
+steve_data$DateTime_UTC <- lubridate::mdy_hm(steve_data$DateTime_UTC)
+desoto_data$DateTime_UTC <- lubridate::mdy_hm(desoto_data$DateTime_UTC)
 
 # load in metabolism model results
 modelfit.eric <- readRDS("./StreamMetabolismModels/MetabResults_Eric.RData")$predictions
@@ -36,7 +39,7 @@ modelfit.steve <- readRDS("./StreamMetabolismModels/MetabResults_Steve.RData")$p
 modelfit.desoto <- readRDS("./StreamMetabolismModels/MetabResults_Desoto.RData")$predictions
 
 # create directory to save results
-dir.create("./DailyAverageData/")
+#dir.create("./DailyAverageData/")
 ```
 
 ```{r dailyavg}
@@ -45,21 +48,27 @@ dir.create("./DailyAverageData/")
 # metabolism_model  dataframe returned by metabolism modeling
 # sensor_data       dataframe from StreamPULSE API
 #
+
 dailyavg <- function(sensor_data, metabolism_model){
   # if sensor data has a "bad data" flag, set value to NA
-  eric_data$value[eric_data$flagtype %in% c("Bad Data")] <- NA
+  sensor_data$value[sensor_data$flagtype %in% c("Bad Data")] <- NA
+  
   # reshape sensor data from long format to wide format
   sensor_data <- tidyr::spread(sensor_data, key = variable, value = value)
-  # if 
+  
   # sort data file and find daily averages
   sensor_data <- sensor_data %>%
-    group_by(date = lubridate::date(DateTime_UTC)) %>% 
-    summarise(Q_m3s.mean = mean(na.omit(Discharge_m3s)),
+    dplyr::group_by(date = lubridate::date(DateTime_UTC)) %>% 
+    dplyr::summarise(Q_m3s.mean = mean(na.omit(Discharge_m3s)),
               DO_mgL.mean = mean(na.omit(DO_mgL)),
               DOsat_pct.mean = mean(na.omit(DOsat_pct)),
               Light_PAR.mean = mean(na.omit(Light_PAR)),
               WaterTemp_C.mean = mean(na.omit(WaterTemp_C)),
               Nitrate_mgL.mean = mean(na.omit(Nitrate_mgL)))
+  
+  # make sure metabolism model date column is correct class
+  metabolism_model$date <- lubridate::date(metabolism_model$date)
+  
   # combine with metabolism model predictions
   dailyavgs <- merge(sensor_data, metabolism_model, by = "date")
   return(dailyavgs)
@@ -97,29 +106,79 @@ xlabelNO3_mgL <- textGrob(expression(paste("NO3 ( mg", L^-1, ")")),
 # Plotting -----------------------------------------------------------
 # xvariable       character string, what you want to graph on the xaxis
 # xlabel          textGrob for xaxis label
+
+fit <- lm(eric.dailyavg$GPP ~ eric.dailyavg$"Q_m3s.mean")
+signif(summary(fit)$coef[2,4], 3)
+eric.dailyavg[[xvariable]]
+xvariable
+
+# linear fit
+fita <- lm(eric.dailyavg$GPP ~ eric.dailyavg$xvariable)
+fit <- summary(lm(eric.dailyavg[["GPP"]] ~ eric.dailyavg[[xvariable]]))
+fit$coefficients[2,4]
+min(na.omit(eric.dailyavg$GPP))
+max(na.omit(eric.dailyavg[[xvariable]]))*2/3
+
 dailyavg_plots <- function(xvariable, xlabel){
-  a <- ggplot(data = eric.dailyavg) +
-    geom_point(aes_string(x = xvariable, y = "GPP"), shape = 1) +
-    theme_classic() + labs(x = NULL, y = NULL, tag = "A")
-  b <- ggplot(data = steve.dailyavg) +
-    geom_point(aes_string(x = xvariable, y = "GPP"), shape = 1) +
-    theme_classic() + labs(x = NULL, y = NULL, tag = "B")
-  c <- ggplot(data = desoto.dailyavg) +
-    geom_point(aes_string(x = xvariable, y = "GPP"), shape = 1) +
-    theme_classic() + labs(x = NULL, y = NULL, tag = "C")
-  d <- ggplot(data = eric.dailyavg) +
-    geom_point(aes_string(x = xvariable, y = "ER"), shape = 1) +
-    theme_classic() + labs(x = NULL, y = NULL, tag = "D")
-  e <- ggplot(data = steve.dailyavg) +
-    geom_point(aes_string(x = xvariable, y = "ER"), shape = 1) +
-    theme_classic() + labs(x = NULL, y = NULL, tag = "E")
-  f <- ggplot(data = desoto.dailyavg) +
-    geom_point(aes_string(x = xvariable, y = "ER"), shape = 1) +
-    theme_classic() + labs(x = NULL, y = NULL, tag = "F")
-  #
-  grid.arrange(arrangeGrob(a, b, c, left = ylabel_GPP, ncol = 3, nrow = 1),
-             arrangeGrob(d, e, f, left = ylabel_ER, ncol = 3, nrow = 1),
-             bottom = xlabel)
+  # lm fit
+  fit <- summary(lm(eric.dailyavg[["GPP"]] ~ eric.dailyavg[[xvariable]]))
+  # plot
+  a <- ggplot(data = eric.dailyavg, aes_string(x = xvariable, y = "GPP")) +
+    geom_point(shape = 1) +
+    theme_classic() + labs(x = NULL, y = NULL, tag = "A") +
+    annotate("text", vjust = 1, x = 0.5*(max(eric.dailyavg[[xvariable]], na.rm=T) +
+                                           min(eric.dailyavg[[xvariable]], na.rm=T)), 
+             y = max(na.omit(eric.dailyavg$GPP)),
+             label = paste0("p = ", signif(fit$coefficients[2,4], 2)))
+  
+  fit <- summary(lm(steve.dailyavg[["GPP"]] ~ steve.dailyavg[[xvariable]]))
+  b <- ggplot(data = steve.dailyavg, aes_string(x = xvariable, y = "GPP")) +
+    geom_point(shape = 1) +
+    theme_classic() + labs(x = NULL, y = NULL, tag = "B") +
+    annotate("text", vjust = 1, x = 0.5*(max(steve.dailyavg[[xvariable]], na.rm=T) +
+                                           min(steve.dailyavg[[xvariable]], na.rm=T)), 
+             y = max(na.omit(steve.dailyavg$GPP)),
+             label = paste0("p = ", signif(fit$coefficients[2,4], 2)))
+  
+  fit <- summary(lm(desoto.dailyavg[["GPP"]] ~ desoto.dailyavg[[xvariable]]))
+  c <- ggplot(data = desoto.dailyavg, aes_string(x = xvariable, y = "GPP")) +
+    geom_point(shape = 1) +
+    theme_classic() + labs(x = NULL, y = NULL, tag = "C") +
+    annotate("text", vjust = 1, x = 0.5*(max(desoto.dailyavg[[xvariable]], na.rm=T) +
+                                           min(desoto.dailyavg[[xvariable]], na.rm=T)), 
+             y = max(na.omit(desoto.dailyavg$GPP)),
+             label = paste0("p = ", signif(fit$coefficients[2,4], 2)))
+  
+  fit <- summary(lm(eric.dailyavg[["ER"]] ~ eric.dailyavg[[xvariable]]))
+  d <- ggplot(data = eric.dailyavg, aes_string(x = xvariable, y = "ER")) +
+    geom_point(shape = 1) + 
+    theme_classic() + labs(x = NULL, y = NULL, tag = "D") +
+    annotate("text", vjust = 1, x = 0.5*(max(eric.dailyavg[[xvariable]], na.rm=T) +
+                                           min(eric.dailyavg[[xvariable]], na.rm=T)), 
+             y = max(na.omit(eric.dailyavg$ER)),
+             label = paste0("p = ", signif(fit$coefficients[2,4], 2)))
+  
+  fit <- summary(lm(steve.dailyavg[["ER"]] ~ steve.dailyavg[[xvariable]]))
+  e <- ggplot(data = steve.dailyavg, aes_string(x = xvariable, y = "ER")) +
+    geom_point(shape = 1) +
+    theme_classic() + labs(x = NULL, y = NULL, tag = "E") +
+    annotate("text", vjust = 1, x = 0.5*(max(steve.dailyavg[[xvariable]], na.rm=T) +
+                                           min(steve.dailyavg[[xvariable]], na.rm=T)), 
+             y = max(na.omit(steve.dailyavg$ER)),
+             label = paste0("p = ", signif(fit$coefficients[2,4], 2)))
+  
+  fit <- summary(lm(desoto.dailyavg[["ER"]] ~ desoto.dailyavg[[xvariable]]))
+  f <- ggplot(data = desoto.dailyavg, aes_string(x = xvariable, y = "ER")) +
+    geom_point(shape = 1) +
+    theme_classic() + labs(x = NULL, y = NULL, tag = "F") +
+    annotate("text", vjust = 1, x = 0.5*(max(desoto.dailyavg[[xvariable]], na.rm=T) +
+                                           min(desoto.dailyavg[[xvariable]], na.rm=T)), 
+             y = max(na.omit(desoto.dailyavg$ER)),
+             label = paste0("p = ", signif(fit$coefficients[2,4], 2)))
+  
+  gridExtra::grid.arrange(arrangeGrob(a, b, c, left = ylabel_GPP, ncol = 3, nrow = 1),
+                          arrangeGrob(d, e, f, left = ylabel_ER, ncol = 3, nrow = 1),
+                          bottom = xlabel)
 }
 
 # [A] [D] eric
