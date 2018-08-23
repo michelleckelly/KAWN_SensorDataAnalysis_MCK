@@ -207,3 +207,4 @@ wc.sel.phases(coher.N.DOsat,
               main = "Cross wavelet power, [nitrate] and DOsat",
               show.date = TRUE, date.format = "%d-%m", timelab = "Date")
 ```
+

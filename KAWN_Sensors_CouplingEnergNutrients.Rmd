@@ -1,0 +1,217 @@
+---
+title: 'KAWN: Coupling energetics & nutrient cycling'
+author: "Michelle Catherine Kelly"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup}
+library(lubridate)
+library(imputeTS)
+library(tidyr)
+library(ggplot2)
+library(gridExtra)
+library(TSA)
+library(biwavelet)
+```
+
+
+```{r dataLoad}
+# pulling from the streamPULSE API will just pull in data that's useful for metabolism modeling, but we're interested in all data available. Therefore, download data from streamPULSE and load in these .csv files. 
+
+# load sensor data from local files (same files as can be downloaded from streamPULSE)
+eric_data <- read.csv("./SensorData_StreamPULSE_Downloaded/KS_KANSASREASTLAWRENCE_sensorData.csv",
+                      header = TRUE)
+steve_data <- read.csv("./SensorData_StreamPULSE_Downloaded/KS_KANSASRFALLLEAF_sensorData.csv", 
+                      header = TRUE)
+desoto_data <- read.csv("./SensorData_StreamPULSE_Downloaded/KS_KANSASR_sensorData.csv", 
+                        header = TRUE)
+```
+
+```{r dataFiller}
+# interpolate gaps in data (after "bad data" removed from dataframe)
+#
+# sensor_data       dataframe from StreamPULSE API
+# returns list, filled sensor dataframe and dataframe of counts of na's in each parameter, once "bad data" changed to NA
+#
+dataFiller <- function(sensor_data){
+  # make sure datetime is of correct class
+  sensor_data$DateTime_UTC <- lubridate::mdy_hm(sensor_data$DateTime_UTC)
+  
+  # set data that's flagged as "bad data" to NA
+  sensor_data$value[sensor_data$flagtype %in% c("Bad Data")] <- NA
+  
+  # remove flagtype and flagcomment columns
+  # otherwise, tidyr::spread() will want to make multiple dateTime rows for the same dateTime 
+  # (b/c not all rows have flagtype and flagcomment data)
+  sensor_data$flagtype <- NULL
+  sensor_data$flagcomment <- NULL
+  
+  # reshape dataframe from long format to wide format
+  sensor_data <- tidyr::spread(sensor_data, key = variable, value = value)
+  
+  # count numbers of missing observations
+  # initialize empty dataframe
+  missingNo <- data.frame(AirPress_kPa = numeric(length = 1),
+                          Discharge_m3s = numeric(length = 1), 
+                          DO_mgL = numeric(length = 1),
+                          DOsat_pct = numeric(length = 1), 
+                          Light_PAR = numeric(length = 1),
+                          Nitrate_mgL = numeric(length = 1), 
+                          WaterTemp_C = numeric(length = 1),
+                          TotalObs = numeric(length = 1), row.names = NULL)
+  # fill with counts of NA values
+  missingNo$AirPress_kPa <- sum(is.na(sensor_data$AirPres_kPa))
+  missingNo$Discharge_m3s <- sum(is.na(sensor_data$Discharge_m3s))
+  missingNo$DO_mgL <- sum(is.na(sensor_data$DO_mgL))
+  missingNo$DOsat_pct <- sum(is.na(sensor_data$DOsat_pct))
+  missingNo$Light_PAR <- sum(is.na(sensor_data$Light_PAR))
+  missingNo$Nitrate_mgL <- sum(is.na(sensor_data$Nitrate_mgL))
+  missingNo$WaterTemp_C <- sum(is.na(sensor_data$WaterTemp_C))
+  # count total observations
+  missingNo$TotalObs <- nrow(sensor_data)
+  
+  # interpolate missing values
+  # this function will throw a warning if there's no seasonality information present in the 
+  # dataset. It's fine if theres no seasonality present, so I'm supressing warnings with 
+  # supressWarnings()
+  sensor_data$AirPres_kPa <- 
+    suppressWarnings(imputeTS::na.seasplit(sensor_data$AirPres_kPa))
+  sensor_data$Discharge_m3s <-
+    suppressWarnings(imputeTS::na.seasplit(sensor_data$Discharge_m3s))
+  sensor_data$DO_mgL <- 
+    suppressWarnings(imputeTS::na.seasplit(sensor_data$DO_mgL))
+  sensor_data$DOsat_pct <- 
+    suppressWarnings(imputeTS::na.seasplit(sensor_data$DOsat_pct))
+  sensor_data$Light_PAR <- 
+    suppressWarnings(imputeTS::na.seasplit(sensor_data$Light_PAR))
+  sensor_data$Nitrate_mgL <- 
+    suppressWarnings(imputeTS::na.seasplit(sensor_data$Nitrate_mgL))
+  sensor_data$WaterTemp_C <- 
+    suppressWarnings(imputeTS::na.seasplit(sensor_data$WaterTemp_C))
+  
+  # return dataframe and missing value counts
+  returnlist <- list(filled.data = sensor_data, 
+                     na.counts = missingNo)
+  return(returnlist)
+}
+
+eric_data <- dataFiller(eric_data)
+eric_na.counts <- eric_data$na.counts
+eric_data <- eric_data$filled.data
+
+steve_data <- dataFiller(steve_data)
+steve_na.counts <- steve_data$na.counts
+steve_data <- steve_data$filled.data
+
+desoto_data <- dataFiller(desoto_data)
+desoto_na.counts <- desoto_data$na.counts
+desoto_data <- desoto_data$filled.data
+```
+
+<!-- test if DO and NO3 are coupled -->
+<!-- test if their coupling relates to GPP or ER -->
+
+
+```{r returner}
+# gives returns, log returns, and log squared returns for DO and Nitrate
+# sensor_data       dataframe returned by dataFiller
+returner <- function(sensor_data){
+  # initialize columns
+  sensor_data$DO.returns <- NA
+  sensor_data$DO.logreturns <- NA
+  sensor_data$DO.Sqlogreturns <- NA
+  
+  sensor_data$Nitrate.returns <- NA
+  sensor_data$Nitrate.logreturns <- NA
+  sensor_data$Nitrate.Sqlogreturns <- NA
+  
+  # fill columns, returns formula:
+  # r[i] = (p[i] - p[i-1]) / p[i-1]
+  for (i in 2:nrow(sensor_data)){
+    # returns
+    sensor_data$DO.returns[i] <- 
+      (sensor_data$DO_mgL[i] - sensor_data$DO_mgL[i-1]) / 
+      sensor_data$DO_mgL[i-1]
+    sensor_data$Nitrate.returns[i] <- 
+      (sensor_data$Nitrate_mgL[i] - sensor_data$Nitrate_mgL[i-1]) /
+      sensor_data$Nitrate_mgL[i-1]
+    
+    # log returns
+    sensor_data$DO.logreturns[i] <- 
+      (log(sensor_data$DO_mgL[i]) - log(sensor_data$DO_mgL[i-1])) / 
+      log(sensor_data$DO_mgL[i-1])
+    sensor_data$Nitrate.logreturns[i] <- 
+      (log(sensor_data$Nitrate_mgL[i]) - log(sensor_data$Nitrate_mgL[i-1])) / 
+      log(sensor_data$Nitrate_mgL[i-1])
+    
+    # squared log returns
+    sensor_data$DO.Sqlogreturns[i] <- sensor_data$DO.logreturns[i]^2
+    sensor_data$Nitrate.Sqlogreturns[i] <- sensor_data$Nitrate.logreturns[i]^2
+  }
+  return(sensor_data)
+}
+
+eric_data <- returner(eric_data)
+steve_data <- returner(steve_data)
+desoto_data <- returner(desoto_data)
+```
+
+```{r plotReturns}
+gridExtra::grid.arrange(
+  arrangeGrob(
+    
+  ggplot(data = eric_data) +
+  geom_line(aes(x = DateTime_UTC, y = DO.logreturns)) +
+  theme_classic() + labs(x = NULL, y = "Log Returns"),
+  
+  ggplot(data = eric_data) +
+    geom_line(aes(x = DateTime_UTC, y = DO.Sqlogreturns)) +
+    theme_classic() + labs(x = NULL, y = "Squared Log Returns"),
+  ncol = 2, nrow = 1),
+  arrangeGrob(
+    
+  ggplot(data = eric_data) +
+  geom_line(aes(x = DateTime_UTC, y = Nitrate.logreturns)) +
+  theme_classic() + labs(x = NULL, y = "Log Returns"),
+  
+  ggplot(data = eric_data) +
+    geom_line(aes(x = DateTime_UTC, y = Nitrate.Sqlogreturns)) +
+    theme_classic() + labs(x = NULL, y = "Squared Log Returns"),
+  ncol = 2, nrow = 1)
+)
+
+# this isn't great, because small changes in N (1.044 to 0.999 mgN/L within 15 min) show up as huge distortions on a returns plot. This isn't minimizing the noise of the data, and it's hard to see any trends
+
+# looking at a fourier transform instead
+
+# use periodogram to show power of each possible frequency within the dataset
+peri <- TSA::periodogram(desoto_data$DO_mgL)
+# extract the power of each possible frequency
+dat <- data.frame(peri$freq, peri$spec)
+# extract top 2 most powerful frequencies
+top2 <- head(dat[order(-dat$peri.spec),], 2)
+# convert frequencies to time periods
+# frequency = number of samples / your meaningful sampling unit
+# we need to account for our samples being collected every fifteen minutes
+desotofreq.DO <- 1/(top2$peri.freq)/15/60 # hours
+desotofreq.DO
+
+peri <- periodogram(desoto_data$Nitrate_mgL)
+dat <- data.frame(peri$freq, peri$spec)
+top2 <- head(dat[order(-dat$peri.spec),], 2)
+desotofreq.N <- 1/(top2$peri.freq)/15/60
+desotofreq.N
+
+
+# trying the wavelets
+# continuous wavelet transform, morlet
+unique(desoto_data$DateTime_UTC)
+biwavelet::check.data(data.frame(desoto_data$DateTime_UTC, desoto_data$DO_mgL))
+
+biwavelet::wt(data.frame(desoto_data$DateTime_UTC, desoto_data$DO_mgL), dt = 15)
+
+m <- data.frame(desoto_data$DateTime_UTC, desoto_data$DO_mgL)
+unique(diff(m[,1]))
+m[diff(m[,1])=="30",]
+```
