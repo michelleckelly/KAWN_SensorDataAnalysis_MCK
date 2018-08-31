@@ -61,12 +61,12 @@ dailyavg <- function(sensor_data, metabolism_model){
   # sort data file and find daily averages
   sensor_data <- sensor_data %>%
     dplyr::group_by(date = lubridate::date(DateTime_UTC)) %>% 
-    dplyr::summarise(Q_m3s.mean = mean(na.omit(Discharge_m3s)),
-              DO_mgL.mean = mean(na.omit(DO_mgL)),
-              DOsat_pct.mean = mean(na.omit(DOsat_pct)),
-              Light_PAR.mean = mean(na.omit(Light_PAR)),
-              WaterTemp_C.mean = mean(na.omit(WaterTemp_C)),
-              Nitrate_mgL.mean = mean(na.omit(Nitrate_mgL)))
+    dplyr::summarise(Q_m3s.mean = mean(Discharge_m3s, na.rm = TRUE),
+              DO_mgL.mean = mean(DO_mgL, na.rm = TRUE),
+              DOsat_pct.mean = mean(DOsat_pct, na.rm = TRUE),
+              Light_PAR.mean = mean(Light_PAR, na.rm = TRUE),
+              WaterTemp_C.mean = mean(WaterTemp_C, na.rm = TRUE),
+              Nitrate_mgL.mean = mean(Nitrate_mgL, na.rm = TRUE))
   
   # make sure metabolism model date column is correct class
   metabolism_model$date <- lubridate::date(metabolism_model$date)
@@ -79,6 +79,56 @@ dailyavg <- function(sensor_data, metabolism_model){
 eric.dailyavg <- dailyavg(eric_data, modelfit.eric)
 steve.dailyavg <- dailyavg(steve_data, modelfit.steve)
 desoto.dailyavg <- dailyavg(desoto_data, modelfit.desoto)
+```
+
+```{r correlations}
+# Linear (pearson) correlation coefficient
+# bounded from -1 to 1, near-zero values signify a weak correlation
+# compute correlations for data that has a same-day complete pair
+cormatrixr <- function(dailyavgs){
+  cormatrix.site <- cor(dailyavgs[2:13], use = "pairwise.complete.obs")
+  # set the diagonal (x to x pairs) of the correlation matrix to 0
+  diag(cormatrix.site) <- NA
+  cormatrix.site[lower.tri(cormatrix.site)] <- NA
+  return(cormatrix.site)
+}
+
+cormatrix.eric <- cormatrixr(eric.dailyavg)
+cormatrix.steve <- cormatrixr(steve.dailyavg)
+cormatrix.desoto <- cormatrixr(desoto.dailyavg)
+```
+
+```{r PCA}
+# principal components analysis (PCA)
+# first, standardize the data (because the variances are different)
+# standardization scales the data, sets variance to 1 and mean to 0
+
+# select variables we want in the PCA
+PCAr <- function(dailyavgs){
+  # remove date column, data code columns
+  selects <- c("Q_m3s.mean", "DO_mgL.mean", "DOsat_pct.mean", 
+               "Light_PAR.mean", "WaterTemp_C.mean", 
+               "Nitrate_mgL.mean", "GPP", "ER")
+  dailyavgs <- dailyavgs[names(dailyavgs) %in% selects]
+  # scale data, sets mean to 0 and variance to 1
+  data.scaled <- as.data.frame(scale(dailyavgs))
+  # perform PCA on scaled data
+  prcomp(na.omit(data.scaled))
+}
+
+eric.PCA <- PCAr(eric.dailyavg)
+steve.PCA <- PCAr(steve.dailyavg)
+desoto.PCA <- PCAr(desoto.dailyavg)
+
+# kaiser's criterion
+# only retain principal components for which the 
+# variance is above 1 (if the data is standardized)
+eric.PCA$sdev^2 # keep the first 3 principal components
+steve.PCA$sdev^2 # keep the first 3 principal components
+desoto.PCA$sdev^2 # keep the first 2 principal components
+
+# check out the loadings of the principal components
+eric.PCA$rotation[,1:2]
 ```
 
 ```{r plotting}
