@@ -96,6 +96,43 @@ cormatrixr <- function(dailyavgs){
 cormatrix.eric <- cormatrixr(eric.dailyavg)
 cormatrix.steve <- cormatrixr(steve.dailyavg)
 cormatrix.desoto <- cormatrixr(desoto.dailyavg)
+
+# should the data be described with a linear model?
+# check out the residuals of the data
+# if the dataset matches the regression model, the resisual plot
+# should be a normally distributed cloud of points
+# centered on 0
+
+plot(resid(lm(GPP~Q_m3s.mean, data = eric.dailyavg)))
+names(eric.dailyavg)
+
+model <- 
+lm(GPP ~ Q_m3s.mean + DO_mgL.mean + DOsat_pct.mean + Light_PAR.mean + 
+     WaterTemp_C.mean + Nitrate_mgL.mean, data = eric.dailyavg)
+model <- 
+lm(GPP ~ Q_m3s.mean, data = eric.dailyavg)
+plot(na.omit(eric.dailyavg$Q_m3s.mean), resid(model),
+     ylab = "Residuals", xlab = "Q", main = "GPP, Eric")
+abline(h=0)
+xlabel
+
+length(na.omit(eric.dailyavg$Q_m3s.mean))
+length(resid(model))
+
+model <- 
+  lm(ER ~ Q_m3s.mean + DO_mgL.mean + DOsat_pct.mean + Light_PAR.mean + 
+     WaterTemp_C.mean + Nitrate_mgL.mean, data = eric.dailyavg)
+
+library(psych)
+pairs.panels(eric.dailyavg[c(2:8,11)], method = "pearson", 
+             cex = 3, ellipses = FALSE, rug = FALSE, hist.col = "white")
+
+pairs.panels(steve.dailyavg[c(2:8,11)], method = "pearson", 
+             cex = 3, ellipses = FALSE, rug = FALSE, hist.col = "white")
+
+pairs.panels(desoto.dailyavg[c(2:8,11)], method = "pearson", 
+             cex = 3, ellipses = FALSE, rug = FALSE, hist.col = "white")
+corPlot(desoto.dailyavg[c(2:8,11)])
 ```
 
 ```{r PCA}

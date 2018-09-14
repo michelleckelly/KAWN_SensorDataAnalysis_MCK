@@ -267,10 +267,10 @@ waverplot <- function(wav){
   # period units are in seconds, so converting to hours
   biwavelet::plot.biwavelet(wav, alpha.coi = 1, 
                             xlab = "", ylab = "Period (hours)", 
-                            yaxt = "n")
+                            yaxt = "n", plot.cb = TRUE)
   axis(side = 1, at = pretty(wav$t), 
        labels = format(pretty(wav$t), "%b"))
-  axis(side = 2, at = rev(axTicks(2)), 
+  axis(side = 2, at = axTicks(2), 
        labels = format((2 ^ axTicks(2))/60/60, digits = 2))
 }
 

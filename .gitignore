@@ -15,15 +15,12 @@
 *.knit.md
 *.tmp
 
-# Ignore folder of compiled raw sensor data files (script is still reproducable without this folder, run DataCleanup to generate)
-/SensorData_CompiledFiles/
+# Ignore script output files (script is still reproducable without this folder)
+/Outputs/
 
 # Ignore NEON files folder containing giant .csv files (script is still reproducable without this folder, run DataCleanup to generate)
-/NEONfiles/
-
-# Ignore metabolism model output .RData files, which are huge (script is still reproducable without this folder, run MetabolismAnalysis to generate)
-/StreamMetabolismModels/*.RData
+/Data/NEONfiles/
 
 # Ignore folder of sensor data files that are uploaded to the streamPULSE server (script is still reproducable without this folder)
-/SensorData_StreamPULSE_Uploaded/
+/Data/SensorData_StreamPULSE_Uploaded/
 
