@@ -15,8 +15,8 @@
 *.knit.md
 *.tmp
 
-# Ignore script output files (script is still reproducable without this folder)
-/Outputs/
+# Ignore large .RData script output files (script is still reproducable without this folder)
+/Outputs/*.RData
 
 # Ignore NEON files folder containing giant .csv files (script is still reproducable without this folder, run DataCleanup to generate)
 /Data/NEONfiles/
