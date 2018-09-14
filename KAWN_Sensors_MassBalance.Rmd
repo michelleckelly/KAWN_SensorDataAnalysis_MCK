@@ -228,3 +228,14 @@ ggplot(data = massBal) +
   xlab("Date") + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")"))) +
   theme(panel.border = element_rect(color = "black", fill = NA))
 ```
+
+```{r}
+# load in USGS nutrient csv and reformat, rename parameter codes with parameter names
+# change from long format to wide format
+# keep only N data
+# save as csv and commit
+
+# examine float data
+# 
+
+```
