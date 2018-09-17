@@ -58,7 +58,7 @@ discharge$Q.farmland_m3s <- NULL
 ```{r Nload}
 # load in and format the nitrogen data
 
-# City data ----------------------------------------------------------
+# Farmland NO3+NO2, NH3 --------------------------------------------------
 # load in data provided by city
 farmland <- read.csv(file = "./Data/SensorData_CompiledFiles/FarmlandDailyReport_CityofLawrence_MCK.csv")
 farmland <- data.frame(date = lubridate::mdy(farmland$Date),
@@ -75,7 +75,7 @@ farmland <- farmland[farmland$date >= lubridate::mdy("1-1-2018"),]
 farmland$Nitrate.farmland_mgNL <- imputeTS::na.interpolation(farmland$Nitrate.farmland_mgNL)
 farmland$Ammonia.farmland_mgNL <- imputeTS::na.interpolation(farmland$Ammonia.farmland_mgNL)
 
-# Bowersock N -------------------------------------------------------
+# Bowersock NO3+NO2 -------------------------------------------------------
 bowersock <- read.csv(file = "./Data/SensorData_CompiledFiles/KAWN_SensorData_Bowersock.csv")
 # take average for each day
 bowersock$dateTime <- lubridate::mdy_hm(bowersock$dateTime)
@@ -83,8 +83,7 @@ bowersock <- bowersock %>%
   dplyr::group_by(date = lubridate::date(dateTime)) %>%
   dplyr::summarise(Nitrate.bowersock_mgNL = mean(nitrateNitrite, na.rm = TRUE))
 
-
-# Desoto, Steve, and Eric N -----------------------------------------
+# Desoto, Steve, and Eric NO3+NO2 -----------------------------------------
 # load in sensor data
 desoto <- read.csv(file = "./Data/SensorData_StreamPULSE_Downloaded/KS_KANSASR_sensorData.csv")
 steve <- read.csv(file = "./Data/SensorData_StreamPULSE_Downloaded/KS_KANSASRFALLLEAF_sensorData.csv")
@@ -113,6 +112,29 @@ eric <- dailyavg(eric)
 names(desoto)[2] <- "Nitrate.desoto_mgNL"
 names(steve)[2] <- "Nitrate.steve_mgNL"
 names(eric)[2] <- "Nitrate.eric_mgNL"
+
+# Desoto, Steve, Eric, Bowersock NH3 and NH4 -------------------------------------
+NH3_NH4 <- read.csv(file = "./Data/SensorData_CompiledFiles/KAWN_Float_NH3_NH4.csv")
+  # for future reference: NH3_NH4 also has data for Eudora and WWTP sites
+
+# fix date format
+NH3_NH4$date <- lubridate::mdy(NH3_NH4$date)
+# seperate out each site from NH3_NH4 and merge with site dataframe
+desoto <- dplyr::full_join(desoto, NH3_NH4 %>% dplyr::filter(site == "Desoto"))
+desoto$site <- NULL
+colnames(desoto)[3:4] <- c("Ammonium.desoto_mgNL", "Ammonia.desoto_mgNL")
+
+steve <- dplyr::full_join(steve, NH3_NH4 %>% dplyr::filter(site == "Steve"))
+steve$site <- NULL
+colnames(steve)[3:4] <- c("Ammonium.steve_mgNL", "Ammonia.steve_mgNL")
+
+eric <- dplyr::full_join(eric, NH3_NH4 %>% dplyr::filter(site == "Eric"))
+eric$site <- NULL
+colnames(eric)[3:4] <- c("Ammonium.eric_mgNL", "Ammonia.eric_mgNL")
+
+bowersock <- dplyr::full_join(bowersock, NH3_NH4 %>% dplyr::filter(site == "Bowersock"))
+bowersock$site <- NULL
+colnames(bowersock)[3:4] <- c("Ammonium.bowersock_mgNL", "Ammonia.bowersock_mgNL")
 ```
 
 ```{r merge}
@@ -126,7 +148,9 @@ massBal <- merge(massBal, eric, by = "date", all = TRUE)
 # trunkate the data at June 15
 massBal <- massBal[massBal$date <= "2018-06-15",]
 # set NA's to zero
-massBal[is.na(massBal)] <- 0
+# if NA's aren't set to zero, the division step in the
+# mass load calculations won't work
+#massBal[is.na(massBal)] <- 0
 
 # mass load     m [mg s-1] = Q [L s-1] * [NO3 as N] [mg L-1]
 # conversion    [kg day-1] = [mg s-1] / 1000 [g/mg] / 1000 [kg/g] 
@@ -144,12 +168,117 @@ massBal$NitrateLoad.steve_kgNday <-
 massBal$NitrateLoad.eric_kgNday <- 
   massBal$Q.lawrence_Ls * massBal$Nitrate.eric_mgNL / 1000 / 1000 * 60 * 60 * 24
 
+# ammonia load calculations
+massBal$AmmoniaLoad.farmland_kgNday <- 
+  massBal$Q.farmland_Ls * massBal$Ammonia.farmland_mgNL / 1000 / 1000 * 60 * 60 * 24
+massBal$AmmoniaLoad.bowersock_kgNday <- 
+  massBal$Q.lawrence_Ls * massBal$Ammonia.bowersock_mgNL / 1000 / 1000 * 60 * 60 * 24
+massBal$AmmoniaLoad.desoto_kgNday <- 
+  massBal$Q.desoto_Ls * massBal$Ammonia.desoto_mgNL / 1000 / 1000 * 60 * 60 * 24
+massBal$AmmoniaLoad.steve_kgNday <- 
+  massBal$Q.lawrence_Ls * massBal$Ammonia.steve_mgNL / 1000 / 1000 * 60 * 60 * 24
+massBal$AmmoniaLoad.eric_kgNday <- 
+  massBal$Q.lawrence_Ls * massBal$Ammonia.eric_mgNL / 1000 / 1000 * 60 * 60 * 24
+
+# ammonium load calculations
+massBal$AmmoniumLoad.bowersock_kgNday <- 
+  massBal$Q.lawrence_Ls * massBal$Ammonium.bowersock_mgNL / 1000 / 1000 * 60 * 60 * 24
+massBal$AmmoniumLoad.desoto_kgNday <- 
+  massBal$Q.desoto_Ls * massBal$Ammonium.desoto_mgNL / 1000 / 1000 * 60 * 60 * 24
+massBal$AmmoniumLoad.steve_kgNday <- 
+  massBal$Q.lawrence_Ls * massBal$Ammonium.steve_mgNL / 1000 / 1000 * 60 * 60 * 24
+massBal$AmmoniumLoad.eric_kgNday <- 
+  massBal$Q.lawrence_Ls * massBal$Ammonium.eric_mgNL / 1000 / 1000 * 60 * 60 * 24
+
 # export massBal dataframe
-write.csv(massBal, file = "./Outputs/NitrateMassBalance.csv", row.names = FALSE)
+write.csv(massBal, file = "./Outputs/NMassBalance.csv", row.names = FALSE)
 ```
 
 ```{r plot}
 theme_set(theme_classic())
+
+# tiny plots
+# bowersock
+ggplot(data = massBal, aes(x = date)) +
+  #geom_line(aes(y = NitrateLoad.bowersock_kgNday, col = "NO3 + NO2"), size = 1) +
+  geom_point(aes(y = NitrateLoad.bowersock_kgNday, col = "NO3 + NO2"), shape = 21, size = 1.5, fill = "white") +
+  #geom_line(data = massBal[!is.na(massBal$AmmoniumLoad.bowersock_kgNday),],
+            #aes(y = AmmoniumLoad.bowersock_kgNday, col = "NH4"), size = 1) +
+  geom_point(aes(y = AmmoniumLoad.bowersock_kgNday, col = "NH4"), shape = 24, size = 2.5, fill = "white") +
+  #geom_line(data = massBal[!is.na(massBal$AmmoniaLoad.bowersock_kgNday),],
+            #aes(y = AmmoniaLoad.bowersock_kgNday, col = "NH3"), size = 1) +
+  geom_point(aes(y = AmmoniaLoad.bowersock_kgNday, col = "NH3"), shape = 22, size = 2.5) +
+  scale_y_continuous(limits = c(0, 25000), labels = scales::scientific) +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) + 
+  scale_color_manual(values = c("black", "red", "blue"), limits = c("NO3 + NO2", "NH4", "NH3")) +
+  theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA)) +
+  xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")")))
+# farmland
+ggplot(data = massBal, aes(x = date)) +
+  #geom_line(aes(y = NitrateLoad.farmland_kgNday, col = "NO3 + NO2")) +
+  geom_point(aes(y = NitrateLoad.farmland_kgNday, col = "NO3 + NO2"), shape = 21, size = 1.5, fill = "white") +
+  geom_point(aes(y = AmmoniaLoad.farmland_kgNday, col = "NH3"), shape = 22, size = 2.5, fill = "white") +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) + 
+  scale_y_continuous(limits = c(0, 25000), labels = scales::scientific) +
+  scale_color_manual(values = c("black", "red", "blue"), limits = c("NO3 + NO2", "NH4", "NH3")) +
+  theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA)) +
+  xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")")))
+# eric
+ggplot(data = massBal, aes(x = date)) +
+  geom_line(aes(y = NitrateLoad.eric_kgNday, col = "NO3 + NO2")) +
+  geom_point(aes(y = NitrateLoad.eric_kgNday, col = "NO3 + NO2"), shape = 21, size = 1.5, fill = "white") +
+  geom_point(aes(y = AmmoniumLoad.eric_kgNday, col = "NH4"), shape = 24, size = 2.5, fill = "white") +
+  geom_point(aes(y = AmmoniaLoad.eric_kgNday, col = "NH3"), shape = 22, size = 2.5, fill = "white") +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) + 
+  scale_y_continuous(limits = c(0, 25000), labels = scales::scientific) +
+  scale_color_manual(values = c("black", "red", "blue"), limits = c("NO3 + NO2", "NH4", "NH3")) +
+  theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA)) +
+  xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")")))
+# steve
+ggplot(data = massBal, aes(x = date)) +
+  geom_line(aes(y = NitrateLoad.steve_kgNday, col = "NO3 + NO2")) +
+  geom_point(aes(y = NitrateLoad.steve_kgNday, col = "NO3 + NO2"), shape = 21, size = 1.5, fill = "white") +
+  geom_point(aes(y = AmmoniumLoad.steve_kgNday, col = "NH4"), shape = 24, size = 2.5, fill = "white") +
+  geom_point(aes(y = AmmoniaLoad.steve_kgNday, col = "NH3"), shape = 22, size = 2.5, fill = "white") +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) + 
+  scale_y_continuous(limits = c(0, 25000), labels = scales::scientific) +
+  scale_color_manual(values = c("black", "red", "blue"), limits = c("NO3 + NO2", "NH4", "NH3")) +
+  theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA)) +
+  xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")")))
+# desoto
+ggplot(data = massBal, aes(x = date)) +
+  geom_line(aes(y = NitrateLoad.desoto_kgNday, col = "NO3 + NO2")) +
+  geom_point(aes(y = NitrateLoad.desoto_kgNday, col = "NO3 + NO2"), shape = 21, size = 1.5, fill = "white") +
+  geom_point(aes(y = AmmoniumLoad.desoto_kgNday, col = "NH4"), shape = 24, size = 2.5, fill = "white") +
+  geom_point(aes(y = AmmoniaLoad.desoto_kgNday, col = "NH3"), shape = 22, size = 2.5, fill = "white") +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) + 
+  scale_y_continuous(limits = c(0, 25000), labels = scales::scientific) +
+  scale_color_manual(values = c("black", "red", "blue"), limits = c("NO3 + NO2", "NH4", "NH3")) +
+  theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA)) +
+  xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")")))
+
+
+#####################
+ggplot(data = massCalcs, aes(x = date, y = farmland_kgNday)) +
+  geom_line() +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
+  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
+ggplot(data = massCalcs, aes(x = date, y = eric_kgNday)) +
+  geom_line() +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
+  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
+ggplot(data = massCalcs, aes(x = date, y = steve_kgNday)) +
+  geom_line() +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
+  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
+ggplot(data = massCalcs, aes(x = date, y = desoto_kgNday)) +
+  geom_line() +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
+  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
+
+
+
+
 
 # subset just the calculated mass loads
 massCalcs <- data.frame(date = massBal$date,
@@ -185,27 +314,7 @@ ggplot(data = massCalcs, aes(x = date)) +
   scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
   xlab("Date") + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
 
-# tiny plots
-ggplot(data = massCalcs, aes(x = date, y = bowersock_kgNday)) +
-  geom_line() +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
-  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
-ggplot(data = massCalcs, aes(x = date, y = farmland_kgNday)) +
-  geom_line() +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
-  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
-ggplot(data = massCalcs, aes(x = date, y = eric_kgNday)) +
-  geom_line() +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
-  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
-ggplot(data = massCalcs, aes(x = date, y = steve_kgNday)) +
-  geom_line() +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
-  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
-ggplot(data = massCalcs, aes(x = date, y = desoto_kgNday)) +
-  geom_line() +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
-  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
+
 
 
 # plot the data
