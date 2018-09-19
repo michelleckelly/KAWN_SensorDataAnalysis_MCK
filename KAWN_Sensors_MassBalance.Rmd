@@ -122,19 +122,19 @@ NH3_NH4$date <- lubridate::mdy(NH3_NH4$date)
 # seperate out each site from NH3_NH4 and merge with site dataframe
 desoto <- dplyr::full_join(desoto, NH3_NH4 %>% dplyr::filter(site == "Desoto"))
 desoto$site <- NULL
-colnames(desoto)[3:4] <- c("Ammonium.desoto_mgNL", "Ammonia.desoto_mgNL")
+colnames(desoto)[3] <- c("Ammonium.desoto_mgNL")
 
 steve <- dplyr::full_join(steve, NH3_NH4 %>% dplyr::filter(site == "Steve"))
 steve$site <- NULL
-colnames(steve)[3:4] <- c("Ammonium.steve_mgNL", "Ammonia.steve_mgNL")
+colnames(steve)[3] <- c("Ammonium.steve_mgNL")
 
 eric <- dplyr::full_join(eric, NH3_NH4 %>% dplyr::filter(site == "Eric"))
 eric$site <- NULL
-colnames(eric)[3:4] <- c("Ammonium.eric_mgNL", "Ammonia.eric_mgNL")
+colnames(eric)[3] <- c("Ammonium.eric_mgNL")
 
 bowersock <- dplyr::full_join(bowersock, NH3_NH4 %>% dplyr::filter(site == "Bowersock"))
 bowersock$site <- NULL
-colnames(bowersock)[3:4] <- c("Ammonium.bowersock_mgNL", "Ammonia.bowersock_mgNL")
+colnames(bowersock)[3] <- c("Ammonium.bowersock_mgNL")
 ```
 
 ```{r merge}
@@ -145,8 +145,6 @@ massBal <- merge(massBal, desoto, by = "date", all = TRUE)
 massBal <- merge(massBal, steve, by = "date", all = TRUE)
 massBal <- merge(massBal, eric, by = "date", all = TRUE)
 
-# trunkate the data at June 15
-massBal <- massBal[massBal$date <= "2018-06-15",]
 # set NA's to zero
 # if NA's aren't set to zero, the division step in the
 # mass load calculations won't work
@@ -168,18 +166,6 @@ massBal$NitrateLoad.steve_kgNday <-
 massBal$NitrateLoad.eric_kgNday <- 
   massBal$Q.lawrence_Ls * massBal$Nitrate.eric_mgNL / 1000 / 1000 * 60 * 60 * 24
 
-# ammonia load calculations
-massBal$AmmoniaLoad.farmland_kgNday <- 
-  massBal$Q.farmland_Ls * massBal$Ammonia.farmland_mgNL / 1000 / 1000 * 60 * 60 * 24
-massBal$AmmoniaLoad.bowersock_kgNday <- 
-  massBal$Q.lawrence_Ls * massBal$Ammonia.bowersock_mgNL / 1000 / 1000 * 60 * 60 * 24
-massBal$AmmoniaLoad.desoto_kgNday <- 
-  massBal$Q.desoto_Ls * massBal$Ammonia.desoto_mgNL / 1000 / 1000 * 60 * 60 * 24
-massBal$AmmoniaLoad.steve_kgNday <- 
-  massBal$Q.lawrence_Ls * massBal$Ammonia.steve_mgNL / 1000 / 1000 * 60 * 60 * 24
-massBal$AmmoniaLoad.eric_kgNday <- 
-  massBal$Q.lawrence_Ls * massBal$Ammonia.eric_mgNL / 1000 / 1000 * 60 * 60 * 24
-
 # ammonium load calculations
 massBal$AmmoniumLoad.bowersock_kgNday <- 
   massBal$Q.lawrence_Ls * massBal$Ammonium.bowersock_mgNL / 1000 / 1000 * 60 * 60 * 24
@@ -189,6 +175,13 @@ massBal$AmmoniumLoad.steve_kgNday <-
   massBal$Q.lawrence_Ls * massBal$Ammonium.steve_mgNL / 1000 / 1000 * 60 * 60 * 24
 massBal$AmmoniumLoad.eric_kgNday <- 
   massBal$Q.lawrence_Ls * massBal$Ammonium.eric_mgNL / 1000 / 1000 * 60 * 60 * 24
+
+# ammonia load calculations
+massBal$AmmoniaLoad.farmland_kgNday <- 
+  massBal$Q.farmland_Ls * massBal$Ammonia.farmland_mgNL / 1000 / 1000 * 60 * 60 * 24
+
+# trunkate the data at May 1
+massBal <- massBal[massBal$date <= "2018-05-01",]
 
 # export massBal dataframe
 write.csv(massBal, file = "./Outputs/NMassBalance.csv", row.names = FALSE)
@@ -200,62 +193,73 @@ theme_set(theme_classic())
 # tiny plots
 # bowersock
 ggplot(data = massBal, aes(x = date)) +
-  #geom_line(aes(y = NitrateLoad.bowersock_kgNday, col = "NO3 + NO2"), size = 1) +
+  geom_line(aes(y = NitrateLoad.bowersock_kgNday, col = "NO3 + NO2")) +
   geom_point(aes(y = NitrateLoad.bowersock_kgNday, col = "NO3 + NO2"), shape = 21, size = 1.5, fill = "white") +
-  #geom_line(data = massBal[!is.na(massBal$AmmoniumLoad.bowersock_kgNday),],
-            #aes(y = AmmoniumLoad.bowersock_kgNday, col = "NH4"), size = 1) +
-  geom_point(aes(y = AmmoniumLoad.bowersock_kgNday, col = "NH4"), shape = 24, size = 2.5, fill = "white") +
-  #geom_line(data = massBal[!is.na(massBal$AmmoniaLoad.bowersock_kgNday),],
-            #aes(y = AmmoniaLoad.bowersock_kgNday, col = "NH3"), size = 1) +
-  geom_point(aes(y = AmmoniaLoad.bowersock_kgNday, col = "NH3"), shape = 22, size = 2.5) +
-  scale_y_continuous(limits = c(0, 25000), labels = scales::scientific) +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) + 
+  geom_line(data = massBal[!is.na(massBal$AmmoniumLoad.bowersock_kgNday),],
+            aes(y = AmmoniumLoad.bowersock_kgNday, col = "NH4"), size = 1) +
+  geom_point(aes(y = AmmoniumLoad.bowersock_kgNday, col = "NH4"), fill = "white", shape = 24, size = 2.5) +
+  scale_y_continuous(limits = c(0, 5000)) +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01"))) + 
   scale_color_manual(values = c("black", "red", "blue"), limits = c("NO3 + NO2", "NH4", "NH3")) +
-  theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA)) +
-  xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")")))
+  theme(legend.position = c(0.6,0.65), legend.title = element_blank(),
+        panel.border = element_rect(color = "black", fill = NA),
+        legend.background = element_rect(color = "black")) +
+  xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")"))) + labs(tag = "(a)")
+ggsave("./Plots/NBal_bowersock.png", width = 2.5, height = 2, units = "in")
 # farmland
 ggplot(data = massBal, aes(x = date)) +
-  #geom_line(aes(y = NitrateLoad.farmland_kgNday, col = "NO3 + NO2")) +
+  geom_line(aes(y = NitrateLoad.farmland_kgNday, col = "NO3 + NO2")) +
   geom_point(aes(y = NitrateLoad.farmland_kgNday, col = "NO3 + NO2"), shape = 21, size = 1.5, fill = "white") +
+  geom_line(data = massBal[!is.na(massBal$AmmoniaLoad.farmland_kgNday),],
+            aes(y = AmmoniaLoad.farmland_kgNday, col = "NH3"), size = 1) +
   geom_point(aes(y = AmmoniaLoad.farmland_kgNday, col = "NH3"), shape = 22, size = 2.5, fill = "white") +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) + 
-  scale_y_continuous(limits = c(0, 25000), labels = scales::scientific) +
-  scale_color_manual(values = c("black", "red", "blue"), limits = c("NO3 + NO2", "NH4", "NH3")) +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01"))) + 
+  scale_y_continuous(limits = c(0, 5000)) +
+  scale_color_manual(values = c("black", "blue"), limits = c("NO3 + NO2", "NH3")) +
   theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA)) +
-  xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")")))
+  xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")"))) + labs(tag = "(b)")
+ggsave("./Plots/NBal_farmland.png", width = 2.5, height = 2, units = "in")
 # eric
 ggplot(data = massBal, aes(x = date)) +
   geom_line(aes(y = NitrateLoad.eric_kgNday, col = "NO3 + NO2")) +
   geom_point(aes(y = NitrateLoad.eric_kgNday, col = "NO3 + NO2"), shape = 21, size = 1.5, fill = "white") +
+  geom_line(data = massBal[!is.na(massBal$AmmoniumLoad.eric_kgNday),],
+            aes(y = AmmoniumLoad.eric_kgNday, col = "NH4"), size = 1) +
   geom_point(aes(y = AmmoniumLoad.eric_kgNday, col = "NH4"), shape = 24, size = 2.5, fill = "white") +
-  geom_point(aes(y = AmmoniaLoad.eric_kgNday, col = "NH3"), shape = 22, size = 2.5, fill = "white") +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) + 
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01"))) + 
   scale_y_continuous(limits = c(0, 25000), labels = scales::scientific) +
-  scale_color_manual(values = c("black", "red", "blue"), limits = c("NO3 + NO2", "NH4", "NH3")) +
+  scale_color_manual(values = c("black", "red"), limits = c("NO3 + NO2", "NH4")) +
   theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA)) +
   xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")")))
+ggsave("./Plots/NBal_eric.png", width = 2.5, height = 3, units = "in")
 # steve
 ggplot(data = massBal, aes(x = date)) +
   geom_line(aes(y = NitrateLoad.steve_kgNday, col = "NO3 + NO2")) +
   geom_point(aes(y = NitrateLoad.steve_kgNday, col = "NO3 + NO2"), shape = 21, size = 1.5, fill = "white") +
+  geom_line(data = massBal[!is.na(massBal$AmmoniumLoad.steve_kgNday),],
+            aes(y = AmmoniumLoad.steve_kgNday, col = "NH4"), size = 1) +
   geom_point(aes(y = AmmoniumLoad.steve_kgNday, col = "NH4"), shape = 24, size = 2.5, fill = "white") +
-  geom_point(aes(y = AmmoniaLoad.steve_kgNday, col = "NH3"), shape = 22, size = 2.5, fill = "white") +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) + 
-  scale_y_continuous(limits = c(0, 25000), labels = scales::scientific) +
-  scale_color_manual(values = c("black", "red", "blue"), limits = c("NO3 + NO2", "NH4", "NH3")) +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01"))) + 
+  scale_y_continuous(limits = c(0, 25000), labels = NULL) +
+  scale_color_manual(values = c("black", "red"), limits = c("NO3 + NO2", "NH4")) +
   theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA)) +
-  xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")")))
+  xlab(NULL) + ylab(NULL)
+ggsave("./Plots/NBal_steve.png", width = 1.75, height = 3, units = "in")
 # desoto
 ggplot(data = massBal, aes(x = date)) +
   geom_line(aes(y = NitrateLoad.desoto_kgNday, col = "NO3 + NO2")) +
   geom_point(aes(y = NitrateLoad.desoto_kgNday, col = "NO3 + NO2"), shape = 21, size = 1.5, fill = "white") +
+  geom_line(data = massBal[!is.na(massBal$AmmoniumLoad.desoto_kgNday),],
+            aes(y = AmmoniumLoad.desoto_kgNday, col = "NH4"), size = 1) +
   geom_point(aes(y = AmmoniumLoad.desoto_kgNday, col = "NH4"), shape = 24, size = 2.5, fill = "white") +
-  geom_point(aes(y = AmmoniaLoad.desoto_kgNday, col = "NH3"), shape = 22, size = 2.5, fill = "white") +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) + 
-  scale_y_continuous(limits = c(0, 25000), labels = scales::scientific) +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01"))) + 
+  scale_y_continuous(limits = c(0, 25000), labels = NULL) +
   scale_color_manual(values = c("black", "red", "blue"), limits = c("NO3 + NO2", "NH4", "NH3")) +
-  theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA)) +
-  xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")")))
+  theme(legend.position = c(0.6,0.8), legend.title = element_blank(), 
+        legend.background = element_rect(color = "black"),
+        panel.border = element_rect(color = "black", fill = NA)) +
+  xlab(NULL) + ylab(NULL)
+ggsave("./Plots/NBal_desoto.png", width = 1.75, height = 3, units = "in")
 
 
 #####################
