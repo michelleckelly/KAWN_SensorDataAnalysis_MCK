@@ -1,0 +1,39 @@
+---
+title: "Spiraling"
+author: "Michelle Kelly"
+date: "September 24, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+
+```{r load}
+# load in chloride and NH4 data
+WaterChem <- read.csv("./Data/KAWN_WaterChemistry.csv")
+```
+
+```{r sort}
+# lubridate date column
+WaterChem$Date <- lubridate::mdy(WaterChem$Date)
+# gather from wide format to long format
+WaterChem <- gather(WaterChem, parameter, measurement, Chloride_mgL:NH4_mgNL)
+```
+
+```{r plot}
+theme_set(theme_classic())
+
+ggplot(data = WaterChemlong, aes(x = DistanceDownstream_km, color = parameter)) +
+  geom_line(aes(y = measurement)) +
+  geom_point(aes(y = measurement)) + 
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none") +
+  labs(x = "Distance from release, km", y = "Concentration, mg/L") +
+  facet_grid(parameter ~ Date, scales = "free")
+
+ggsave("./Plots/NSpiraling.png", width = 6, height = 4.5, units = "in")
+```
