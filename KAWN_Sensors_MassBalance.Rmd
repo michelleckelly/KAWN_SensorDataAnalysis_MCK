@@ -94,7 +94,7 @@ ggplot(data = Nload[Nload$site %in% c("Eric", "Steve", "Desoto"),],
   scale_y_continuous(limits = c(0, 45000), labels = scales::scientific) +
   xlab(NULL) + ylab(expression(paste("N load (kg-N ", day^-1, ")"))) +
   facet_grid(. ~ factor(site, levels = c("Eric", "Steve", "Desoto")))
-ggsave("./Plots/Nbal_downstreamfacet2.png", width = 6, height = 3, units = "in")
+ggsave("./Plots/Nbal_downstreamfacet.png", width = 6, height = 3, units = "in")
 ```
 
 

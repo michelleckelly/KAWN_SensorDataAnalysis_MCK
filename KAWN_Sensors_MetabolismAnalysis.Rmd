@@ -22,18 +22,75 @@ library(streamMetabolizer)
 library(ggplot2)
 library(dplyr)
 library(gridExtra)
-
-# create folder to save model results and plots in
-dir.create("./StreamMetabolismModels")
+library(tidyr)
 ```
 
-```{r NEP}
+```{r metabolism.load}
+loadfromfile <- TRUE # if loadfromfile TRUE, load metabolsim model from saved RData file
+
+if (loadfromfile) {
+  modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
+  modelfit.steve <- readRDS("./Outputs/MetabResults_Steve.RData")
+  modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
+}
+```
+
+```{r metabolism.calculate}
+if (!loadfromfile){
+  # unique user token for user michelleckelly
+  user_token <- "a1a704245e5fda8ac9b4" 
+  model_type <-  "bayes" # model type for stream metabolizer to use
+  model_name <-  "streamMetabolizer" # default modeling framework
+  
+  # Eric ----------------------------------------------------------
+  # site code for eric's: Region_SiteName https://data.streampulse.org/sitelist
+  site_code.eric <- "KS_KANSASREASTLAWRENCE"
+  # request data from API
+  eric_data <- request_data(site_code.eric, token = user_token) 
+  # format data for modeling
+  fitdata.eric <- prep_metabolism(eric_data, type = model_type, model = model_name,
+                                  rm_flagged = "Bad Data", fillgaps = "interpolation")
+  # fit metabolism model (about 1hr of run time)
+  modelfit.eric <- fit_metabolism(fitdata.eric)
+  # save model results to folder
+  saveRDS(modelfit.eric, file = "./Outputs/MetabResults_Eric.RData") 
+  write.csv(modelfit.eric$predictions, file = "./Outputs/MetabResults_Eric.csv")
+  
+  # Steve -------------------------------------------------------
+  site_code.steve <- "KS_KANSASRFALLLEAF" # site code for steve's
+  # request data from API
+  steve_data <- request_data(site_code.steve, token = user_token) 
+  # format data for modeling
+  fitdata.steve <- prep_metabolism(steve_data, type = model_type, model = model_name,
+                                    rm_flagged = "Bad Data", fillgaps = "interpolation")
+  # fit metabolism model (about 1hr of run time)
+  modelfit.steve <- fit_metabolism(fitdata.steve)
+  # save model results to folder
+  saveRDS(modelfit.steve, file = "./Outputs/MetabResults_Steve.RData") 
+  write.csv(modelfit.steve$predictions, file = "./Outputs/MetabResults_Steve.csv")
+  
+  # Desoto ------------------------------------------------------
+  site_code.desoto <- "KS_KANSASR"
+  desoto_data <- request_data(site_code.desoto, token = user_token)
+  # formatting data for metabolism modeling
+  fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, model = model_name,
+                                    rm_flagged = "Bad Data", fillgaps = "interpolation")
+  # use streamMetabolizer to fit model
+  modelfit.desoto <- fit_metabolism(fitdata.desoto)
+  # save model results to folder, as .RData and as .csv
+  saveRDS(modelfit.desoto, file = "./Outputs/MetabResults_Desoto.RData") 
+  write.csv(modelfit.desoto$predictions, file = "./Outputs/MetabResults_Desoto.csv")
+}
+```
+
+```{r NEP.calculate}
 # Calculate Net Ecosystem Production (NEP) from metabolism model output
-#
+
 # Arguments
 # model_output    dataframe returned by metabolismModeling
 # Returns
 # dataframe of date, cumulative NEP, cumulative GPP, and cumulative ER for site
+
 NEP_calcs <- function(model_output){
   NEP_data <- data.frame(date = model_output$date,
                          GPP = model_output$GPP,
@@ -49,6 +106,55 @@ NEP_calcs <- function(model_output){
   return(NEP_data)
 }
 
+# NEP calculations
+NEP.eric <- NEP_calcs(modelfit.eric$predictions)
+NEP.steve <- NEP_calcs(modelfit.steve$predictions)
+NEP.desoto <- NEP_calcs(modelfit.desoto$predictions)
+```
+
+```{r metabolism.plot}
+# Eric
+ggplot(modelfit.eric$predictions, aes(x = date)) +
+  geom_line(aes(y = GPP, color = "GPP")) +
+  geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
+  geom_line(aes(y = ER, color = "ER")) +
+  geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+  geom_rect(aes(xmin = as.Date("2018-02-20"), xmax = as.Date("2018-02-23"), 
+                ymin = -10, ymax = 10), fill = "white") + # sensor burial
+  geom_rect(aes(xmin = as.Date("2018-03-06"), xmax = as.Date("2018-03-12"), 
+                ymin = -10, ymax = 10), fill = "white") + # sensor burial
+  geom_rect(aes(xmin = as.Date("2018-04-01"), xmax = as.Date("2018-04-04"), 
+                ymin = -10, ymax = 10), fill = "white") + # sensor burial
+  geom_rect(aes(xmin = as.Date("2018-04-14"), xmax = as.Date("2018-04-17"), 
+                ymin = -10, ymax = 10), fill = "white") + # sensor burial
+  geom_rect(aes(xmin = as.Date("2018-04-25"), xmax = as.Date("2018-04-27"), 
+                ymin = -10, ymax = 10), fill = "white") + # sensor burial
+  labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
+  scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01")), 
+                 date_breaks = "month", date_labels = "%e %b") +
+  geom_line(aes(y = 0), color = "black") +
+  ylim(c(-15,15)) + theme_classic() +
+  theme(legend.title=element_blank(), legend.position = "none")
+ggsave("./Plots/MetabPlot_Eric_May.png",height = 2.5, width = 6, units = "in")
+
+# Desoto
+ggplot(modelfit.desoto$predictions, aes(x = date)) +
+  geom_line(aes(y = GPP, color = "GPP")) +
+  geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
+  geom_line(aes(y = ER, color = "ER")) +
+  geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+  geom_line(aes(y = 0), color = "black") +
+  labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
+  scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01")), 
+                 date_breaks = "month", date_labels = "%e %b") +
+  ylim(c(-15,15)) + theme_classic() +
+  theme(legend.title=element_blank(), legend.position = "none")
+ggsave("./Plots/MetabPlot_Desoto_May.png",height = 2.5, width = 6, units = "in")
+```
+
+
+
+```{r NEP.plot}
 # plot NEP results
 #
 # Arguments
@@ -78,49 +184,6 @@ NEP_plotter <- function(NEP_dataframe, legend_pos){
 ```
 
 ```{r stream.metab.eric}
-user_token <- "a1a704245e5fda8ac9b4" # unique user token for user michelleckelly
-site_code.eric <- "KS_KANSASREASTLAWRENCE" # site code for eric's
-
-model_type <-  "bayes" # model type for stream metabolizer to use
-model_name <-  "streamMetabolizer" # default modeling framework
-
-eric_data <- request_data(site_code.eric, token = user_token) # request data from API
-
-# format data for modeling
-fitdata.eric <- prep_metabolism(eric_data, type = model_type, model = model_name,
-                                rm_flagged = "Bad Data", fillgaps = "interpolation")
-
-# fit metabolism model (about 1hr of run time)
-modelfit.eric <- fit_metabolism(fitdata.eric)
-
-# save model results to folder
-saveRDS(modelfit.eric, file = "./StreamMetabolismModels/MetabResults_Eric.RData") 
-write.csv(modelfit.eric$predictions, file = "./StreamMetabolismModels/MetabResults_Eric.csv")
-
-# to load .RData file, use readRDS()
-#modelfit.eric <- readRDS("./StreamMetabolismModels/MetabResults_Eric.RData")
-
-# NEP calculations
-NEP.eric <- NEP_calcs(modelfit.eric$predictions)
-
-# plot predictions
-eric.metabplot <- 
-  ggplot(data = modelfit.eric$predictions, aes(x = date)) +
-    geom_line(aes(y = GPP, color = "GPP")) +
-    geom_line(aes(y = ER, color = "ER")) +
-    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
-    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
-    #geom_rect(aes(xmin = perryLakeRelease.start, xmax = perryLakeRelease.end,
-                  #ymin = -15, ymax = 10), fill = "white") +
-    geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
-    labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)"), tag = "A") +
-    ylim(c(-20,20)) +
-    scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-06-01")), 
-                 date_breaks = "2 weeks", date_labels = "%e %b") +
-    scale_color_discrete(name = NULL) + 
-    scale_fill_discrete(name = "95% CI", labels = NULL) + 
-    theme_classic() + theme(legend.position = "top")
-
 # NEP plot
 NEPplot.eric <- 
   NEP_plotter(NEP.eric, legend_pos = "top") +
@@ -136,25 +199,6 @@ ggsave("./StreamMetabolismModels/MetabPlot_Eric.png", ericGrob,
 ```
 
 ```{r stream.metab.steve}
-site_code.steve <- "KS_KANSASRFALLLEAF" # site code for steve's
-steve_data <- request_data(site_code.steve, token = user_token) # request data from API
-
-# format data for modeling
-fitdata.steve <- prep_metabolism(steve_data, type = model_type, model = model_name,
-                                  rm_flagged = "Bad Data", fillgaps = "interpolation")
-
-# fit metabolism model (about 1hr of run time)
-modelfit.steve <- fit_metabolism(fitdata.steve)
-# save model results to folder
-saveRDS(modelfit.steve, file = "./StreamMetabolismModels/MetabResults_Steve.RData") 
-write.csv(modelfit.steve$predictions, file = "./StreamMetabolismModels/MetabResults_Steve.csv")
-
-# to load .RData file, use readRDS()
-#modelfit.steve <- readRDS("./StreamMetabolismModels/MetabResults_Steve.RData")
-
-# NEP calculations
-NEP.steve <- NEP_calcs(modelfit.steve$predictions)
-
 # plot predictions
 steve.metabplot <- 
   ggplot(data = modelfit.steve$predictions, aes(x = date)) +
@@ -187,49 +231,6 @@ ggsave("./StreamMetabolismModels/MetabPlot_Steve.png", steveGrob,
 ```
 
 ```{r streammetab.desoto}
-site_code.desoto <- "KS_KANSASR" # Region_SiteName https://data.streampulse.org/sitelist
-desoto_data <- request_data(site_code.desoto, token = user_token)
-
-# formatting data for metabolism modeling
-# this function filters flagged data and extrapolates missing data points, estimates additonal variables if necessary
-fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, model = model_name,
-                                  rm_flagged = "Bad Data", fillgaps = "interpolation")
-
-# use streamMetabolizer to fit model
-modelfit.desoto <- fit_metabolism(fitdata.desoto) # automatically pushes model to database
-
-# save model results to folder, as .RData and as .csv
-saveRDS(modelfit.desoto, file = "./StreamMetabolismModels/MetabResults_Desoto.RData") 
-write.csv(modelfit.desoto$predictions, file = "./StreamMetabolismModels/MetabResults_Desoto.csv")
-
-# to load .RData file, use readRDS()
-#modelfit.desoto <- readRDS("./StreamMetabolismModels/MetabResults_Desoto.RData")
-
-# NEP calculations
-NEP.desoto <- NEP_calcs(modelfit.desoto$predictions)
-
-# use these if you'd like to filter out reservoir release dates
-#perryLakeRelease.start <- as.Date("2018-02-23")
-#perryLakeRelease.end <- as.Date("2018-03-07")
-
-# plot metabolism predictions
-desoto.metabplot <- 
-  ggplot(data = modelfit.desoto$predictions, aes(x = date)) +
-    geom_line(aes(y = GPP, color = "GPP")) +
-    geom_line(aes(y = ER, color = "ER")) +
-    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
-    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
-    #geom_rect(aes(xmin = perryLakeRelease.start, xmax = perryLakeRelease.end,
-                  #ymin = -10, ymax = 10), fill = "white") +
-    geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
-    labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)"), tag = "E") +
-    ylim(c(-20,20)) +
-    scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-06-01")), 
-                 date_breaks = "2 weeks", date_labels = "%e %b") +
-    scale_color_discrete(name = NULL) + 
-    scale_fill_discrete(name = "95% CI", labels = NULL) + 
-    theme_classic() + theme(legend.position = "top")
-
 # NEP plot
 NEPplot.desoto <- 
   NEP_plotter(NEP.desoto, legend_pos = "top") +
