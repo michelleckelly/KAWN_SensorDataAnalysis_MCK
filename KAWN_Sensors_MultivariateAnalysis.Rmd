@@ -15,6 +15,7 @@ library(gridExtra)
 library(dplyr)
 library(ggplot2)
 library(ggpmisc)
+library(imputeTS)
 ```
 
 
@@ -22,11 +23,11 @@ library(ggpmisc)
 # pulling from the streamPULSE API will just pull in data that's useful for metabolism modeling, but we're interested in all data available. Therefore, download data from streamPULSE and load in these .csv files. 
 
 # load sensor data from local files (same files as can be downloaded from streamPULSE)
-eric_data <- read.csv("./SensorData_StreamPULSE_Downloaded/KS_KANSASREASTLAWRENCE_sensorData.csv",
+eric_data <- read.csv("./Data/SensorData_StreamPULSE_Downloaded/KS_KANSASREASTLAWRENCE_sensorData.csv",
                       header = TRUE)
-steve_data <- read.csv("./SensorData_StreamPULSE_Downloaded/KS_KANSASRFALLLEAF_sensorData.csv", 
+steve_data <- read.csv("./Data/SensorData_StreamPULSE_Downloaded/KS_KANSASRFALLLEAF_sensorData.csv", 
                       header = TRUE)
-desoto_data <- read.csv("./SensorData_StreamPULSE_Downloaded/KS_KANSASR_sensorData.csv", 
+desoto_data <- read.csv("./Data/SensorData_StreamPULSE_Downloaded/KS_KANSASR_sensorData.csv", 
                         header = TRUE)
 
 # make sure datetime is of correct class
@@ -35,14 +36,140 @@ steve_data$DateTime_UTC <- lubridate::mdy_hm(steve_data$DateTime_UTC)
 desoto_data$DateTime_UTC <- lubridate::mdy_hm(desoto_data$DateTime_UTC)
 
 # load in metabolism model results
-modelfit.eric <- readRDS("./StreamMetabolismModels/MetabResults_Eric.RData")$predictions
-modelfit.steve <- readRDS("./StreamMetabolismModels/MetabResults_Steve.RData")$predictions
-modelfit.desoto <- readRDS("./StreamMetabolismModels/MetabResults_Desoto.RData")$predictions
+modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")$predictions
+modelfit.steve <- readRDS("./Outputs/MetabResults_Steve.RData")$predictions
+modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")$predictions
 
-# create directory to save results
-#dir.create("./DailyAverageData/")
 ```
 
+```{r NO3Uptake.Desoto}
+desoto_data$value[desoto_data$flagtype %in% c("Bad Data")] <- NA
+desoto_data <- tidyr::spread(desoto_data, key = variable, value = value)
+
+# hourly averages of NO3 concentration
+desoto_uptake <- desoto_data %>%
+  dplyr::group_by(DateTime_UTC = lubridate::round_date(DateTime_UTC, unit = "hour")) %>%
+  dplyr::summarise(Q_m3s = mean(Discharge_m3s), 
+                   Nitrate_mgL = mean(Nitrate_mgL))
+
+# extrapolate gaps in data
+desoto_uptake$Q_m3s <- imputeTS::na.interpolation(desoto_uptake$Q_m3s)
+desoto_uptake$Nitrate_mgL<- imputeTS::na.interpolation(desoto_uptake$Nitrate_mgL)
+
+# USGS field measurements
+# 2018-03-01    Q = 1410 ft3/s      Channel area = 811 ft2
+# 2018-04-24    Q = 2330 ft3/s      Channel area = 1400 ft2
+
+# Append USGS field measurements and extrapolate in between
+desoto_uptake$A_m2 <- NA
+desoto_uptake$A_m2[desoto_uptake$DateTime_UTC >= ymd("2018-03-01") &
+                     desoto_uptake$DateTime_UTC <= ymd("2018-03-02")] <- 75.3 #m2
+desoto_uptake$A_m2[desoto_uptake$DateTime_UTC >= ymd("2018-04-24") &
+                     desoto_uptake$DateTime_UTC <= ymd("2018-04-25")] <- 130.1 #m2
+# extrapolate in between field measurements
+desoto_uptake$A_m2 <- imputeTS::na.interpolation(desoto_uptake$A_m2)
+
+# find maximum [NO3] in each day
+desoto_NMax <- desoto_uptake %>% 
+  dplyr::group_by(DateTime_UTC = lubridate::floor_date(DateTime_UTC, unit = "day")) %>%
+  dplyr::summarise(Max.Nitrate_mgL = max(Nitrate_mgL))
+
+# initialize uptake column
+desoto_uptake$U_mgNm2day <- NA
+i <- 1
+# run loop to calculate uptake
+for (i in 1:nrow(desoto_uptake)){
+  # Q/A, [m3/s] / [m2] = [m/s]
+  v <- desoto_uptake$Q_m3s[i] / desoto_uptake$A_m2[i]
+  # time of day / 24 [unitless]
+  hr <- hour(desoto_uptake$DateTime_UTC[i]) / 24
+  date <- floor_date(desoto_uptake$DateTime_UTC[i], unit = "day")
+  date.pre <- date - lubridate::days(1)
+  
+  # if theres a preceeding date,
+  if (date.pre %in% desoto_NMax$DateTime_UTC){
+    NMax.0 <- desoto_NMax$Max.Nitrate_mgL[desoto_NMax$DateTime_UTC == date.pre]
+    NMax.24 <- desoto_NMax$Max.Nitrate_mgL[desoto_NMax$DateTime_UTC == date]
+  
+    desoto_uptake$U_mgNm2day[i] <- v * (NMax.0 * (1 - hr) + NMax.24 * hr -
+                                          desoto_uptake$Nitrate_mgL[i])
+    # unit conversions
+    # currently: [m/s * mg/L], convert to [mg / s / m2]
+    desoto_uptake$U_mgNm2day[i] <- desoto_uptake$U_mgNm2day[i] / 1000
+    # convert from [mg/s/m2] to [mg m^-2 day^-1]
+    desoto_uptake$U_mgNm2day[i] <- desoto_uptake$U_mgNm2day[i] * 1.15741e5
+  } # exit loop for filling U
+} # exit loop for calculating v, hr, date, date.pre
+
+write.csv(desoto_uptake, file = "./Outputs/NitrateUptake_Desoto.csv", row.names = FALSE)
+```
+
+```{r uptakePlot}
+# calculate daily average uptake rate
+desoto_uptake.avg <- desoto_uptake %>%
+  dplyr::group_by(date = lubridate::floor_date(DateTime_UTC, unit = "day")) %>%
+  dplyr::summarise(U_mgNm2day = mean(U_mgNm2day))
+
+# join uptake dataframe with GPP dataframe
+desoto_uptake.avg$date <- as.Date(desoto_uptake.avg$date)
+modelfit.desoto <- dplyr::full_join(desoto_uptake.avg, modelfit.desoto, by = "date")
+modelfit.desoto <- modelfit.desoto[modelfit.desoto$date <= as.Date("2018-05-01"),]
+
+# split by date
+modelfit.desotoDuring <- modelfit.desoto[modelfit.desoto$date < as.Date("2018-04-01"),]
+modelfit.desotoPost <- modelfit.desoto[modelfit.desoto$date >= as.Date("2018-04-01") &
+                                         modelfit.desoto$date <= as.Date("2018-05-01"),]
+
+# plot uptake through time during release
+ggplot(modelfit.desoto, aes(x = date, y = U_mgNm2day)) +
+  geom_line() +
+  geom_point(shape = 21, size = 1.5, fill = "white") +
+  theme_classic() + 
+  labs(x = NULL, y = "Nitrate uptake, (mg-N m^-2 day^-1)") + 
+  theme(panel.border = element_rect(color = "black", fill = NA))
+ggsave(filename = "./Plots/DesotoUptake.png", height = 4, width = 5, units = "in")
+
+ggplot(desoto_data, aes(x = DateTime_UTC, y = Nitrate_mgL)) +
+  geom_point(shape = 21, size = 1, fill = "white") +
+  theme_classic() + ylim(c(0, 1.5)) + 
+  scale_x_datetime(limits = c(ymd_hms("2018-02-09 00:00:00"), ymd_hms("2018-02-20 00:00:00")), 
+                   date_breaks = "2 days", date_labels = "%b %d") +
+  labs(x = NULL, y = "Nitrate (mg-N L^-1)") +
+  theme(panel.border = element_rect(color = "black", fill = NA))
+ggsave(filename = "./Plots/DesotoDiel.png", height = 2.5, width = 3.5, units = "in")
+
+summary(lm(U_mgNm2day~GPP, data = modelfit.desotoDuring))
+summary(lm(U_mgNm2day~GPP, data = modelfit.desotoPost))
+summary(lm(U_mgNm2day~ER, data = modelfit.desotoDuring))
+summary(lm(U_mgNm2day~ER, data = modelfit.desotoPost))
+
+ggplot(modelfit.desotoDuring, aes(x = GPP, y = U_mgNm2day)) +
+  geom_point(shape = 1) +
+  geom_smooth(method = lm, se = TRUE, color = "red") +
+  labs(x = "GPP", y = "Nitrate uptake, (mg-N m^-2 day^-1)") +
+  theme(panel.border = element_rect(color = "black", fill = NA))
+ggsave(filename = "./Plots/Desoto_UvsGPP_duringpump.png", height = 3.5, width = 3.5, units = "in")
+
+ggplot(modelfit.desotoDuring, aes(x = ER, y = U_mgNm2day)) +
+  geom_point(shape = 1) +
+  geom_smooth(method = lm)
+ggplot(modelfit.desotoPost, aes(x = GPP, y = U_mgNm2day)) +
+  geom_point(shape = 1) +
+  geom_smooth(method = lm)
+ggplot(modelfit.desotoPost, aes(x = ER, y = U_mgNm2day)) +
+  geom_point(shape = 1) +
+  geom_smooth(method = lm)
+
+summary(lm(U_mgNm2day~GPP, data = modelfit.desoto))
+summary(lm(U_mgNm2day~ER, data = modelfit.desoto))
+
+ggplot(modelfit.desoto, aes(x = GPP, y = U_mgNm2day)) +
+  geom_point(shape = 1) +
+  geom_smooth(method = lm)
+ggplot(modelfit.desoto, aes(x = ER, y = U_mgNm2day)) +
+  geom_point(shape = 1) +
+  geom_smooth(method = lm)
+```
 
 ```{r dailyavg}
 # calculates a dataframe of daily average values of sensor data, merges with metabolism dataframe, and returns merged dataframe
@@ -79,6 +206,13 @@ dailyavg <- function(sensor_data, metabolism_model){
 eric.dailyavg <- dailyavg(eric_data, modelfit.eric)
 steve.dailyavg <- dailyavg(steve_data, modelfit.steve)
 desoto.dailyavg <- dailyavg(desoto_data, modelfit.desoto)
+
+#eric_data <- NULL
+#modelfit.eric <- NULL
+#steve_data <- NULL
+#modelfit.steve <- NULL
+#desoto_data <- NULL
+#modelfit.desoto <- NULL
 ```
 
 ```{r correlations}
