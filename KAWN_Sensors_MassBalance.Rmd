@@ -11,6 +11,7 @@ library(magrittr)
 library(dplyr)
 library(imputeTS)
 library(ggplot2)
+library(tidyr)
 ```
 
 ```{r load}
@@ -29,7 +30,89 @@ if(loadfromfile == FALSE){
 }
 ```
 
-```{r reshape}
+```{r Plot.NO3Conc}
+# Plot of daily average nitrate concentrations through time
+# 
+# Caption: Average daily nitrate concentration at Upstream (color)
+# Discharge, Downstream, and Desoto monitoring sites. Dates span 
+# from 1 Feb 2018 to 1 May 2018
+
+ggplot(data = massBal, aes(x = date)) +
+  # Upstream (Bowersock)
+  geom_line(aes(y = Nitrate.bowersock_mgNL, color = "Upstream")) +
+  geom_point(aes(y = Nitrate.bowersock_mgNL, color = "Upstream")) +
+  # Discharge (Eric)
+  geom_line(aes(y = Nitrate.eric_mgNL, color = "Discharge")) +
+  geom_point(aes(y = Nitrate.eric_mgNL, color = "Discharge")) +
+  # Desoto
+  geom_line(aes(y = Nitrate.desoto_mgNL, color = "Desoto")) +
+  geom_point(aes(y = Nitrate.desoto_mgNL, color = "Desoto")) +
+  # Downstream (Steve)
+  geom_line(aes(y = Nitrate.steve_mgNL, color = "Downstream")) +
+  geom_point(aes(y = Nitrate.steve_mgNL, color = "Downstream")) +
+  #
+  # axis and color scales
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
+               date_breaks = "2 weeks", date_labels = "%b %e" ) + 
+  scale_color_manual(values = c("Upstream" = "#000000", "Discharge" = "#FF0000", 
+                                 "Downstream" = "#23baaf", "Desoto" = "#F2AD00"),
+                     breaks = c("Upstream", "Discharge", "Downstream", "Desoto"),
+                     name = "Site") +
+  scale_shape_manual(values = 21) +
+  # axis labels
+  xlab("Date") + 
+  ylab(expression(NO[3]^{"-"}-N * "  (mg" ~~ L^{-1} * ")"))+
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = c(0.1, 0.79),
+        legend.background = element_rect(color = "black"))
+
+ggsave(filename = "./Plots/Nitrate_time.png", device = "png", 
+       width = 7.5, height = 4, units = "in")
+```
+
+```{r Plot.NO3Load}
+# Plot of daily average nitrate load, calculated 
+# as daily average nitrate concentration * daily average
+# flow
+
+ggplot(data = massBal, aes(x = date)) +
+  # Upstream (Bowersock)
+  geom_line(aes(y = NitrateLoad.bowersock_kgNday, color = "Upstream")) +
+  geom_point(aes(y = NitrateLoad.bowersock_kgNday, color = "Upstream")) +
+  # Discharge (Eric)
+  geom_line(aes(y = NitrateLoad.eric_kgNday, color = "Discharge")) +
+  geom_point(aes(y = NitrateLoad.eric_kgNday, color = "Discharge")) +
+  # Desoto
+  geom_line(aes(y = NitrateLoad.desoto_kgNday, color = "Desoto")) +
+  geom_point(aes(y = NitrateLoad.desoto_kgNday, color = "Desoto")) +
+  # Downstream (Steve)
+  geom_line(aes(y = Nitrate.steve_mgNL, color = "Downstream")) +
+  geom_point(aes(y = Nitrate.steve_mgNL, color = "Downstream")) +
+  #
+  # axis and color scales
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
+               date_breaks = "2 weeks", date_labels = "%b %e" ) + 
+  scale_color_manual(values = c("Upstream" = "#000000", "Discharge" = "#FF0000", 
+                                 "Downstream" = "#23baaf", "Desoto" = "#F2AD00"),
+                     breaks = c("Upstream", "Discharge", "Downstream", "Desoto"),
+                     name = "Site") +
+  scale_shape_manual(values = 21) +
+  # axis labels
+  xlab("Date") + 
+  ylab(expression(NO[3]^{"-"}-N ~~ "Load  (kg" ~~ day^{-1} * ")"))+
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = c(0.1, 0.79),
+        legend.background = element_rect(color = "black"))
+
+ggsave(filename = "./Plots/NitrateLoad_time.png", device = "png", 
+       width = 7.5, height = 4, units = "in")
+```
+
+```{r ReshapeData}
 # select only loading data and
 # gather from wide format to long format
 Nload <- 
@@ -96,7 +179,6 @@ ggplot(data = Nload[Nload$site %in% c("Eric", "Steve", "Desoto"),],
   facet_grid(. ~ factor(site, levels = c("Eric", "Steve", "Desoto")))
 ggsave("./Plots/Nbal_downstreamfacet.png", width = 6, height = 3, units = "in")
 ```
-
 
 ```{r plot}
 theme_set(theme_classic())
@@ -194,95 +276,4 @@ ggplot(data = massBal, aes(x = date)) +
         panel.border = element_rect(color = "black", fill = NA)) +
   xlab(NULL) + ylab(NULL)
 ggsave("./Plots/NBal_desoto.png", width = 3, height = 5, units = "in")
-
-
-#####################
-ggplot(data = massCalcs, aes(x = date, y = farmland_kgNday)) +
-  geom_line() +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
-  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
-ggplot(data = massCalcs, aes(x = date, y = eric_kgNday)) +
-  geom_line() +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
-  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
-ggplot(data = massCalcs, aes(x = date, y = steve_kgNday)) +
-  geom_line() +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
-  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
-ggplot(data = massCalcs, aes(x = date, y = desoto_kgNday)) +
-  geom_line() +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
-  xlab(NULL) + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
-
-
-
-
-
-# subset just the calculated mass loads
-massCalcs <- data.frame(date = massBal$date,
-                        bowersock_kgNday = massBal$NitrateLoad.bowersock_kgNday,
-                        farmland_kgNday = massBal$NitrateLoad.farmland_kgNday,
-                        eric_kgNday = massBal$NitrateLoad.eric_kgNday,
-                        steve_kgNday = massBal$NitrateLoad.steve_kgNday,
-                        desoto_kgNday = massBal$NitrateLoad.desoto_kgNday)
-
-# make a "calculated load" for erics
-massCalcs$bowersock.add.farmland <- massCalcs$bowersock_kgNday + massCalcs$farmland_kgNday
-
-# plotting measured load at desoto, measured load at steve, 
-# and calculated load at eric's (bowersock load + farmland load)
-ggplot(data = massCalcs, aes(x = date)) +
-  geom_area(aes(y = desoto_kgNday, fill = "desoto measured"), col = "black") +
-  geom_area(aes(y = steve_kgNday, fill = "steve measured"), col = "blue") +
-  geom_area(aes(y = bowersock.add.farmland, fill = "eric calculated"), col = "red") +
-  scale_fill_manual(name = NULL, values = alpha(c("white", "red", "blue"), 0.5)) +
-  theme(legend.position = c(0.15,0.85)) +
-  guides(fill = guide_legend(override.aes = list(alpha = 0.5))) +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
-  xlab("Date") + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
-
-ggplot(data = massCalcs, aes(x = date)) +
-  geom_area(aes(y = desoto_kgNday, fill = "desoto measured"), col = "black") +
-  geom_area(aes(y = steve_kgNday, fill = "steve measured"), col = "blue") +
-  geom_area(aes(y = bowersock.add.farmland, fill = "eric calculated"), col = "red") +
-  geom_area(aes(y = eric_kgNday, fill = "eric measured"), col = "green") +
-  scale_fill_manual(name = NULL, values = alpha(c("white", "red", "green","blue"), 0.5)) +
-  theme(legend.position = c(0.15,0.85)) +
-  guides(fill = guide_legend(override.aes = list(alpha = 0.5))) +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-30"))) +
-  xlab("Date") + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")")))
-
-
-
-
-# plot the data
-ggplot(data = massBal) +
-  geom_line(aes(x = date, y = NitrateLoad.bowersock_kgNday, col = "Bower"), size = 1.2) +
-  geom_line(aes(x = date, y = NitrateLoad.desoto_kgNday, col = "Desoto"), size = 1.2) +
-  geom_line(aes(x = date, y = NitrateLoad.farmland_kgNday, col = "Farmland"), size = 1.2) +
-  geom_line(aes(x = date, y = NitrateLoad.eric_kgNday, col = "Eric"), size = 1.2) +
-  geom_line(aes(x = date, y = NitrateLoad.steve_kgNday, col = "Steve"), size = 1.2) +
-  xlab("Date") + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")"))) +
-  theme(panel.border = element_rect(color = "black", fill = NA))
-
-ggplot(data = massBal) +
-  geom_area(aes(x = date, y = NitrateLoad.desoto_kgNday, fill = "Desoto"), 
-            alpha = 0.8, col = "black", size = 1) +
-  geom_area(aes(x = date, y = NitrateLoad.bowersock_kgNday, fill = "Bowersock"), 
-            alpha = 0.8, col = "black", size = 1) +
-  geom_area(aes(x = date, y = NitrateLoad.farmland_kgNday, fill = "Farmland"), 
-            alpha = 0.8, col = "black", size = 1) +
-  xlab("Date") + ylab(expression(paste("Nitrate load (kg-N ", day^-1, ")"))) +
-  theme(panel.border = element_rect(color = "black", fill = NA))
-```
-
-```{r}
-# load in USGS nutrient csv and reformat, rename parameter codes with parameter names
-# change from long format to wide format
-# keep only N data
-# save as csv and commit
-
-# examine float data
-# 
-
 ```
