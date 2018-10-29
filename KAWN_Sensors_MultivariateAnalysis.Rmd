@@ -20,86 +20,128 @@ library(imputeTS)
 
 
 ```{r dataload}
-# pulling from the streamPULSE API will just pull in data that's useful for metabolism modeling, but we're interested in all data available. Therefore, download data from streamPULSE and load in these .csv files. 
+# Load in data that will be used for uptake calculations
+# Note: we're not directly downloading this from the
+# streamPULSE database because that will just return
+# only the data that's useful for metabolism modeling.
+# These CSV files are manually downloaded from the database
 
-# load sensor data from local files (same files as can be downloaded from streamPULSE)
-eric_data <- read.csv("./Data/SensorData_StreamPULSE_Downloaded/KS_KANSASREASTLAWRENCE_sensorData.csv",
-                      header = TRUE)
-steve_data <- read.csv("./Data/SensorData_StreamPULSE_Downloaded/KS_KANSASRFALLLEAF_sensorData.csv", 
-                      header = TRUE)
-desoto_data <- read.csv("./Data/SensorData_StreamPULSE_Downloaded/KS_KANSASR_sensorData.csv", 
-                        header = TRUE)
+# Load in sensor data
+eric_data <- 
+  read.csv("./Data/StreamPULSE_DownloadedFrom/KS_KANSASREASTLAWRENCE_sensorData.csv",
+           header = TRUE)
+steve_data <- 
+  read.csv("./Data/StreamPULSE_DownloadedFrom/KS_KANSASRFALLLEAF_sensorData.csv", 
+  header = TRUE)
+desoto_data <- 
+  read.csv("./Data/StreamPULSE_DownloadedFrom/KS_KANSASR_sensorData.csv", 
+  header = TRUE)
 
-# make sure datetime is of correct class
+# Make sure datetime is the correct class
 eric_data$DateTime_UTC <- lubridate::mdy_hm(eric_data$DateTime_UTC)
 steve_data$DateTime_UTC <- lubridate::mdy_hm(steve_data$DateTime_UTC)
 desoto_data$DateTime_UTC <- lubridate::mdy_hm(desoto_data$DateTime_UTC)
+# Convert UTC to local time (be sure everything agrees with everything else...)
+eric_data$DateTime_CST <- lubridate::with_tz(eric_data$DateTime_UTC, 
+                                              tzone = "America/Chicago")
+steve_data$DateTime_CST <- lubridate::with_tz(steve_data$DateTime_UTC, 
+                                              tzone = "America/Chicago")
+desoto_data$DateTime_CST <- lubridate::with_tz(desoto_data$DateTime_UTC, 
+                                              tzone = "America/Chicago")
 
-# load in metabolism model results
+# Load in metabolism model results
 modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")$predictions
 modelfit.steve <- readRDS("./Outputs/MetabResults_Steve.RData")$predictions
 modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")$predictions
-
 ```
 
 ```{r NO3Uptake.Desoto}
+# Calculate NO3 uptake at the Desoto sensor, 
+# using the extrapolated diel method 
+# (Heffernan and Cohen 2010, Eqn. 1)
+
+# Remove any data that's been flagged "Bad"
 desoto_data$value[desoto_data$flagtype %in% c("Bad Data")] <- NA
+# Keeping the flagtype and flagcomment columns screws up the
+# reshape, so remove these
+desoto_data$flagtype <- NULL
+desoto_data$flagcomment <- NULL
+# Reshape the data from long format to wide format
 desoto_data <- tidyr::spread(desoto_data, key = variable, value = value)
 
-# hourly averages of NO3 concentration
-desoto_uptake <- desoto_data %>%
-  dplyr::group_by(DateTime_UTC = lubridate::round_date(DateTime_UTC, unit = "hour")) %>%
-  dplyr::summarise(Q_m3s = mean(Discharge_m3s), 
-                   Nitrate_mgL = mean(Nitrate_mgL))
+# Create new dataframe with data needed for uptake calculation
+desoto_uptake <- desoto_data[c("DateTime_UTC", "DateTime_CST", 
+                               "Discharge_m3s", "Nitrate_mgL")]
 
-# extrapolate gaps in data
-desoto_uptake$Q_m3s <- imputeTS::na.interpolation(desoto_uptake$Q_m3s)
-desoto_uptake$Nitrate_mgL<- imputeTS::na.interpolation(desoto_uptake$Nitrate_mgL)
+# Add a vector that indexes by date
+desoto_uptake$date <- lubridate::date(desoto_uptake$DateTime_CST)
+for (i in 1:nrow(desoto_uptake)){
+  desoto_uptake$day[i] <- as.numeric(desoto_uptake$date[i] - desoto_uptake$date[1])
+}
+
+# Create dataframe MaxNitrate: maximum [NO3-] each day
+MaxNitrate <- 
+  desoto_uptake %>%
+  dplyr::group_by(date = lubridate::floor_date(DateTime_CST, unit = "day")) %>%
+  dplyr::summarise(MaxNitrate = max(Nitrate_mgL, na.rm = TRUE))
+MaxNitrate$date <- as.Date(MaxNitrate$date)
+
+# Merge dataframes, joining matching rows by "date"
+desoto_uptake <- left_join(desoto_uptake, MaxNitrate)
+# Remove "date"
+desoto_uptake$date <- NULL
+
+# Use a static value of river bed area (m^2)
+# (until we have modeling data)
 
 # USGS field measurements
 # 2018-03-01    Q = 1410 ft3/s      Channel area = 811 ft2
+#                 = 39.93 m3/s                   = 75.34 m2
 # 2018-04-24    Q = 2330 ft3/s      Channel area = 1400 ft2
+#                 = 65.97 m3/s                   = 130.06 m2
 
-# Append USGS field measurements and extrapolate in between
-desoto_uptake$A_m2 <- NA
-desoto_uptake$A_m2[desoto_uptake$DateTime_UTC >= ymd("2018-03-01") &
-                     desoto_uptake$DateTime_UTC <= ymd("2018-03-02")] <- 75.3 #m2
-desoto_uptake$A_m2[desoto_uptake$DateTime_UTC >= ymd("2018-04-24") &
-                     desoto_uptake$DateTime_UTC <= ymd("2018-04-25")] <- 130.1 #m2
-# extrapolate in between field measurements
-desoto_uptake$A_m2 <- imputeTS::na.interpolation(desoto_uptake$A_m2)
+# average discharge:
+mean(desoto_uptake$Discharge_m3s, na.rm = TRUE) # 61.3 m3/s
+# therefore, will approximate channel area as 130 m2
+A_m2 <- 130
 
-# find maximum [NO3] in each day
-desoto_NMax <- desoto_uptake %>% 
-  dplyr::group_by(DateTime_UTC = lubridate::floor_date(DateTime_UTC, unit = "day")) %>%
-  dplyr::summarise(Max.Nitrate_mgL = max(Nitrate_mgL))
+# Convert discharge to m3/hr so units work out
+desoto_uptake$Discharge_m3hr <- desoto_uptake$Discharge_m3s*3600
+# Calculate water velocity
+desoto_uptake$v_mhr <- desoto_uptake$Discharge_m3hr/A_m2
 
-# initialize uptake column
-desoto_uptake$U_mgNm2day <- NA
-i <- 1
-# run loop to calculate uptake
-for (i in 1:nrow(desoto_uptake)){
-  # Q/A, [m3/s] / [m2] = [m/s]
-  v <- desoto_uptake$Q_m3s[i] / desoto_uptake$A_m2[i]
-  # time of day / 24 [unitless]
-  hr <- hour(desoto_uptake$DateTime_UTC[i]) / 24
-  date <- floor_date(desoto_uptake$DateTime_UTC[i], unit = "day")
-  date.pre <- date - lubridate::days(1)
-  
-  # if theres a preceeding date,
-  if (date.pre %in% desoto_NMax$DateTime_UTC){
-    NMax.0 <- desoto_NMax$Max.Nitrate_mgL[desoto_NMax$DateTime_UTC == date.pre]
-    NMax.24 <- desoto_NMax$Max.Nitrate_mgL[desoto_NMax$DateTime_UTC == date]
-  
-    desoto_uptake$U_mgNm2day[i] <- v * (NMax.0 * (1 - hr) + NMax.24 * hr -
-                                          desoto_uptake$Nitrate_mgL[i])
-    # unit conversions
-    # currently: [m/s * mg/L], convert to [mg / s / m2]
-    desoto_uptake$U_mgNm2day[i] <- desoto_uptake$U_mgNm2day[i] / 1000
-    # convert from [mg/s/m2] to [mg m^-2 day^-1]
-    desoto_uptake$U_mgNm2day[i] <- desoto_uptake$U_mgNm2day[i] * 1.15741e5
-  } # exit loop for filling U
-} # exit loop for calculating v, hr, date, date.pre
+# Calculate the difference between the preceeding 
+# NO3-max and [NO3-] at time t
+desoto_uptake$NO3Diff <- NA
+# Take the first row that day == 1
+start <- which(desoto_uptake$day == 1)[1]
+for (i in start:nrow(desoto_uptake)){
+  # Calculate previous day
+  prevday <- desoto_uptake$day[i] - 1
+  # Get maximum concentration of NO3 during previous day
+  NO3Max.prevday <- unique(desoto_uptake$MaxNitrate[desoto_uptake$day == prevday])
+  # Get current NO3 concentration
+  NO3 <- desoto_uptake$Nitrate_mgL[i]
+  # Take the difference between previous max and current
+  desoto_uptake$NO3Diff[i] <- NO3Max.prevday - NO3
+  # Iterate loop and end
+  i <-  i + 1
+}
+
+# Sum the differences from t = 0 to t = 24 for each day
+desoto_uptake <- 
+  desoto_uptake %>%
+  group_by(day) %>%
+  mutate(NO3Sum = sum(NO3Diff))
+
+# Multiply sum difference and velocity * 0.001 L/m3 * 24hr/1day
+desoto_uptake$UaNO3 <- desoto_uptake$NO3Sum * desoto_uptake$v_mhr * 0.001 * 24
+
+ggplot(data = desoto_uptake, aes(DateTime_CST, UaNO3)) +
+  geom_line() +
+  geom_point()
+ggplot(data = modelfit.desoto, aes(date, GPP)) +
+  geom_point()
 
 write.csv(desoto_uptake, file = "./Outputs/NitrateUptake_Desoto.csv", row.names = FALSE)
 ```
