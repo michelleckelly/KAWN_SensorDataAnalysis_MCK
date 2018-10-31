@@ -1,12 +1,14 @@
 # Ignore history files
 .Rhistory
 
-# Ignore session data files
-.RData
+# Ignore RData files
+*.RData
 
-# Ignore Word files, powerpoint files
+# Ignore Word files, powerpoint files, excel files, zip files
 *.docx
 *.pptx
+*.xlsx
+*.zip
 
 # Ignore Rmd default cache directory
 /cache/
@@ -25,6 +27,4 @@
 # Ignore folder of sensor data files that are uploaded to the streamPULSE server (script is still reproducable without this folder)
 /Data/SensorData_StreamPULSE_Uploaded/
 
-# Ignore .xlsx data files
-/Data/SensorData_CompiledFiles/*.xlsx
 
