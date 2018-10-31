@@ -26,7 +26,7 @@ library(tidyr)
 ```
 
 ```{r metabolism.load}
-loadfromfile <- TRUE # if loadfromfile TRUE, load metabolsim model from saved RData file
+loadfromfile <- FALSE # if loadfromfile TRUE, load metabolsim model from saved RData file
 
 if (loadfromfile) {
   modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
@@ -116,40 +116,76 @@ NEP.desoto <- NEP_calcs(modelfit.desoto$predictions)
 # Eric
 ggplot(modelfit.eric$predictions, aes(x = date)) +
   geom_line(aes(y = GPP, color = "GPP")) +
-  geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
+  geom_point(aes(y = GPP, color = "GPP")) +
+  #geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
   geom_line(aes(y = ER, color = "ER")) +
-  geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+  geom_point(aes(y = ER, color = "ER")) +
+  #geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
   geom_rect(aes(xmin = as.Date("2018-02-20"), xmax = as.Date("2018-02-23"), 
-                ymin = -10, ymax = 10), fill = "white") + # sensor burial
+                ymin = -25, ymax = 25), fill = "white") + # sensor burial
   geom_rect(aes(xmin = as.Date("2018-03-06"), xmax = as.Date("2018-03-12"), 
-                ymin = -10, ymax = 10), fill = "white") + # sensor burial
+                ymin = -25, ymax = 25), fill = "white") + # sensor burial
   geom_rect(aes(xmin = as.Date("2018-04-01"), xmax = as.Date("2018-04-04"), 
-                ymin = -10, ymax = 10), fill = "white") + # sensor burial
+                ymin = -25, ymax = 25), fill = "white") + # sensor burial
   geom_rect(aes(xmin = as.Date("2018-04-14"), xmax = as.Date("2018-04-17"), 
-                ymin = -10, ymax = 10), fill = "white") + # sensor burial
+                ymin = -25, ymax = 25), fill = "white") + # sensor burial
   geom_rect(aes(xmin = as.Date("2018-04-25"), xmax = as.Date("2018-04-27"), 
-                ymin = -10, ymax = 10), fill = "white") + # sensor burial
+                ymin = -25, ymax = 25), fill = "white") + # sensor burial
   labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
   scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01")), 
-                 date_breaks = "month", date_labels = "%e %b") +
+                 date_breaks = "2 weeks", date_labels = "%e %b") +
+  scale_color_manual(values = c("GPP" = "#FF0000", "ER" = "#000000"), 
+                     name = "Discharge") +
   geom_line(aes(y = 0), color = "black") +
-  ylim(c(-15,15)) + theme_classic() +
-  theme(legend.title=element_blank(), legend.position = "none")
-ggsave("./Plots/MetabPlot_Eric_May.png",height = 2.5, width = 6, units = "in")
+  ylim(c(-25,30)) + 
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = c(0.17, 0.88), legend.direction = "horizontal",
+        legend.background = element_rect(color = "black"))
+ggsave("./Plots/MetabPlot_Eric.png", height = 2.5, width = 7, units = "in")
+
+# Steve
+ggplot(modelfit.steve$predictions, aes(x = date)) +
+  geom_line(aes(y = GPP, color = "GPP")) +
+  geom_point(aes(y = GPP, color = "GPP")) +
+  #geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
+  geom_line(aes(y = ER, color = "ER")) +
+  geom_point(aes(y = ER, color = "ER")) +
+  #geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+  geom_line(aes(y = 0), color = "black") +
+  labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
+  scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01")), 
+                 date_breaks = "2 weeks", date_labels = "%e %b") +
+  scale_color_manual(values = c("GPP" = "#23baaf", "ER" = "#000000"), 
+                     name = "Downstream") +
+  ylim(c(-25,30)) + 
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = c(0.19, 0.88), legend.direction = "horizontal",
+        legend.background = element_rect(color = "black"))
+ggsave("./Plots/MetabPlot_Steve.png",height = 2.5, width = 7, units = "in")
 
 # Desoto
 ggplot(modelfit.desoto$predictions, aes(x = date)) +
   geom_line(aes(y = GPP, color = "GPP")) +
-  geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
+  geom_point(aes(y = GPP, color = "GPP")) +
+  #geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
   geom_line(aes(y = ER, color = "ER")) +
-  geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
+  geom_point(aes(y = ER, color = "ER")) +
+  #geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
   geom_line(aes(y = 0), color = "black") +
   labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
   scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01")), 
-                 date_breaks = "month", date_labels = "%e %b") +
-  ylim(c(-15,15)) + theme_classic() +
-  theme(legend.title=element_blank(), legend.position = "none")
-ggsave("./Plots/MetabPlot_Desoto_May.png",height = 2.5, width = 6, units = "in")
+                 date_breaks = "2 weeks", date_labels = "%e %b") +
+  scale_color_manual(values = c("GPP" = "#F2AD00", "ER" = "#000000"), 
+                     name = "Desoto") +
+  ylim(c(-25,30)) + 
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = c(0.16, 0.88), legend.direction = "horizontal",
+        legend.background = element_rect(color = "black"))
+  #theme(legend.title=element_blank(), legend.position = "none")
+ggsave("./Plots/MetabPlot_Desoto.png",height = 2.5, width = 7, units = "in")
 ```
 
 

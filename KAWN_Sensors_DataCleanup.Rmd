@@ -39,7 +39,6 @@ masterFile <- function(sitename, USGS){
     dataframe <- read.csv(paste("./SensorData_CompiledFiles/KAWN_SensorData_", 
                                 sitename, ".csv", sep = ""), 
                           header = TRUE)
-    dataframe$dateTime <- ymd_hms(dataframe$dateTime, tz = "America/Chicago")
   }
   
   if(!file.exists(paste("./SensorData_CompiledFiles/KAWN_SensorData_", 
@@ -147,8 +146,11 @@ masterFile <- function(sitename, USGS){
 
 bowersock <- masterFile(sitename = "Bowersock", USGS = FALSE)
 eric <- masterFile(sitename = "Eric", USGS = FALSE)
+eric$dateTime_UTC <- ymd_hms(eric$dateTime_UTC, tz = "UTC")
 steve <- masterFile(sitename = "Steve", USGS = FALSE)
+steve$dateTime_UTC <- ymd_hms(steve$dateTime_UTC, tz = "UTC")
 desoto <- masterFile(sitename = "Desoto", USGS = TRUE)
+desoto$dateTime_UTC <- ymd_hms(desoto$dateTime_UTC, tz = "UTC")
 ```
 
 ```{r reachQ}
@@ -364,29 +366,32 @@ if (downloadNEONfiles == TRUE){
 
 PAR <- read.csv(file = paste0(getwd(), "/NEONfiles", "/stackedFiles", "/PARPAR_1min.csv"), 
                 header = TRUE)
-PAR <- subset(PAR, subset = PAR$verticalPosition == 10) # take measurements that are closest to ground
-PAR$startDateTime <- ymd_hms(PAR$startDateTime, tz = "America/Chicago")
+# Take PAR measurements from the highest up sensor (60 m)
+PAR <- subset(PAR, subset = PAR$verticalPosition == 60)
+# Keep NEON default time zone
+PAR$startDateTime <- ymd_hms(PAR$startDateTime)
 PAR <- data.frame(
-    dateTime = PAR$startDateTime,
+    dateTime_UTC = PAR$startDateTime,
     PAR = PAR$PARMean
 )
 
-eric <- merge(eric, PAR, by = "dateTime") # PAR units are micromoles per m^2 per second
-steve <- merge(steve, PAR, by = "dateTime")
-desoto <- merge(desoto, PAR, by = "dateTime")
+eric <- merge(eric, PAR, by = "dateTime_UTC") # PAR units are micromoles per m^2 per second
+steve <- merge(steve, PAR, by = "dateTime_UTC")
+desoto <- merge(desoto, PAR, by = "dateTime_UTC")
+
 
 #### Barometric pressure, units are kPa
 BarPress <- read.csv(file = paste0(getwd(), "/NEONfiles", "/stackedFiles", "/BP_1min.csv"), 
                      header = TRUE)
 
 BarPress <- data.frame(
-  dateTime = ymd_hms(BarPress$startDateTime, tz = "America/Chicago"),
+  dateTime_UTC = ymd_hms(BarPress$startDateTime, tz = "UTC"),
   barom.pressure = BarPress$staPresMean # units: kPa
 )
 
-eric <- merge(eric, BarPress, by = "dateTime")
-steve <- merge(steve, BarPress, by = "dateTime")
-desoto <- merge(desoto, BarPress, by = "dateTime")
+eric <- merge(eric, BarPress, by = "dateTime_UTC")
+steve <- merge(steve, BarPress, by = "dateTime_UTC")
+desoto <- merge(desoto, BarPress, by = "dateTime_UTC")
 
 write.csv(eric, row.names = FALSE, file = "KAWN_SensorData_Eric.csv")
 write.csv(steve, row.names = FALSE, file = "KAWN_SensorData_Steve.csv")
