@@ -18,7 +18,6 @@ library(ggpmisc)
 library(imputeTS)
 ```
 
-
 ```{r dataload}
 # Load in data that will be used for uptake calculations
 # Note: we're not directly downloading this from the
@@ -32,22 +31,10 @@ eric_data <-
            header = TRUE)
 steve_data <- 
   read.csv("./Data/StreamPULSE_DownloadedFrom/KS_KANSASRFALLLEAF_sensorData.csv", 
-  header = TRUE)
+           header = TRUE)
 desoto_data <- 
   read.csv("./Data/StreamPULSE_DownloadedFrom/KS_KANSASR_sensorData.csv", 
-  header = TRUE)
-
-# Make sure datetime is the correct class
-eric_data$DateTime_UTC <- lubridate::mdy_hm(eric_data$DateTime_UTC)
-steve_data$DateTime_UTC <- lubridate::mdy_hm(steve_data$DateTime_UTC)
-desoto_data$DateTime_UTC <- lubridate::mdy_hm(desoto_data$DateTime_UTC)
-# Convert UTC to local time (be sure everything agrees with everything else...)
-eric_data$DateTime_CST <- lubridate::with_tz(eric_data$DateTime_UTC, 
-                                              tzone = "America/Chicago")
-steve_data$DateTime_CST <- lubridate::with_tz(steve_data$DateTime_UTC, 
-                                              tzone = "America/Chicago")
-desoto_data$DateTime_CST <- lubridate::with_tz(desoto_data$DateTime_UTC, 
-                                              tzone = "America/Chicago")
+           header = TRUE)
 
 # Load in metabolism model results
 modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")$predictions
@@ -55,96 +42,153 @@ modelfit.steve <- readRDS("./Outputs/MetabResults_Steve.RData")$predictions
 modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")$predictions
 ```
 
-```{r NO3Uptake.Desoto}
-# Calculate NO3 uptake at the Desoto sensor, 
-# using the extrapolated diel method 
+```{r datasetup}
+# Function to setup the data for uptake calculations
+# Input: Sensor data frame
+# Output: Sensor data frame with added columns for
+#         local time, data flagged "Bad Data" removed
+
+prepper <- function(sensor_data){
+  # Format datetime column correctly
+  sensor_data$DateTime_UTC <- 
+    lubridate::ymd_hms(sensor_data$DateTime_UTC)
+  # Add column for local time
+  sensor_data$DateTime_CST <- 
+    lubridate::with_tz(sensor_data$DateTime_UTC, 
+                       tzone = "America/Chicago")
+  #
+  # Remove data that's been flagged as "Bad Data"
+  sensor_data$value[sensor_data$flagtype %in% c("Bad Data")] <- NA
+  # Remove flagtype and flagcomment columns
+  sensor_data$flagtype <- NULL
+  sensor_data$flagcomment <- NULL
+  # Reshape dataframe from long to wide format
+  sensor_data <- tidyr::spread(sensor_data, 
+                               key = variable, value = value)
+  # Create new dataframe with only data needed for uptake calculation
+  sensor_uptake <- sensor_data[c("DateTime_UTC", "DateTime_CST",
+                                 "Discharge_m3s", "Nitrate_mgL")]
+  #
+  # Extrapolate between missing values?
+  #
+  #
+  # Return new dataframe
+  return(sensor_uptake)
+}
+
+# Run function
+eric_uptake <- prepper(eric_data)
+steve_uptake <- prepper(steve_data)
+desoto_uptake <- prepper(desoto_data)
+```
+
+```{r NO3Uptake.Equation1}
+# Calculate NO3 uptake using the extrapolated diel method 
 # (Heffernan and Cohen 2010, Eqn. 1)
 
-# Remove any data that's been flagged "Bad"
-desoto_data$value[desoto_data$flagtype %in% c("Bad Data")] <- NA
-# Keeping the flagtype and flagcomment columns screws up the
-# reshape, so remove these
-desoto_data$flagtype <- NULL
-desoto_data$flagcomment <- NULL
-# Reshape the data from long format to wide format
-desoto_data <- tidyr::spread(desoto_data, key = variable, value = value)
+# Input: the dataframe spit out by prepper()
+# Output: Calculated NO3 Uptake
 
-# Create new dataframe with data needed for uptake calculation
-desoto_uptake <- desoto_data[c("DateTime_UTC", "DateTime_CST", 
-                               "Discharge_m3s", "Nitrate_mgL")]
-
-# Add a vector that indexes by date
-desoto_uptake$date <- lubridate::date(desoto_uptake$DateTime_CST)
-for (i in 1:nrow(desoto_uptake)){
-  desoto_uptake$day[i] <- as.numeric(desoto_uptake$date[i] - desoto_uptake$date[1])
+HC_Eqn1 <- function(prepped_df){
+  # Add date index vector
+  # (Based on CST local time)
+  # Extract date into new column
+  prepped_df$date <- 
+    lubridate::date(prepped_df$DateTime_CST)
+  # Count number of days since start
+  for (i in 1:nrow(prepped_df)){
+    prepped_df$day[i] <- 
+      as.numeric(prepped_df$date[i] - prepped_df$date[1])
+  }
+  #
+  # Find maximum nitrate concentration each 
+  # (local time) day
+  prepped_df <- prepped_df %>%
+    dplyr::group_by(date) %>%
+    dplyr::mutate(MaxNitrate = max(Nitrate_mgL, na.rm = TRUE))
+  #
+  # Use a static value for river bed area (m^2)
+  # Average discharge at desoto = 61.3 m3/s
+  # USGS field measuremnents
+  # 2018-03-01    Q = 1410 ft3/s      Channel area = 811 ft2
+  #                 = 39.93 m3/s                   = 75.34 m2
+  # 2018-04-24    Q = 2330 ft3/s      Channel area = 1400 ft2
+  #                 = 65.97 m3/s                   = 130.06 m2
+  # Approximate river bed area as 130 m2 (for now)
+  A_m2 <- 130
+  #
+  # Calculate water velocity [m/s]
+  prepped_df$v_ms <- prepped_df$Discharge_m3s/A_m2
+  # 
+  # Calculate difference betweeen preceeding day's NitrateMax 
+  # and Nitrate at time t
+  prepped_df$DiffNitrate <- NA
+  # Grab the row number of the start of day 1
+  start <- which(prepped_df$day == 1)[1]
+  # Loop from day 1 to end
+  for(i in start:nrow(prepped_df)){
+    # Get previous day: current day - 1
+    prevday <- prepped_df$day[i] - 1
+    # Get MaxNitrate during prevday
+    MaxNitrate.prev <- unique(prepped_df$MaxNitrate[prepped_df$day == prevday])
+    # Get current Nitrate
+    Nitrate <- prepped_df$Nitrate_mgL[i]
+    # Calculate difference
+    prepped_df$DiffNitrate[i] <- MaxNitrate.prev - Nitrate
+    # Iterate loop
+    i <- i + 1
+  }
+  
+  # Sum the differences from t = 0 to t = 24 for each day
+  prepped_df <- prepped_df %>%
+    group_by(day) %>%
+    mutate(SumDiffNitrate = sum(DiffNitrate))
+  # Multiply SumDiff and velocity, and correct for units
+  # Q [m3/s] / A [m2] = v [m/s]
+  # v [m/s] * [NO3] [mg-N/L] = U [m*mg-N / s*L]
+  # U [m*mg-N / s*L] * [1000 L / 1 m3] = U [mg-N / m2*s]
+  prepped_df$UaNO3_mgNm2s <- prepped_df$SumDiffNitrate * prepped_df$v_ms * 1000
+  #
+  # I don't know if this calculation is totally correct. The numbers seem
+  # super high.
+  #
+  # Rename columns
+  names(prepped_df)[names(prepped_df) == "MaxNitrate"] <- "Nitrate_DailyMax_mgNL"
+  names(prepped_df)[names(prepped_df) == "v_ms"] <- "Velocity_ms"
+  names(prepped_df)[names(prepped_df) == "DiffNitrate"] <- "DiffNitrate_mgNL"
+  names(prepped_df)[names(prepped_df) == "SumDiffNitrate"] <- "SumDiffNitrate_mgNL"
+  prepped_df$date <- NULL
+  # Return dataframe
+  return(prepped_df)
 }
 
-# Create dataframe MaxNitrate: maximum [NO3-] each day
-MaxNitrate <- 
-  desoto_uptake %>%
-  dplyr::group_by(date = lubridate::floor_date(DateTime_CST, unit = "day")) %>%
-  dplyr::summarise(MaxNitrate = max(Nitrate_mgL, na.rm = TRUE))
-MaxNitrate$date <- as.Date(MaxNitrate$date)
+# Run function
+eric_uptake_Eqn1 <- HC_Eqn1(eric_uptake)
+steve_uptake_Eqn1 <- HC_Eqn1(steve_uptake)
+desoto_uptake_Eqn1 <- HC_Eqn1(desoto_uptake)
 
-# Merge dataframes, joining matching rows by "date"
-desoto_uptake <- left_join(desoto_uptake, MaxNitrate)
-# Remove "date"
-desoto_uptake$date <- NULL
+# Save output as CSV
+write.csv(desoto_uptake, file = "./Outputs/NitrateUptake_Desoto.csv", row.names = FALSE)
 
-# Use a static value of river bed area (m^2)
-# (until we have modeling data)
-
-# USGS field measurements
-# 2018-03-01    Q = 1410 ft3/s      Channel area = 811 ft2
-#                 = 39.93 m3/s                   = 75.34 m2
-# 2018-04-24    Q = 2330 ft3/s      Channel area = 1400 ft2
-#                 = 65.97 m3/s                   = 130.06 m2
-
-# average discharge:
-mean(desoto_uptake$Discharge_m3s, na.rm = TRUE) # 61.3 m3/s
-# therefore, will approximate channel area as 130 m2
-A_m2 <- 130
-
-# Convert discharge to m3/hr so units work out
-desoto_uptake$Discharge_m3hr <- desoto_uptake$Discharge_m3s*3600
-# Calculate water velocity
-desoto_uptake$v_mhr <- desoto_uptake$Discharge_m3hr/A_m2
-
-# Calculate the difference between the preceeding 
-# NO3-max and [NO3-] at time t
-desoto_uptake$NO3Diff <- NA
-# Take the first row that day == 1
-start <- which(desoto_uptake$day == 1)[1]
-for (i in start:nrow(desoto_uptake)){
-  # Calculate previous day
-  prevday <- desoto_uptake$day[i] - 1
-  # Get maximum concentration of NO3 during previous day
-  NO3Max.prevday <- unique(desoto_uptake$MaxNitrate[desoto_uptake$day == prevday])
-  # Get current NO3 concentration
-  NO3 <- desoto_uptake$Nitrate_mgL[i]
-  # Take the difference between previous max and current
-  desoto_uptake$NO3Diff[i] <- NO3Max.prevday - NO3
-  # Iterate loop and end
-  i <-  i + 1
-}
-
-# Sum the differences from t = 0 to t = 24 for each day
-desoto_uptake <- 
-  desoto_uptake %>%
-  group_by(day) %>%
-  mutate(NO3Sum = sum(NO3Diff))
-
-# Multiply sum difference and velocity * 0.001 L/m3 * 24hr/1day
-desoto_uptake$UaNO3 <- desoto_uptake$NO3Sum * desoto_uptake$v_mhr * 0.001 * 24
-
-ggplot(data = desoto_uptake, aes(DateTime_CST, UaNO3)) +
+# Plot
+ggplot(data = desoto_uptake_Eqn1, aes(DateTime_CST, UaNO3_mgNm2s)) +
   geom_line() +
   geom_point()
-ggplot(data = modelfit.desoto, aes(date, GPP)) +
+ggplot(data = modelfit.desoto$predictions, aes(date, GPP)) +
   geom_point()
-
-write.csv(desoto_uptake, file = "./Outputs/NitrateUptake_Desoto.csv", row.names = FALSE)
 ```
+
+```{r NO3Uptake.Eqn2}
+# Calculate NO3 uptake using the integrated diel method 
+# (Heffernan and Cohen 2010, Eqn. 2)
+
+# Input: the dataframe spit out by prepper()
+# Output: Calculated NO3 Uptake
+HC_Eqn2 <- function(prepped_df){
+  
+}
+```
+
 
 ```{r uptakePlot}
 # calculate daily average uptake rate
