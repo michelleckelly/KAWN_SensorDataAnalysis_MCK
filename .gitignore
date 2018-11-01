@@ -23,12 +23,12 @@
 # file of streampulse sensor data
 # (script is still reproducable without these files,
 # access metadata through data.streampulse.org if needed
-/Data/SensorData_StreamPULSE_DownloadedFrom/.txt
-/Data/SensorData_StreamPULSE_DownloadedFrom/*.zip
+/Data/StreamPULSE_DownloadedFrom/*.txt
+/Data/StreamPULSE_DownloadedFrom/*.zip
 
 # Ignore folder of sensor data files that are uploaded to the streamPULSE server 
 # (script is still reproducable without this folder)
-/Data/SensorData_StreamPULSE_UploadedTo/
+/Data/StreamPULSE_UploadedTo/
 
 # Ignore large .RData script output files 
 # (script is still reproducable without this folder)
@@ -38,3 +38,5 @@
 # (script is still reproducable without them)
 /Outputs/*.zip
 
+# Ignore metabolism workspace file, created for sharing purposes
+MetabolismWorkspaceFile_31Oct18.RData
