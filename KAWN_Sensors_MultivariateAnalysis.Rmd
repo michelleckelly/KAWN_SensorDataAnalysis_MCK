@@ -37,9 +37,9 @@ desoto_data <-
            header = TRUE)
 
 # Load in metabolism model results
-modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")$predictions
-modelfit.steve <- readRDS("./Outputs/MetabResults_Steve.RData")$predictions
-modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")$predictions
+modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
+modelfit.steve <- readRDS("./Outputs/MetabResults_Steve.RData")
+modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
 ```
 
 ```{r datasetup}
@@ -182,79 +182,295 @@ ggplot(data = modelfit.desoto$predictions, aes(date, GPP)) +
 # Calculate NO3 uptake using the integrated diel method 
 # (Heffernan and Cohen 2010, Eqn. 2)
 
+# Differences between Eqn. 1 and 2:
+#   - Eqn 2 takes an hourly average of obervations (less
+#     sensitive to variations in Nitrate)
+
 # Input: the dataframe spit out by prepper()
 # Output: Calculated NO3 Uptake
+
 HC_Eqn2 <- function(prepped_df){
-  
+  #
+  # Take an hourly average Nitrate concentration
+  prepped_df <- 
+    prepped_df %>%
+    dplyr::group_by(DateTime_CST = lubridate::floor_date(DateTime_CST, unit = "hour")) %>%
+    dplyr::summarise(Mean.Discharge_m3s = mean(Discharge_m3s),
+                     Mean.Nitrate_mgL = mean(Nitrate_mgL))
+  #
+  # Add date index vector
+  # (Based on CST local time)
+  # Extract date into new column
+  prepped_df$date <- 
+    lubridate::date(prepped_df$DateTime_CST)
+  # Count number of days since start
+  prepped_df$day <- numeric(length = nrow(prepped_df))
+  for (i in 1:nrow(prepped_df)){
+    prepped_df$day[i] <- 
+      as.numeric(prepped_df$date[i] - prepped_df$date[1])
+  }
+  # Get hour of day, as fraction of 24
+  prepped_df$hour <- lubridate::hour(prepped_df$DateTime_CST) / 24
+  #
+  # Find maximum nitrate concentration each 
+  # (local time) day
+  prepped_df <- prepped_df %>%
+    dplyr::group_by(date) %>%
+    dplyr::mutate(MaxNitrate = max(Mean.Nitrate_mgL, na.rm = TRUE))
+  #
+  # Use a static value for river bed area (m^2)
+  # Average discharge at desoto = 61.3 m3/s
+  # USGS field measuremnents
+  # 2018-03-01    Q = 1410 ft3/s      Channel area = 811 ft2
+  #                 = 39.93 m3/s                   = 75.34 m2
+  # 2018-04-24    Q = 2330 ft3/s      Channel area = 1400 ft2
+  #                 = 65.97 m3/s                   = 130.06 m2
+  # Approximate river bed area as 130 m2 (for now)
+  A_m2 <- 130
+  #
+  # Calculate water velocity [m/s]
+  prepped_df$v_ms <- prepped_df$Mean.Discharge_m3s/A_m2
+  # 
+  # Run loop to calculate uptake
+  prepped_df$DiffNitrate_mgL <- NA
+  # Grab the row number of the start of day 1
+  start <- which(prepped_df$day == 1)[1]
+  for (i in start:nrow(prepped_df)){
+    # Get previous day: current day - 1
+    prevday <- prepped_df$day[i] - 1
+    # Get MaxNitrate during prevday
+    MaxNitrate.prev <- unique(prepped_df$MaxNitrate[prepped_df$day == prevday])
+    # Get MaxNitrate during current day
+    MaxNitrate <- unique(prepped_df$MaxNitrate[prepped_df$day == prepped_df$day[i]])
+    # Get Nitrate at current hour
+    Nitrate <- prepped_df$Mean.Nitrate_mgL[i]
+    # Calculate DiffNitrate for each hour
+    prepped_df$DiffNitrate_mgL[i] <- 
+      MaxNitrate.prev * (1 - prepped_df$hour) + 
+      MaxNitrate * (prepped_df$hour) - Nitrate
+  }
+  #
+  # Sum the differences from t = 0 to t = 24 for each day
+  results <- prepped_df %>%
+    group_by(day) %>%
+    summarise(date = date[1],
+              Mean.Discharge_m3s = mean(Mean.Discharge_m3s, na.rm = TRUE),
+              Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE),
+              Mean.v_ms = mean(v_ms, na.rm = TRUE), 
+              SumDiffNitrate = sum(DiffNitrate_mgL))
+  # Multiply SumDiff by velocity
+  # Unit check:
+  # [mg / L] * [m / s] = [mg*m / L*s]
+  # [mg*m / L*s] * 1000 [L / m3] * 86400 [s / day] * 1 [kg] / 10^6 [mg]
+  results$UaNO3_kgNm2day <- 
+    results$SumDiffNitrate * results$Mean.v_ms * 1000 * 86400 / 10^6
+  #
+  # Clean up dataframe
+  names(results)[names(results) == "date"] <- "Date"
+  names(results)[names(results) == "Mean.v_ms"] <- "Mean.velocity_ms"
+  results$SumDiffNitrate <- NULL
+  results$day <- NULL
+  # Return dataframe
+  return(results)
 }
+
+# Execute function
+eric_uptake_Eqn2 <- HC_Eqn2(eric_uptake)
+steve_uptake_Eqn2 <- HC_Eqn2(steve_uptake)
+desoto_uptake_Eqn2 <- HC_Eqn2(desoto_uptake)
 ```
 
+```{r uptakeMerge}
+# Merge uptake calculations into one dataframe
+# so things are easier to plot
+# Save merged dataframe
+
+# Join dataframes
+NitrateUptake <- dplyr::full_join(eric_uptake_Eqn2, steve_uptake_Eqn2, 
+                                  by = "Date", suffix = c(".eric", ".steve"))
+NitrateUptake <- dplyr::full_join(NitrateUptake, desoto_uptake_Eqn2, 
+                                  by = "Date")
+# Cleanup
+names(NitrateUptake)[names(NitrateUptake) == "Mean.Discharge_m3s"] <- 
+  "Mean.Discharge_m3s.desoto"
+names(NitrateUptake)[names(NitrateUptake) == "Mean.Nitrate_mgL"] <- 
+  "Mean.Nitrate_mgL.desoto"
+names(NitrateUptake)[names(NitrateUptake) == "Mean.velocity_ms"] <- 
+  "Mean.velocity_ms.desoto"
+names(NitrateUptake)[names(NitrateUptake) == "UaNO3_kgNm2day"] <- 
+  "UaNO3_kgNm2day.desoto"
+
+# Add column to denote during waste release or after
+# During: dates prior to 1 April 2018
+# After: dates post 1 April 2018
+NitrateUptake$ReleaseStatus <- "During"
+NitrateUptake$ReleaseStatus[NitrateUptake$Date >= ymd("2018-04-01")] <- "After"
+
+# Save dataframe
+```
+
+```{r JoinUptakeMetab}
+# Join uptake dataframe with metabolism dataframes
+Metabolism <- dplyr::full_join(modelfit.eric$predictions, modelfit.steve$predictions,
+                               by = "date", suffix = c(".eric", ".steve"))
+Metabolism <- dplyr::full_join(Metabolism, modelfit.desoto$predictions, by = "date")
+
+# Cleanup
+Metabolism$msgs.fit.eric <- NULL
+Metabolism$warnings.eric <- NULL
+Metabolism$errors.eric <- NULL
+Metabolism$msgs.fit.steve <- NULL
+Metabolism$warnings.steve <- NULL
+Metabolism$errors.steve <- NULL
+Metabolism$msgs.fit <- NULL
+Metabolism$warnings <- NULL
+Metabolism$errors <- NULL
+names(Metabolism)[names(Metabolism) == "GPP"] <- "GPP.desoto"
+names(Metabolism)[names(Metabolism) == "GPP.lower"] <- "GPP.lower.desoto"
+names(Metabolism)[names(Metabolism) == "GPP.upper"] <- "GPP.upper.desoto"
+names(Metabolism)[names(Metabolism) == "ER"] <- "ER.desoto"
+names(Metabolism)[names(Metabolism) == "ER.lower"] <- "ER.lower.desoto"
+names(Metabolism)[names(Metabolism) == "ER.upper"] <- "ER.upper.desoto"
+names(Metabolism)[names(Metabolism) == "date"] <- "Date"
+
+# Join with uptake dataframe
+UptakeMetab <- dplyr::full_join(NitrateUptake, Metabolism, by = "Date")
+```
 
 ```{r uptakePlot}
-# calculate daily average uptake rate
-desoto_uptake.avg <- desoto_uptake %>%
-  dplyr::group_by(date = lubridate::floor_date(DateTime_UTC, unit = "day")) %>%
-  dplyr::summarise(U_mgNm2day = mean(U_mgNm2day))
+# Plotting nitrate uptake versus time
+# Nitrate uptake calculated using 
+# Heffernan and cohen 2010, Eqn. 2
+#
+# Combined plot of all sites together
+# Difficult to see differences between
+# during pumping and post-pumping
+#
+ggplot(data = UptakeMetab, aes(x = Date)) +
+  # Discharge (Eric)
+  geom_point(aes(y = UaNO3_kgNm2day.eric, color = "Discharge")) +
+  geom_line(aes(y = UaNO3_kgNm2day.eric, color = "Discharge")) +
+  # Downstream (Steve)
+  geom_point(aes(y = UaNO3_kgNm2day.steve, color = "Downstream")) +
+  geom_line(aes(y = UaNO3_kgNm2day.steve, color = "Downstream")) +
+  # Desoto
+  geom_point(aes(y = UaNO3_kgNm2day.desoto, color = "Desoto")) +
+  geom_line(aes(y = UaNO3_kgNm2day.desoto, color = "Desoto")) +
+  # axis and color scales
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
+               date_breaks = "2 weeks", date_labels = "%b %e" ) + 
+  scale_color_manual(values = c("Upstream" = "#000000", "Discharge" = "#FF0000", 
+                                 "Downstream" = "#23baaf", "Desoto" = "#F2AD00"),
+                     breaks = c("Upstream", "Discharge", "Downstream", "Desoto"),
+                     name = "Site") +
+  scale_shape_manual(values = 21) +
+  # axis labels
+  xlab("Date") + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ day^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = c(0.1, 0.79),
+        legend.background = element_rect(color = "black"))
 
-# join uptake dataframe with GPP dataframe
-desoto_uptake.avg$date <- as.Date(desoto_uptake.avg$date)
-modelfit.desoto <- dplyr::full_join(desoto_uptake.avg, modelfit.desoto, by = "date")
-modelfit.desoto <- modelfit.desoto[modelfit.desoto$date <= as.Date("2018-05-01"),]
+# Comparing during and post-release
+# Eric
+ggplot(data = UptakeMetab, aes(x = Date)) +
+  # Desoto
+  geom_point(aes(y = UaNO3_kgNm2day.eric, color = ReleaseStatus)) +
+  geom_line(aes(y = UaNO3_kgNm2day.eric, color = ReleaseStatus)) +
+  # axis and color scales
+  #scale_y_continuous(limits = c(0, 500)) +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
+               date_breaks = "2 weeks", date_labels = "%b %e" ) +
+  scale_color_manual(values = c("After" = "#000000", "During" = "#FF0000"),
+                     breaks = c("During", "After"),
+                     name = "Release period") +
+  scale_shape_manual(values = 21) +
+  # axis labels
+  xlab("Date") + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ day^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = c(0.21, 0.83),
+        legend.background = element_rect(color = "black"))
+ggsave(filename = "./Plots/Uptake_time_eric.png", device = "png", 
+       width = 3.75, height = 3.5, units = "in")
 
-# split by date
-modelfit.desotoDuring <- modelfit.desoto[modelfit.desoto$date < as.Date("2018-04-01"),]
-modelfit.desotoPost <- modelfit.desoto[modelfit.desoto$date >= as.Date("2018-04-01") &
-                                         modelfit.desoto$date <= as.Date("2018-05-01"),]
 
-# plot uptake through time during release
-ggplot(modelfit.desoto, aes(x = date, y = U_mgNm2day)) +
-  geom_line() +
-  geom_point(shape = 21, size = 1.5, fill = "white") +
-  theme_classic() + 
-  labs(x = NULL, y = "Nitrate uptake, (mg-N m^-2 day^-1)") + 
-  theme(panel.border = element_rect(color = "black", fill = NA))
-ggsave(filename = "./Plots/DesotoUptake.png", height = 4, width = 5, units = "in")
+# Steve
+ggplot(data = UptakeMetab, aes(x = Date)) +
+  # Desoto
+  geom_point(aes(y = UaNO3_kgNm2day.steve, color = ReleaseStatus)) +
+  geom_line(aes(y = UaNO3_kgNm2day.steve, color = ReleaseStatus)) +
+  # axis and color scales
+  scale_y_continuous(limits = c(0, 700)) +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
+               date_breaks = "2 weeks", date_labels = "%b %e" ) +
+  scale_color_manual(values = c("After" = "#000000", "During" = "#23baaf"),
+                     breaks = c("During", "After"),
+                     name = "Release period") +
+  scale_shape_manual(values = 21) +
+  # axis labels
+  xlab("Date") + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ day^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = c(0.21, 0.83),
+        legend.background = element_rect(color = "black"))
+ggsave(filename = "./Plots/Uptake_time_steve.png", device = "png", 
+       width = 3.75, height = 3.5, units = "in")
 
-ggplot(desoto_data, aes(x = DateTime_UTC, y = Nitrate_mgL)) +
-  geom_point(shape = 21, size = 1, fill = "white") +
-  theme_classic() + ylim(c(0, 1.5)) + 
-  scale_x_datetime(limits = c(ymd_hms("2018-02-09 00:00:00"), ymd_hms("2018-02-20 00:00:00")), 
-                   date_breaks = "2 days", date_labels = "%b %d") +
-  labs(x = NULL, y = "Nitrate (mg-N L^-1)") +
-  theme(panel.border = element_rect(color = "black", fill = NA))
-ggsave(filename = "./Plots/DesotoDiel.png", height = 2.5, width = 3.5, units = "in")
+# Desoto
+ggplot(data = UptakeMetab, aes(x = Date)) +
+  # Desoto
+  geom_point(aes(y = UaNO3_kgNm2day.desoto, color = ReleaseStatus)) +
+  geom_line(aes(y = UaNO3_kgNm2day.desoto, color = ReleaseStatus)) +
+  # axis and color scales
+  scale_y_continuous(limits = c(0, 700)) +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
+               date_breaks = "2 weeks", date_labels = "%b %e" ) +
+  scale_color_manual(values = c("After" = "#000000", "During" = "#F2AD00"),
+                     breaks = c("During", "After"),
+                     name = "Release period") +
+  scale_shape_manual(values = 21) +
+  # axis labels
+  xlab("Date") + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ day^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = c(0.21, 0.83),
+        legend.background = element_rect(color = "black"))
+ggsave(filename = "./Plots/Uptake_time_desoto.png", device = "png", 
+       width = 3.75, height = 3.5, units = "in")
 
-summary(lm(U_mgNm2day~GPP, data = modelfit.desotoDuring))
-summary(lm(U_mgNm2day~GPP, data = modelfit.desotoPost))
-summary(lm(U_mgNm2day~ER, data = modelfit.desotoDuring))
-summary(lm(U_mgNm2day~ER, data = modelfit.desotoPost))
 
-ggplot(modelfit.desotoDuring, aes(x = GPP, y = U_mgNm2day)) +
-  geom_point(shape = 1) +
-  geom_smooth(method = lm, se = TRUE, color = "red") +
-  labs(x = "GPP", y = "Nitrate uptake, (mg-N m^-2 day^-1)") +
-  theme(panel.border = element_rect(color = "black", fill = NA))
-ggsave(filename = "./Plots/Desoto_UvsGPP_duringpump.png", height = 3.5, width = 3.5, units = "in")
+# Notes: seperate these dataframes so that the june data isnt in them
 
-ggplot(modelfit.desotoDuring, aes(x = ER, y = U_mgNm2day)) +
-  geom_point(shape = 1) +
-  geom_smooth(method = lm)
-ggplot(modelfit.desotoPost, aes(x = GPP, y = U_mgNm2day)) +
-  geom_point(shape = 1) +
-  geom_smooth(method = lm)
-ggplot(modelfit.desotoPost, aes(x = ER, y = U_mgNm2day)) +
-  geom_point(shape = 1) +
-  geom_smooth(method = lm)
+# Plotting Nitrate vs uptake
+ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.eric, y = UaNO3_kgNm2day.eric)) +
+  geom_point(aes(color = ReleaseStatus))
+ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.steve, y = UaNO3_kgNm2day.steve)) +
+  geom_point(aes(color = ReleaseStatus))
+ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.desoto, y = UaNO3_kgNm2day.desoto)) +
+  geom_point(aes(color = ReleaseStatus))
+# All
+ggplot(data = UptakeMetab) +
+  geom_point(aes(x = Mean.Nitrate_mgL.eric, y = UaNO3_kgNm2day.eric)) +
+  geom_point(aes(x = Mean.Nitrate_mgL.steve, y = UaNO3_kgNm2day.steve)) +
+  geom_point(aes(x = Mean.Nitrate_mgL.desoto, y = UaNO3_kgNm2day.desoto))
 
-summary(lm(U_mgNm2day~GPP, data = modelfit.desoto))
-summary(lm(U_mgNm2day~ER, data = modelfit.desoto))
+# Plotting GPP vs uptake
+ggplot(data = UptakeMetab) +
+  geom_point(aes(x = GPP.eric, y = UaNO3_kgNm2day.eric))
+ggplot(data = UptakeMetab) +
+  geom_point(aes(x = GPP.steve, y = UaNO3_kgNm2day.steve))
+ggplot(data = UptakeMetab) +
+  geom_point(aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto))
 
-ggplot(modelfit.desoto, aes(x = GPP, y = U_mgNm2day)) +
-  geom_point(shape = 1) +
-  geom_smooth(method = lm)
-ggplot(modelfit.desoto, aes(x = ER, y = U_mgNm2day)) +
-  geom_point(shape = 1) +
-  geom_smooth(method = lm)
 ```
 
 ```{r dailyavg}

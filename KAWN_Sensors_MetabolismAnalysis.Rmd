@@ -26,7 +26,7 @@ library(tidyr)
 ```
 
 ```{r metabolism.load}
-loadfromfile <- FALSE # if loadfromfile TRUE, load metabolsim model from saved RData file
+loadfromfile <- TRUE # if loadfromfile TRUE, load metabolsim model from saved RData file
 
 if (loadfromfile) {
   modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
@@ -188,8 +188,6 @@ ggplot(modelfit.desoto$predictions, aes(x = date)) +
 ggsave("./Plots/MetabPlot_Desoto.png",height = 2.5, width = 7, units = "in")
 ```
 
-
-
 ```{r NEP.plot}
 # plot NEP results
 #
@@ -218,74 +216,3 @@ NEP_plotter <- function(NEP_dataframe, legend_pos){
     theme_classic() + theme(legend.position = legend_pos)
 }
 ```
-
-```{r stream.metab.eric}
-# NEP plot
-NEPplot.eric <- 
-  NEP_plotter(NEP.eric, legend_pos = "top") +
-  labs(tag = "B")
-
-# arrange plots
-lay <- rbind(c(1,1,1,2))
-ericGrob <- arrangeGrob(eric.metabplot, NEPplot.eric, layout_matrix = lay)
-
-# save plot to folder
-ggsave("./StreamMetabolismModels/MetabPlot_Eric.png", ericGrob,
-       height = 3, width = 12, units = "in")
-```
-
-```{r stream.metab.steve}
-# plot predictions
-steve.metabplot <- 
-  ggplot(data = modelfit.steve$predictions, aes(x = date)) +
-    geom_line(aes(y = GPP, color = "GPP")) +
-    geom_line(aes(y = ER, color = "ER")) +
-    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
-    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
-    #geom_rect(aes(xmin = perryLakeRelease.start, xmax = perryLakeRelease.end,
-                  #ymin = -15, ymax = 15), fill = "white") +
-    geom_line(aes(y = 0), linetype = "dashed", color = "grey") +
-    labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)"), tag = "C") +
-    ylim(c(-20,20)) +
-    scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-06-01")), 
-                 date_breaks = "2 weeks", date_labels = "%e %b") +
-    scale_color_discrete(name = NULL) + 
-    scale_fill_discrete(name = "95% CI", labels = NULL) + 
-    theme_classic() + theme(legend.position = "top")
-
-# NEP plot
-NEPplot.steve <- 
-  NEP_plotter(NEP.steve, legend_pos = "top") +
-  labs(tag = "D")
-
-# arrange plots
-steveGrob <- arrangeGrob(steve.metabplot, NEPplot.steve, layout_matrix = lay)
-
-# save plot to folder
-ggsave("./StreamMetabolismModels/MetabPlot_Steve.png", steveGrob,
-       height = 3, width = 12, units = "in")
-```
-
-```{r streammetab.desoto}
-# NEP plot
-NEPplot.desoto <- 
-  NEP_plotter(NEP.desoto, legend_pos = "top") +
-  labs(tag = "F")
-
-# arrange plots
-desotoGrob <- arrangeGrob(desoto.metabplot, NEPplot.desoto, layout_matrix = lay)
-
-# save plot to folder
-ggsave("./StreamMetabolismModels/MetabPlot_Desoto.png", desotoGrob, 
-       height = 3, width = 12, units = "in")
-```
-
-```{r metab_arrange}
-# arrange all of the metabolism plots
-allGrob <- grid.arrange(ericGrob, steveGrob, desotoGrob)
-
-# save the big plot
-ggsave("./StreamMetabolismModels/MetabPlot.png", allGrob,
-       height = 8, width = 11, units = "in")
-```
-
