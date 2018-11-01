@@ -1,14 +1,6 @@
-# Ignore history files
-.Rhistory
-
-# Ignore RData files
-*.RData
-
-# Ignore Word files, powerpoint files, excel files, zip files
-*.docx
-*.pptx
-*.xlsx
-*.zip
+# Ignore history and RData files
+*.Rhistory
+.RData
 
 # Ignore Rmd default cache directory
 /cache/
@@ -18,13 +10,31 @@
 *.knit.md
 *.tmp
 
-# Ignore large .RData script output files (script is still reproducable without this folder)
-/Outputs/*.RData
+# Ignore Word files, powerpoint files, excel files
+*.docx
+*.pptx
+*.xlsx
 
-# Ignore NEON files folder containing giant .csv files (script is still reproducable without this folder, run DataCleanup to generate)
+# Ignore NEON files folder containing giant .csv files 
+# (script is still reproducable without this folder, run DataCleanup to generate)
 /Data/NEONfiles/
 
-# Ignore folder of sensor data files that are uploaded to the streamPULSE server (script is still reproducable without this folder)
-/Data/SensorData_StreamPULSE_Uploaded/
+# Ignore StreamPULSE_DownloadedFrom metadata files and zip
+# file of streampulse sensor data
+# (script is still reproducable without these files,
+# access metadata through data.streampulse.org if needed
+/Data/SensorData_StreamPULSE_DownloadedFrom/.txt
+/Data/SensorData_StreamPULSE_DownloadedFrom/*.zip
 
+# Ignore folder of sensor data files that are uploaded to the streamPULSE server 
+# (script is still reproducable without this folder)
+/Data/SensorData_StreamPULSE_UploadedTo/
+
+# Ignore large .RData script output files 
+# (script is still reproducable without this folder)
+/Outputs/*.RData
+
+# Ignore any output zip files, created for sharing purposes 
+# (script is still reproducable without them)
+/Outputs/*.zip
 
