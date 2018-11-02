@@ -167,9 +167,6 @@ eric_uptake_Eqn1 <- HC_Eqn1(eric_uptake)
 steve_uptake_Eqn1 <- HC_Eqn1(steve_uptake)
 desoto_uptake_Eqn1 <- HC_Eqn1(desoto_uptake)
 
-# Save output as CSV
-write.csv(desoto_uptake, file = "./Outputs/NitrateUptake_Desoto.csv", row.names = FALSE)
-
 # Plot
 ggplot(data = desoto_uptake_Eqn1, aes(DateTime_CST, UaNO3_mgNm2s)) +
   geom_line() +
@@ -307,6 +304,7 @@ NitrateUptake$ReleaseStatus <- "During"
 NitrateUptake$ReleaseStatus[NitrateUptake$Date >= ymd("2018-04-01")] <- "After"
 
 # Save dataframe
+write.csv(NitrateUptake, file = "./Outputs/NitrateUptakeResults.csv", row.names = FALSE)
 ```
 
 ```{r JoinUptakeMetab}
@@ -337,7 +335,7 @@ names(Metabolism)[names(Metabolism) == "date"] <- "Date"
 UptakeMetab <- dplyr::full_join(NitrateUptake, Metabolism, by = "Date")
 ```
 
-```{r uptakePlot}
+```{r uptake.timePlot}
 # Plotting nitrate uptake versus time
 # Nitrate uptake calculated using 
 # Heffernan and cohen 2010, Eqn. 2
@@ -349,13 +347,30 @@ UptakeMetab <- dplyr::full_join(NitrateUptake, Metabolism, by = "Date")
 ggplot(data = UptakeMetab, aes(x = Date)) +
   # Discharge (Eric)
   geom_point(aes(y = UaNO3_kgNm2day.eric, color = "Discharge")) +
-  geom_line(aes(y = UaNO3_kgNm2day.eric, color = "Discharge")) +
+  geom_smooth(data = subset(UptakeMetab, ReleaseStatus == "During"), 
+              aes(y = UaNO3_kgNm2day.eric, color = "Discharge"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_smooth(data = subset(UptakeMetab, ReleaseStatus == "After"), 
+              aes(y = UaNO3_kgNm2day.eric, color = "Discharge"), 
+              formula = y~x, method = "lm", se = FALSE) +
   # Downstream (Steve)
   geom_point(aes(y = UaNO3_kgNm2day.steve, color = "Downstream")) +
-  geom_line(aes(y = UaNO3_kgNm2day.steve, color = "Downstream")) +
+  geom_smooth(data = subset(UptakeMetab, ReleaseStatus == "During"), 
+              aes(y = UaNO3_kgNm2day.steve, color = "Downstream"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_smooth(data = subset(UptakeMetab, ReleaseStatus == "After"), 
+              aes(y = UaNO3_kgNm2day.steve, color = "Downstream"), 
+              formula = y~x, method = "lm", se = FALSE) +
   # Desoto
   geom_point(aes(y = UaNO3_kgNm2day.desoto, color = "Desoto")) +
-  geom_line(aes(y = UaNO3_kgNm2day.desoto, color = "Desoto")) +
+  geom_smooth(data = subset(UptakeMetab, ReleaseStatus == "During"), 
+              aes(y = UaNO3_kgNm2day.desoto, color = "Desoto"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_smooth(data = subset(UptakeMetab, ReleaseStatus == "After"), 
+              aes(y = UaNO3_kgNm2day.desoto, color = "Desoto"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  # Vertical line at 1-Apr-18
+  geom_vline(aes(xintercept = as_date("2018-04-01")), linetype = 2) +
   # axis and color scales
   scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
                date_breaks = "2 weeks", date_labels = "%b %e" ) + 
@@ -370,85 +385,96 @@ ggplot(data = UptakeMetab, aes(x = Date)) +
   # plot theme
   theme_classic() +
   theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = c(0.1, 0.79),
+        legend.position = c(0.15, 0.79),
         legend.background = element_rect(color = "black"))
-
-# Comparing during and post-release
-# Eric
-ggplot(data = UptakeMetab, aes(x = Date)) +
-  # Desoto
-  geom_point(aes(y = UaNO3_kgNm2day.eric, color = ReleaseStatus)) +
-  geom_line(aes(y = UaNO3_kgNm2day.eric, color = ReleaseStatus)) +
-  # axis and color scales
-  #scale_y_continuous(limits = c(0, 500)) +
+#
+# Save plot
+ggsave("./Plots/Uptake_time_singleaxis.png",
+       height = 4, width = 6, units = "in")
+#
+#
+# Version 2:
+# Plots of sites seperated by an axis break
+#
+# Eric, with linear model for during and after pumping
+plot_eric.lm <- 
+  ggplot(data = UptakeMetab, aes(x = Date)) +
+  # Discharge (Eric)
+  geom_smooth(data = subset(UptakeMetab, ReleaseStatus == "During"), 
+              aes(y = UaNO3_kgNm2day.eric, color = "Discharge"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_smooth(data = subset(UptakeMetab, ReleaseStatus == "After"), 
+              aes(y = UaNO3_kgNm2day.eric, color = "Discharge"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_point(aes(y = UaNO3_kgNm2day.eric, color = "Discharge")) +
+  # Horizontal line at 1 April, pump shutoff date
+  geom_vline(aes(xintercept = as_date("2018-04-01")), linetype = 2) +
+  # Axis scales
+  scale_y_continuous(limits = c(-50, 6000)) +
   scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
-               date_breaks = "2 weeks", date_labels = "%b %e" ) +
-  scale_color_manual(values = c("After" = "#000000", "During" = "#FF0000"),
-                     breaks = c("During", "After"),
-                     name = "Release period") +
-  scale_shape_manual(values = 21) +
+               date_breaks = "2 weeks", labels = NULL) + 
+  # Color scales
+  scale_color_manual(values = c("Upstream" = "#000000", "Discharge" = "#FF0000", 
+                                 "Downstream" = "#23baaf", "Desoto" = "#F2AD00"),
+                     limits = c("Discharge", "Downstream", "Desoto"),
+                     name = "Site") +
   # axis labels
-  xlab("Date") + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ day^{-1} * ")")) +
+  xlab(NULL) + 
+  ylab(NULL) +
   # plot theme
   theme_classic() +
   theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = c(0.21, 0.83),
+        legend.position = c(0.15, 0.72),
         legend.background = element_rect(color = "black"))
-ggsave(filename = "./Plots/Uptake_time_eric.png", device = "png", 
-       width = 3.75, height = 3.5, units = "in")
-
-
-# Steve
-ggplot(data = UptakeMetab, aes(x = Date)) +
+#
+# Steve and desoto, with linear model for during and after pumping
+plot_steve.desoto.lm <- 
+  ggplot(data = UptakeMetab, aes(x = Date)) +
+  # Downstream (Steve)
+  geom_smooth(data = subset(UptakeMetab, ReleaseStatus == "During"), 
+              aes(y = UaNO3_kgNm2day.steve, color = "Downstream"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_smooth(data = subset(UptakeMetab, ReleaseStatus == "After"), 
+              aes(y = UaNO3_kgNm2day.steve, color = "Downstream"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_point(aes(y = UaNO3_kgNm2day.steve, color = "Downstream")) +
   # Desoto
-  geom_point(aes(y = UaNO3_kgNm2day.steve, color = ReleaseStatus)) +
-  geom_line(aes(y = UaNO3_kgNm2day.steve, color = ReleaseStatus)) +
+  geom_smooth(data = subset(UptakeMetab, ReleaseStatus == "During"), 
+              aes(y = UaNO3_kgNm2day.desoto, color = "Desoto"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_smooth(data = subset(UptakeMetab, ReleaseStatus == "After"), 
+              aes(y = UaNO3_kgNm2day.desoto, color = "Desoto"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_point(aes(y = UaNO3_kgNm2day.desoto, color = "Desoto")) +
+  geom_vline(aes(xintercept = as_date("2018-04-01")), linetype = 2) +
   # axis and color scales
-  scale_y_continuous(limits = c(0, 700)) +
+  scale_y_continuous(limits = c(-100, 500)) +
   scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
-               date_breaks = "2 weeks", date_labels = "%b %e" ) +
-  scale_color_manual(values = c("After" = "#000000", "During" = "#23baaf"),
-                     breaks = c("During", "After"),
-                     name = "Release period") +
-  scale_shape_manual(values = 21) +
+               date_breaks = "2 weeks", date_labels = "%b %e" ) + 
+  scale_color_manual(values = c("Upstream" = "#000000", "Discharge" = "#FF0000", 
+                                 "Downstream" = "#23baaf", "Desoto" = "#F2AD00"),
+                     breaks = c("Upstream", "Discharge", "Downstream", "Desoto"),
+                     name = "Site") +
   # axis labels
   xlab("Date") + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ day^{-1} * ")")) +
+  ylab(NULL) +
   # plot theme
   theme_classic() +
   theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = c(0.21, 0.83),
-        legend.background = element_rect(color = "black"))
-ggsave(filename = "./Plots/Uptake_time_steve.png", device = "png", 
-       width = 3.75, height = 3.5, units = "in")
+        legend.position = "none")
 
-# Desoto
-ggplot(data = UptakeMetab, aes(x = Date)) +
-  # Desoto
-  geom_point(aes(y = UaNO3_kgNm2day.desoto, color = ReleaseStatus)) +
-  geom_line(aes(y = UaNO3_kgNm2day.desoto, color = ReleaseStatus)) +
-  # axis and color scales
-  scale_y_continuous(limits = c(0, 700)) +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
-               date_breaks = "2 weeks", date_labels = "%b %e" ) +
-  scale_color_manual(values = c("After" = "#000000", "During" = "#F2AD00"),
-                     breaks = c("During", "After"),
-                     name = "Release period") +
-  scale_shape_manual(values = 21) +
-  # axis labels
-  xlab("Date") + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ day^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = c(0.21, 0.83),
-        legend.background = element_rect(color = "black"))
-ggsave(filename = "./Plots/Uptake_time_desoto.png", device = "png", 
-       width = 3.75, height = 3.5, units = "in")
+yaxis <- textGrob(label = expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ day^{-1} * ")"),
+                  rot = 90)
+Plot.uptake_time <- grid.arrange(plot_eric.lm, 
+                                 plot_steve.desoto.lm, 
+                                 left = yaxis)
+ggsave("./Plots/Uptake_time.png", Plot.uptake_time, 
+       height = 5, width = 6, units = "in")
 
-
-# Notes: seperate these dataframes so that the june data isnt in them
+# For updating the mass balance plots....
+#scale_shape_manual(values = c("After" = 21, "During" = 19),
+#                     breaks = c("During", "After"),
+#                     name = "Release period")
 
 # Plotting Nitrate vs uptake
 ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.eric, y = UaNO3_kgNm2day.eric)) +
@@ -462,16 +488,179 @@ ggplot(data = UptakeMetab) +
   geom_point(aes(x = Mean.Nitrate_mgL.eric, y = UaNO3_kgNm2day.eric)) +
   geom_point(aes(x = Mean.Nitrate_mgL.steve, y = UaNO3_kgNm2day.steve)) +
   geom_point(aes(x = Mean.Nitrate_mgL.desoto, y = UaNO3_kgNm2day.desoto))
-
-# Plotting GPP vs uptake
-ggplot(data = UptakeMetab) +
-  geom_point(aes(x = GPP.eric, y = UaNO3_kgNm2day.eric))
-ggplot(data = UptakeMetab) +
-  geom_point(aes(x = GPP.steve, y = UaNO3_kgNm2day.steve))
-ggplot(data = UptakeMetab) +
-  geom_point(aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto))
-
 ```
+
+```{r uptake.supply}
+# Note! these aren't equivalent units. follow the scaling calculation in convivo et al
+
+# Merge uptake calculations with nitrate load calculations
+# nitrate load:
+# uptake: NitrateUptake
+
+# Load N balance data
+NitrateLoad <- read.csv("./Outputs/NMassBalance.csv")
+# Format date correctly
+NitrateLoad$date <- lubridate::ymd(NitrateLoad$date)
+names(NitrateLoad)[names(NitrateLoad) == "date"] <- "Date"
+# Merge NitrateUptake and NitrateLoad by date
+NSupplyDemand <- dplyr::full_join(NitrateUptake, NitrateLoad, by = "Date")
+
+# eric
+ggplot(data = NSupplyDemand, aes(x = Date)) +
+  geom_col(aes(y = -UaNO3_kgNm2day.eric, color = "Uptake")) +
+  geom_col(aes(y = (NitrateLoad.eric_kgNday), color = "Supply")) +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
+               date_breaks = "2 weeks", date_labels = "%b %e" )
+# Desoto
+ggplot(data = NSupplyDemand, aes(x = Date)) +
+  geom_col(aes(y = NitrateLoad.desoto_kgNday, fill = "Supply")) +
+  geom_col(aes(y = -UaNO3_kgNm2day.desoto, fill = "Uptake")) +
+  #geom_col(aes(y = NitrateLoad.desoto_kgNday/UaNO3_kgNm2day.desoto)) +
+  #scale_y_continuous(limits = c(0, 150)) +
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
+               date_breaks = "2 weeks", date_labels = "%b %e" )
+```
+
+```{r uptake.metabPlot}
+# Plotting metabolism vs calculated uptake
+# Not seeing any strong patterns here, which 
+# may say that nitrification processes (which
+# arent accounted for in the uptake calc) have an 
+# important affect on metab
+#
+# GPP vs uptake
+# All sites
+ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
+  geom_point(aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = "Discharge")) +
+  geom_point(aes(x = GPP.steve, y = UaNO3_kgNm2day.steve, color = "Downstream")) +
+  geom_point(aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto, color = "Desoto")) +
+  xlab(expression("GPP (g "*O[2] ~ m^{-2} ~ d^{-1} * ")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ d^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none")
+
+ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
+  geom_point(aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto, color = ReleaseStatus)) +
+  geom_point(aes(x = GPP.steve, y = UaNO3_kgNm2day.steve, color = ReleaseStatus)) +
+  geom_point(aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = ReleaseStatus)) +
+  #geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              #ReleaseStatus == "During"), 
+              #aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = "During"), 
+              #formula = y~x, method = "lm", se = FALSE) +
+  #geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              #ReleaseStatus == "After"), 
+              #aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = "After"), 
+              #formula = y~x, method = "lm", se = FALSE) +
+  xlab(expression("GPP (g "*O[2] ~ m^{-2} ~ d^{-1} * ")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ d^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none")
+
+
+# Eric, broken up by release status
+ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
+  geom_point(aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = ReleaseStatus)) +
+  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              ReleaseStatus == "During"), 
+              aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = "During"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              ReleaseStatus == "After"), 
+              aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = "After"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  xlab(expression("GPP (g "*O[2] ~ m^{-2} ~ d^{-1} * ")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ d^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none")
+
+# Steve, broken up by release status
+ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
+  geom_point(aes(x = GPP.steve, y = UaNO3_kgNm2day.steve, color = ReleaseStatus)) +
+  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              ReleaseStatus == "During"), 
+              aes(x = GPP.steve, y = UaNO3_kgNm2day.steve, color = "During"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              ReleaseStatus == "After"), 
+              aes(x = GPP.steve, y = UaNO3_kgNm2day.steve, color = "After"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  xlab(expression("GPP (g "*O[2] ~ m^{-2} ~ d^{-1} * ")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ d^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none")
+
+# Desoto, broken up by release status
+ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
+  geom_point(aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto, color = ReleaseStatus)) +
+  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              ReleaseStatus == "During"), 
+              aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto, color = "During"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              ReleaseStatus == "After"), 
+              aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto, color = "After"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  xlab(expression("GPP (g "*O[2] ~ m^{-2} ~ d^{-1} * ")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ d^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none")
+
+# ER vs uptake
+# All sites
+ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
+  geom_point(aes(x = ER.eric, y = UaNO3_kgNm2day.eric, color = "Discharge")) +
+  geom_point(aes(x = ER.steve, y = UaNO3_kgNm2day.steve, color = "Downstream")) +
+  geom_point(aes(x = ER.desoto, y = UaNO3_kgNm2day.desoto, color = "Desoto"))
+
+# Eric, broken up by release status
+ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
+  geom_point(aes(x = ER.eric, y = UaNO3_kgNm2day.eric, color = ReleaseStatus)) +
+  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              ReleaseStatus == "During"), 
+              aes(x = ER.eric, y = UaNO3_kgNm2day.eric, color = "During"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              ReleaseStatus == "After"), 
+              aes(x = ER.eric, y = UaNO3_kgNm2day.eric, color = "After"), 
+              formula = y~x, method = "lm", se = FALSE)
+
+# Steve, broken up by release status
+ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
+  geom_point(aes(x = ER.steve, y = UaNO3_kgNm2day.steve, color = ReleaseStatus)) +
+  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              ReleaseStatus == "During"), 
+              aes(x = ER.steve, y = UaNO3_kgNm2day.steve, color = "During"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              ReleaseStatus == "After"), 
+              aes(x = ER.steve, y = UaNO3_kgNm2day.steve, color = "After"), 
+              formula = y~x, method = "lm", se = FALSE)
+
+# Desoto, broken up by release status
+ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
+  geom_point(aes(x = ER.desoto, y = UaNO3_kgNm2day.desoto, color = ReleaseStatus)) +
+  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              ReleaseStatus == "During"), 
+              aes(x = ER.desoto, y = UaNO3_kgNm2day.desoto, color = "During"), 
+              formula = y~x, method = "lm", se = FALSE) +
+  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
+                              ReleaseStatus == "After"), 
+              aes(x = ER.desoto, y = UaNO3_kgNm2day.desoto, color = "After"), 
+              formula = y~x, method = "lm", se = FALSE)
+```
+
+
+
 
 ```{r dailyavg}
 # calculates a dataframe of daily average values of sensor data, merges with metabolism dataframe, and returns merged dataframe
