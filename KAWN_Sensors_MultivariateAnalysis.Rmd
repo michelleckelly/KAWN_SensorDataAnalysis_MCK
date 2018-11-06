@@ -463,7 +463,7 @@ plot_steve.desoto.lm <-
   theme(panel.border = element_rect(color = "black", fill = NA),
         legend.position = "none")
 
-yaxis <- textGrob(label = expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ day^{-1} * ")"),
+yaxis <- textGrob(label = expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")"),
                   rot = 90)
 Plot.uptake_time <- grid.arrange(plot_eric.lm, 
                                  plot_steve.desoto.lm, 
@@ -485,9 +485,50 @@ ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.desoto, y = UaNO3_kgNm2day.d
   geom_point(aes(color = ReleaseStatus))
 # All
 ggplot(data = UptakeMetab) +
-  geom_point(aes(x = Mean.Nitrate_mgL.eric, y = UaNO3_kgNm2day.eric)) +
-  geom_point(aes(x = Mean.Nitrate_mgL.steve, y = UaNO3_kgNm2day.steve)) +
-  geom_point(aes(x = Mean.Nitrate_mgL.desoto, y = UaNO3_kgNm2day.desoto))
+  geom_point(aes(x = Mean.Nitrate_mgL.eric, y = UaNO3_kgNm2day.eric), shape = 21) +
+  geom_point(aes(x = Mean.Nitrate_mgL.steve, y = UaNO3_kgNm2day.steve), shape = 21) +
+  geom_point(aes(x = Mean.Nitrate_mgL.desoto, y = UaNO3_kgNm2day.desoto), shape = 21) +
+  # axis labels
+  xlab(expression(NO[3]^{"-"} ~~ "(mg-N" ~ L^{-1} *")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none")
+ggsave("./Plots/Uptake_NO3.png", 
+       height = 3.5, width = 4, units = "in")
+
+# Plotting GPP vs uptake
+# All
+ggplot(data = UptakeMetab) +
+  geom_point(aes(x = GPP.eric, y = UaNO3_kgNm2day.eric), shape = 21) +
+  geom_point(aes(x = GPP.steve, y = UaNO3_kgNm2day.steve), shape = 21) +
+  geom_point(aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto), shape = 21) +
+  # axis labels
+  xlab(expression(GPP ~~ "(g " * O[2] ~ m^{-2} ~ day^{-1} *")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none")
+ggsave("./Plots/Uptake_GPP.png", 
+       height = 3.5, width = 4, units = "in")
+# Plotting ER vs uptake
+# All
+ggplot(data = UptakeMetab) +
+  geom_point(aes(x = ER.eric, y = UaNO3_kgNm2day.eric), shape = 21) +
+  geom_point(aes(x = ER.steve, y = UaNO3_kgNm2day.steve), shape = 21) +
+  geom_point(aes(x = ER.desoto, y = UaNO3_kgNm2day.desoto), shape = 21) +
+  # axis labels
+  xlab(expression(ER ~~ "(g " * O[2] ~ m^{-2} ~ day^{-1} *")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none")
+ggsave("./Plots/Uptake_ER.png", 
+       height = 3.5, width = 4, units = "in")
+
 ```
 
 ```{r uptake.supply}
