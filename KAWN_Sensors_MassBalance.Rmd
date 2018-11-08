@@ -36,11 +36,16 @@ if(loadfromfile == FALSE){
 # Caption: Average daily nitrate concentration at Upstream (color)
 # Discharge, Downstream, and Desoto monitoring sites. Dates span 
 # from 1 Feb 2018 to 1 May 2018
+massBal$Nitrate.bowersock_mgNL == 0
+
 
 ggplot(data = massBal, aes(x = date)) +
   # Upstream (Bowersock)
   geom_line(aes(y = Nitrate.bowersock_mgNL, color = "Upstream")) +
   geom_point(aes(y = Nitrate.bowersock_mgNL, color = "Upstream")) +
+  # Bowersock: BDL designation
+  geom_point(data = massBal[massBal$Nitrate.bowersock_mgNL < 0.1,],
+             aes(y = Nitrate.bowersock_mgNL), shape = 21, fill = "white") +
   # Discharge (Eric)
   geom_line(aes(y = Nitrate.eric_mgNL, color = "Discharge")) +
   geom_point(aes(y = Nitrate.eric_mgNL, color = "Discharge")) +
@@ -81,6 +86,9 @@ ggplot(data = massBal, aes(x = date)) +
   # Upstream (Bowersock)
   geom_line(aes(y = NitrateLoad.bowersock_kgNday, color = "Upstream")) +
   geom_point(aes(y = NitrateLoad.bowersock_kgNday, color = "Upstream")) +
+  # Bowersock: BDL designation
+  geom_point(data = massBal[massBal$Nitrate.bowersock_mgNL < 0.1,],
+             aes(y = NitrateLoad.bowersock_kgNday), shape = 21, fill = "white") +
   # Discharge (Eric)
   geom_line(aes(y = NitrateLoad.eric_kgNday, color = "Discharge")) +
   geom_point(aes(y = NitrateLoad.eric_kgNday, color = "Discharge")) +
@@ -88,8 +96,8 @@ ggplot(data = massBal, aes(x = date)) +
   geom_line(aes(y = NitrateLoad.desoto_kgNday, color = "Desoto")) +
   geom_point(aes(y = NitrateLoad.desoto_kgNday, color = "Desoto")) +
   # Downstream (Steve)
-  geom_line(aes(y = Nitrate.steve_mgNL, color = "Downstream")) +
-  geom_point(aes(y = Nitrate.steve_mgNL, color = "Downstream")) +
+  geom_line(aes(y = NitrateLoad.steve_kgNday, color = "Downstream")) +
+  geom_point(aes(y = NitrateLoad.steve_kgNday, color = "Downstream")) +
   #
   # axis and color scales
   scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
