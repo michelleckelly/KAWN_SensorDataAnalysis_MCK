@@ -205,479 +205,253 @@ ggsave("./Plots/Uptake_time.png", Plot.uptake_time,
        height = 5, width = 6, units = "in")
 ```
 
-```{r uptake.nitrate}
+```{r uptake.GPP}
 # Reshape data so you can use a facet operator
 # Add a designator for site name
 # Add a designator for ReleaseStatus (done)
+# Order ReleaseStatus as a factor 
 
+# Select data prior to May 1
+UptakeMetab <- subset(UptakeMetab, Date <= ymd("2018-05-01"))
 
+# Change factor levels of ReleaseStatus designation 
+# so they plot in the correct order
+UptakeMetab$ReleaseStatus <- factor(UptakeMetab$ReleaseStatus, 
+                                    levels = c("During", "After"), ordered = T)
 
+# GPP vs Uptake
+Plot.uptake_GPP <- grid.arrange(
+  # Eric: GPP vs Uptake
+  ggplot(data = UptakeMetab, aes(x = GPP.eric, y = UaNO3_kgNm2day.eric)) +
+    geom_point(shape = 21, fill = "white") +
+    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
+                color = "#FF0000") +
+    facet_grid(.~ReleaseStatus) +
+    # axis labels
+    xlab(NULL) + 
+    ylab(NULL) +
+    # plot theme
+    theme_classic() +
+    theme(panel.border = element_rect(color = "black", fill = NA),
+          legend.position = "none", strip.background = element_blank(),
+          strip.text.x = element_blank()),
+  
+  # Steve: GPP vs Uptake
+  ggplot(data = UptakeMetab, aes(x = GPP.steve, y = UaNO3_kgNm2day.steve)) +
+    geom_point(shape = 21, fill = "white") +
+    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
+                color = "#23baaf") +
+    facet_grid(.~ReleaseStatus) +
+    # axis labels
+    xlab(NULL) + 
+    ylab(NULL) +
+    # plot theme
+    theme_classic() +
+    theme(panel.border = element_rect(color = "black", fill = NA),
+          legend.position = "none", strip.background = element_blank(),
+          strip.text.x = element_blank()),
+  
+  # Desoto: GPP vs Uptake
+  ggplot(data = UptakeMetab, aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto)) +
+    geom_point(shape = 21, fill = "white") +
+    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
+                color = "#F2AD00") +
+    facet_grid(.~ReleaseStatus) +
+    # axis labels
+    xlab(NULL) + 
+    ylab(NULL) +
+    # plot theme
+    theme_classic() +
+    theme(panel.border = element_rect(color = "black", fill = NA),
+          legend.position = "none", strip.background = element_blank(),
+          strip.text.x = element_blank()),
+  
+  left = yaxis,
+  bottom = textGrob(label = expression("GPP (g "*O[2] ~ m^{-2} ~ d^{-1} * ")"))
+)
+# Save plot
+ggsave("./Plots/Uptake_GPP.png", Plot.uptake_GPP,
+       height = 5.5, width = 4.25, units = "in")
 ```
 
-
-```{r uptake.timePlot}
-# Plotting Nitrate vs uptake
-ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.eric, y = UaNO3_kgNm2day.eric)) +
-  geom_point(aes(color = ReleaseStatus))
-ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.steve, y = UaNO3_kgNm2day.steve)) +
-  geom_point(aes(color = ReleaseStatus))
-ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.desoto, y = UaNO3_kgNm2day.desoto)) +
-  geom_point(aes(color = ReleaseStatus))
-# All
-ggplot(data = UptakeMetab) +
-  geom_point(aes(x = Mean.Nitrate_mgL.eric, y = UaNO3_kgNm2day.eric), shape = 21) +
-  geom_point(aes(x = Mean.Nitrate_mgL.steve, y = UaNO3_kgNm2day.steve), shape = 21) +
-  geom_point(aes(x = Mean.Nitrate_mgL.desoto, y = UaNO3_kgNm2day.desoto), shape = 21) +
-  # axis labels
-  xlab(expression(NO[3]^{"-"} ~~ "(mg-N" ~ L^{-1} *")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
-ggsave("./Plots/Uptake_NO3.png", 
-       height = 3.5, width = 4, units = "in")
-
-# Plotting GPP vs uptake
-# All
-ggplot(data = UptakeMetab) +
-  geom_point(aes(x = GPP.eric, y = UaNO3_kgNm2day.eric), shape = 21) +
-  geom_point(aes(x = GPP.steve, y = UaNO3_kgNm2day.steve), shape = 21) +
-  geom_point(aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto), shape = 21) +
-  # axis labels
-  xlab(expression(GPP ~~ "(g " * O[2] ~ m^{-2} ~ day^{-1} *")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
-ggsave("./Plots/Uptake_GPP.png", 
-       height = 3.5, width = 4, units = "in")
-# Plotting ER vs uptake
-# All
-ggplot(data = UptakeMetab) +
-  geom_point(aes(x = ER.eric, y = UaNO3_kgNm2day.eric), shape = 21) +
-  geom_point(aes(x = ER.steve, y = UaNO3_kgNm2day.steve), shape = 21) +
-  geom_point(aes(x = ER.desoto, y = UaNO3_kgNm2day.desoto), shape = 21) +
-  # axis labels
-  xlab(expression(ER ~~ "(g " * O[2] ~ m^{-2} ~ day^{-1} *")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
-ggsave("./Plots/Uptake_ER.png", 
-       height = 3.5, width = 4, units = "in")
-
+```{r uptake.ER}
+# ER vs Uptake
+Plot.uptake_ER <- grid.arrange(
+  # Eric: GPP vs Uptake
+  ggplot(data = UptakeMetab, aes(x = ER.eric, y = UaNO3_kgNm2day.eric)) +
+    geom_point(shape = 21, fill = "white") +
+    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
+                color = "#FF0000") +
+    facet_grid(.~ReleaseStatus) +
+    # axis labels
+    xlab(NULL) + 
+    ylab(NULL) +
+    # plot theme
+    theme_classic() +
+    theme(panel.border = element_rect(color = "black", fill = NA),
+          legend.position = "none", strip.background = element_blank(),
+          strip.text.x = element_blank()),
+  
+  # Steve: GPP vs Uptake
+  ggplot(data = UptakeMetab, aes(x = ER.steve, y = UaNO3_kgNm2day.steve)) +
+    geom_point(shape = 21, fill = "white") +
+    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
+                color = "#23baaf") +
+    facet_grid(.~ReleaseStatus) +
+    # axis labels
+    xlab(NULL) + 
+    ylab(NULL) +
+    # plot theme
+    theme_classic() +
+    theme(panel.border = element_rect(color = "black", fill = NA),
+          legend.position = "none", strip.background = element_blank(),
+          strip.text.x = element_blank()),
+  
+  # Desoto: GPP vs Uptake
+  ggplot(data = UptakeMetab, aes(x = ER.desoto, y = UaNO3_kgNm2day.desoto)) +
+    geom_point(shape = 21, fill = "white") +
+    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
+                color = "#F2AD00") +
+    facet_grid(.~ReleaseStatus) +
+    # axis labels
+    xlab(NULL) + 
+    ylab(NULL) +
+    # plot theme
+    theme_classic() +
+    theme(panel.border = element_rect(color = "black", fill = NA),
+          legend.position = "none", strip.background = element_blank(),
+          strip.text.x = element_blank()),
+  
+  left = yaxis,
+  bottom = textGrob(label = expression("ER (g "*O[2] ~ m^{-2} ~ d^{-1} * ")"))
+)
+# Save plot
+ggsave("./Plots/Uptake_ER.png", Plot.uptake_ER,
+       height = 5.5, width = 4.25, units = "in")
 ```
 
-```{r uptake.supply}
-# Note! these aren't equivalent units. follow the scaling calculation in convivo et al
-
-# Merge uptake calculations with nitrate load calculations
-# nitrate load:
-# uptake: NitrateUptake
-
-# Load N balance data
-NitrateLoad <- read.csv("./Outputs/NMassBalance.csv")
-# Format date correctly
-NitrateLoad$date <- lubridate::ymd(NitrateLoad$date)
-names(NitrateLoad)[names(NitrateLoad) == "date"] <- "Date"
-# Merge NitrateUptake and NitrateLoad by date
-NSupplyDemand <- dplyr::full_join(NitrateUptake, NitrateLoad, by = "Date")
-
-# eric
-ggplot(data = NSupplyDemand, aes(x = Date)) +
-  geom_col(aes(y = -UaNO3_kgNm2day.eric, color = "Uptake")) +
-  geom_col(aes(y = (NitrateLoad.eric_kgNday), color = "Supply")) +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
-               date_breaks = "2 weeks", date_labels = "%b %e" )
-# Desoto
-ggplot(data = NSupplyDemand, aes(x = Date)) +
-  geom_col(aes(y = NitrateLoad.desoto_kgNday, fill = "Supply")) +
-  geom_col(aes(y = -UaNO3_kgNm2day.desoto, fill = "Uptake")) +
-  #geom_col(aes(y = NitrateLoad.desoto_kgNday/UaNO3_kgNm2day.desoto)) +
-  #scale_y_continuous(limits = c(0, 150)) +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
-               date_breaks = "2 weeks", date_labels = "%b %e" )
+```{r uptake.Nitrate}
+# ER vs Uptake
+Plot.uptake_Nitrate <- grid.arrange(
+  # Eric: GPP vs Uptake
+  ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.eric, y = UaNO3_kgNm2day.eric)) +
+    geom_point(shape = 21, fill = "white") +
+    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
+                color = "#FF0000") +
+    facet_grid(.~ReleaseStatus) +
+    # axis labels
+    xlab(NULL) + 
+    ylab(NULL) +
+    # plot theme
+    theme_classic() +
+    theme(panel.border = element_rect(color = "black", fill = NA),
+          legend.position = "none", strip.background = element_blank(),
+          strip.text.x = element_blank()),
+  
+  # Steve: GPP vs Uptake
+  ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.steve, y = UaNO3_kgNm2day.steve)) +
+    geom_point(shape = 21, fill = "white") +
+    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
+                color = "#23baaf") +
+    facet_grid(.~ReleaseStatus) +
+    # axis labels
+    xlab(NULL) + 
+    ylab(NULL) +
+    # plot theme
+    theme_classic() +
+    theme(panel.border = element_rect(color = "black", fill = NA),
+          legend.position = "none", strip.background = element_blank(),
+          strip.text.x = element_blank()),
+  
+  # Desoto: GPP vs Uptake
+  ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.desoto, y = UaNO3_kgNm2day.desoto)) +
+    geom_point(shape = 21, fill = "white") +
+    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
+                color = "#F2AD00") +
+    facet_grid(.~ReleaseStatus) +
+    # axis labels
+    xlab(NULL) + 
+    ylab(NULL) +
+    # plot theme
+    theme_classic() +
+    theme(panel.border = element_rect(color = "black", fill = NA),
+          legend.position = "none", strip.background = element_blank(),
+          strip.text.x = element_blank()),
+  
+  left = yaxis,
+  bottom = textGrob(label = expression(NO[3]^{"-"} ~~ "(mg-N" ~ L^{-1} *")"))
+)
+# Save plot
+ggsave("./Plots/Uptake_Nitrate.png", Plot.uptake_Nitrate,
+       height = 5.5, width = 4.25, units = "in")
 ```
 
-```{r uptake.metabPlot}
-# Plotting metabolism vs calculated uptake
-# Not seeing any strong patterns here, which 
-# may say that nitrification processes (which
-# arent accounted for in the uptake calc) have an 
-# important affect on metab
-#
-# GPP vs uptake
-# All sites
-ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
-  geom_point(aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = "Discharge")) +
-  geom_point(aes(x = GPP.steve, y = UaNO3_kgNm2day.steve, color = "Downstream")) +
-  geom_point(aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto, color = "Desoto")) +
-  xlab(expression("GPP (g "*O[2] ~ m^{-2} ~ d^{-1} * ")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ d^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
+```{r pearsonCorrelations}
+# Compute linear correlations between uptake and predictors
 
-ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
-  geom_point(aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto, color = ReleaseStatus)) +
-  geom_point(aes(x = GPP.steve, y = UaNO3_kgNm2day.steve, color = ReleaseStatus)) +
-  geom_point(aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = ReleaseStatus)) +
-  #geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              #ReleaseStatus == "During"), 
-              #aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = "During"), 
-              #formula = y~x, method = "lm", se = FALSE) +
-  #geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              #ReleaseStatus == "After"), 
-              #aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = "After"), 
-              #formula = y~x, method = "lm", se = FALSE) +
-  xlab(expression("GPP (g "*O[2] ~ m^{-2} ~ d^{-1} * ")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ d^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
+# Uptake and GPP
+# During pumping
+cor(x = subset(UptakeMetab, ReleaseStatus == "During")$GPP.eric, 
+    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_kgNm2day.eric, 
+    use = "pairwise.complete.obs", method = "pearson")
+cor(x = subset(UptakeMetab, ReleaseStatus == "During")$GPP.steve, 
+    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_kgNm2day.steve, 
+    use = "pairwise.complete.obs", method = "pearson")
+cor(x = subset(UptakeMetab, ReleaseStatus == "During")$GPP.desoto, 
+    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_kgNm2day.desoto, 
+    use = "pairwise.complete.obs", method = "pearson")
+# After pumping
+cor(x = subset(UptakeMetab, ReleaseStatus == "After")$GPP.eric, 
+    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_kgNm2day.eric, 
+    use = "pairwise.complete.obs", method = "pearson")
+cor(x = subset(UptakeMetab, ReleaseStatus == "After")$GPP.steve, 
+    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_kgNm2day.steve, 
+    use = "pairwise.complete.obs", method = "pearson")
+cor(x = subset(UptakeMetab, ReleaseStatus == "After")$GPP.desoto, 
+    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_kgNm2day.desoto, 
+    use = "pairwise.complete.obs", method = "pearson")
 
+# Uptake and ER
+# During pumping
+cor(x = subset(UptakeMetab, ReleaseStatus == "During")$ER.eric, 
+    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_kgNm2day.eric, 
+    use = "pairwise.complete.obs", method = "pearson")
+cor(x = subset(UptakeMetab, ReleaseStatus == "During")$ER.steve, 
+    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_kgNm2day.steve, 
+    use = "pairwise.complete.obs", method = "pearson")
+cor(x = subset(UptakeMetab, ReleaseStatus == "During")$ER.desoto, 
+    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_kgNm2day.desoto, 
+    use = "pairwise.complete.obs", method = "pearson")
+# After pumping
+cor(x = subset(UptakeMetab, ReleaseStatus == "After")$ER.eric, 
+    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_kgNm2day.eric, 
+    use = "pairwise.complete.obs", method = "pearson")
+cor(x = subset(UptakeMetab, ReleaseStatus == "After")$ER.steve, 
+    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_kgNm2day.steve, 
+    use = "pairwise.complete.obs", method = "pearson")
+cor(x = subset(UptakeMetab, ReleaseStatus == "After")$ER.desoto, 
+    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_kgNm2day.desoto, 
+    use = "pairwise.complete.obs", method = "pearson")
 
-# Eric, broken up by release status
-ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
-  geom_point(aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = ReleaseStatus)) +
-  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              ReleaseStatus == "During"), 
-              aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = "During"), 
-              formula = y~x, method = "lm", se = FALSE) +
-  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              ReleaseStatus == "After"), 
-              aes(x = GPP.eric, y = UaNO3_kgNm2day.eric, color = "After"), 
-              formula = y~x, method = "lm", se = FALSE) +
-  xlab(expression("GPP (g "*O[2] ~ m^{-2} ~ d^{-1} * ")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ d^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
-
-# Steve, broken up by release status
-ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
-  geom_point(aes(x = GPP.steve, y = UaNO3_kgNm2day.steve, color = ReleaseStatus)) +
-  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              ReleaseStatus == "During"), 
-              aes(x = GPP.steve, y = UaNO3_kgNm2day.steve, color = "During"), 
-              formula = y~x, method = "lm", se = FALSE) +
-  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              ReleaseStatus == "After"), 
-              aes(x = GPP.steve, y = UaNO3_kgNm2day.steve, color = "After"), 
-              formula = y~x, method = "lm", se = FALSE) +
-  xlab(expression("GPP (g "*O[2] ~ m^{-2} ~ d^{-1} * ")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ d^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
-
-# Desoto, broken up by release status
-ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
-  geom_point(aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto, color = ReleaseStatus)) +
-  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              ReleaseStatus == "During"), 
-              aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto, color = "During"), 
-              formula = y~x, method = "lm", se = FALSE) +
-  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              ReleaseStatus == "After"), 
-              aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto, color = "After"), 
-              formula = y~x, method = "lm", se = FALSE) +
-  xlab(expression("GPP (g "*O[2] ~ m^{-2} ~ d^{-1} * ")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{2} ~ d^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
-
-# ER vs uptake
-# All sites
-ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
-  geom_point(aes(x = ER.eric, y = UaNO3_kgNm2day.eric, color = "Discharge")) +
-  geom_point(aes(x = ER.steve, y = UaNO3_kgNm2day.steve, color = "Downstream")) +
-  geom_point(aes(x = ER.desoto, y = UaNO3_kgNm2day.desoto, color = "Desoto"))
-
-# Eric, broken up by release status
-ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
-  geom_point(aes(x = ER.eric, y = UaNO3_kgNm2day.eric, color = ReleaseStatus)) +
-  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              ReleaseStatus == "During"), 
-              aes(x = ER.eric, y = UaNO3_kgNm2day.eric, color = "During"), 
-              formula = y~x, method = "lm", se = FALSE) +
-  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              ReleaseStatus == "After"), 
-              aes(x = ER.eric, y = UaNO3_kgNm2day.eric, color = "After"), 
-              formula = y~x, method = "lm", se = FALSE)
-
-# Steve, broken up by release status
-ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
-  geom_point(aes(x = ER.steve, y = UaNO3_kgNm2day.steve, color = ReleaseStatus)) +
-  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              ReleaseStatus == "During"), 
-              aes(x = ER.steve, y = UaNO3_kgNm2day.steve, color = "During"), 
-              formula = y~x, method = "lm", se = FALSE) +
-  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              ReleaseStatus == "After"), 
-              aes(x = ER.steve, y = UaNO3_kgNm2day.steve, color = "After"), 
-              formula = y~x, method = "lm", se = FALSE)
-
-# Desoto, broken up by release status
-ggplot(data = subset(UptakeMetab, Date <= ymd("2018-05-01"))) +
-  geom_point(aes(x = ER.desoto, y = UaNO3_kgNm2day.desoto, color = ReleaseStatus)) +
-  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              ReleaseStatus == "During"), 
-              aes(x = ER.desoto, y = UaNO3_kgNm2day.desoto, color = "During"), 
-              formula = y~x, method = "lm", se = FALSE) +
-  geom_smooth(data = subset(UptakeMetab, Date <= ymd("2018-05-01") & 
-                              ReleaseStatus == "After"), 
-              aes(x = ER.desoto, y = UaNO3_kgNm2day.desoto, color = "After"), 
-              formula = y~x, method = "lm", se = FALSE)
-```
-
-
-
-
-```{r dailyavg}
-# calculates a dataframe of daily average values of sensor data, merges with metabolism dataframe, and returns merged dataframe
-#
-# metabolism_model  dataframe returned by metabolism modeling
-# sensor_data       dataframe from StreamPULSE API
-#
-
-dailyavg <- function(sensor_data, metabolism_model){
-  # if sensor data has a "bad data" flag, set value to NA
-  sensor_data$value[sensor_data$flagtype %in% c("Bad Data")] <- NA
-  
-  # reshape sensor data from long format to wide format
-  sensor_data <- tidyr::spread(sensor_data, key = variable, value = value)
-  
-  # sort data file and find daily averages
-  sensor_data <- sensor_data %>%
-    dplyr::group_by(date = lubridate::date(DateTime_UTC)) %>% 
-    dplyr::summarise(Q_m3s.mean = mean(Discharge_m3s, na.rm = TRUE),
-              DO_mgL.mean = mean(DO_mgL, na.rm = TRUE),
-              DOsat_pct.mean = mean(DOsat_pct, na.rm = TRUE),
-              Light_PAR.mean = mean(Light_PAR, na.rm = TRUE),
-              WaterTemp_C.mean = mean(WaterTemp_C, na.rm = TRUE),
-              Nitrate_mgL.mean = mean(Nitrate_mgL, na.rm = TRUE))
-  
-  # make sure metabolism model date column is correct class
-  metabolism_model$date <- lubridate::date(metabolism_model$date)
-  
-  # combine with metabolism model predictions
-  dailyavgs <- merge(sensor_data, metabolism_model, by = "date")
-  return(dailyavgs)
-}
-
-eric.dailyavg <- dailyavg(eric_data, modelfit.eric)
-steve.dailyavg <- dailyavg(steve_data, modelfit.steve)
-desoto.dailyavg <- dailyavg(desoto_data, modelfit.desoto)
-
-#eric_data <- NULL
-#modelfit.eric <- NULL
-#steve_data <- NULL
-#modelfit.steve <- NULL
-#desoto_data <- NULL
-#modelfit.desoto <- NULL
-```
-
-```{r correlations}
-# Linear (pearson) correlation coefficient
-# bounded from -1 to 1, near-zero values signify a weak correlation
-# compute correlations for data that has a same-day complete pair
-cormatrixr <- function(dailyavgs){
-  cormatrix.site <- cor(dailyavgs[2:13], use = "pairwise.complete.obs")
-  # set the diagonal (x to x pairs) of the correlation matrix to 0
-  diag(cormatrix.site) <- NA
-  cormatrix.site[lower.tri(cormatrix.site)] <- NA
-  return(cormatrix.site)
-}
-
-cormatrix.eric <- cormatrixr(eric.dailyavg)
-cormatrix.steve <- cormatrixr(steve.dailyavg)
-cormatrix.desoto <- cormatrixr(desoto.dailyavg)
-
-# should the data be described with a linear model?
-# check out the residuals of the data
-# if the dataset matches the regression model, the resisual plot
-# should be a normally distributed cloud of points
-# centered on 0
-
-plot(resid(lm(GPP~Q_m3s.mean, data = eric.dailyavg)))
-names(eric.dailyavg)
-
-model <- 
-lm(GPP ~ Q_m3s.mean + DO_mgL.mean + DOsat_pct.mean + Light_PAR.mean + 
-     WaterTemp_C.mean + Nitrate_mgL.mean, data = eric.dailyavg)
-model <- 
-lm(GPP ~ Q_m3s.mean, data = eric.dailyavg)
-plot(na.omit(eric.dailyavg$Q_m3s.mean), resid(model),
-     ylab = "Residuals", xlab = "Q", main = "GPP, Eric")
-abline(h=0)
-xlabel
-
-length(na.omit(eric.dailyavg$Q_m3s.mean))
-length(resid(model))
-
-model <- 
-  lm(ER ~ Q_m3s.mean + DO_mgL.mean + DOsat_pct.mean + Light_PAR.mean + 
-     WaterTemp_C.mean + Nitrate_mgL.mean, data = eric.dailyavg)
-
-library(psych)
-pairs.panels(eric.dailyavg[c(2:8,11)], method = "pearson", 
-             cex = 3, ellipses = FALSE, rug = FALSE, hist.col = "white")
-
-pairs.panels(steve.dailyavg[c(2:8,11)], method = "pearson", 
-             cex = 3, ellipses = FALSE, rug = FALSE, hist.col = "white")
-
-pairs.panels(desoto.dailyavg[c(2:8,11)], method = "pearson", 
-             cex = 3, ellipses = FALSE, rug = FALSE, hist.col = "white")
-corPlot(desoto.dailyavg[c(2:8,11)])
-```
-
-```{r PCA}
-# principal components analysis (PCA)
-# first, standardize the data (because the variances are different)
-# standardization scales the data, sets variance to 1 and mean to 0
-
-# select variables we want in the PCA
-PCAr <- function(dailyavgs){
-  # remove date column, data code columns
-  selects <- c("Q_m3s.mean", "DO_mgL.mean", "DOsat_pct.mean", 
-               "Light_PAR.mean", "WaterTemp_C.mean", 
-               "Nitrate_mgL.mean", "GPP", "ER")
-  dailyavgs <- dailyavgs[names(dailyavgs) %in% selects]
-  # scale data, sets mean to 0 and variance to 1
-  data.scaled <- as.data.frame(scale(dailyavgs))
-  # perform PCA on scaled data
-  prcomp(na.omit(data.scaled))
-}
-
-eric.PCA <- PCAr(eric.dailyavg)
-steve.PCA <- PCAr(steve.dailyavg)
-desoto.PCA <- PCAr(desoto.dailyavg)
-
-# kaiser's criterion
-# only retain principal components for which the 
-# variance is above 1 (if the data is standardized)
-eric.PCA$sdev^2 # keep the first 3 principal components
-steve.PCA$sdev^2 # keep the first 3 principal components
-desoto.PCA$sdev^2 # keep the first 2 principal components
-
-# check out the loadings of the principal components
-eric.PCA$rotation[,1:2]
-```
-
-```{r plotting}
-# axis labels -----------------------------------------------
-# y axis label for GPP
-ylabel_GPP <- textGrob(expression(paste("GPP (g ", ~O[2]~m^-2~d^-1, ")")),
-                       rot = 90, gp = gpar(cex = 0.9))
-# y axis label for ER
-ylabel_ER <- textGrob(expression(paste("ER (g ", ~O[2]~m^-2~d^-1, ")")),
-                      rot = 90, gp = gpar(cex = 0.9))
-# x axis label for Q
-xlabelQ <- textGrob(expression(paste("Q (", m^3, " ", s^-1, ")")), 
-                    gp = gpar(cex = 0.9))
-# DO mg/L
-xlabelDO_mgL <- textGrob(expression(paste("DO (mg ", L^-1, ")")), 
-                         gp = gpar(cex = 0.9))
-# mean light
-xlabelPAR <- textGrob(expression(paste("PAR")), 
-                      gp = gpar(cex = 0.9))
-# water temp
-xlabelWaterTemp_C <- textGrob(expression(paste("T (", degree~C, ")")), 
-                              gp = gpar(cex = 0.9))
-# NO3
-xlabelNO3_mgL <- textGrob(expression(paste("NO3 ( mg", L^-1, ")")), 
-                          gp = gpar(cex = 0.9))
-
-# Plotting -----------------------------------------------------------
-# xvariable       character string, what you want to graph on the xaxis
-# xlabel          textGrob for xaxis label
-
-dailyavg_plots <- function(xvariable, xlabel){
-  # lm fit
-  fit <- summary(lm(eric.dailyavg[["GPP"]] ~ eric.dailyavg[[xvariable]]))
-  # plot
-  a <- ggplot(data = eric.dailyavg, aes_string(x = xvariable, y = "GPP")) +
-    geom_point(shape = 1) +
-    theme_classic() + labs(x = NULL, y = NULL, tag = "A") +
-    annotate("text", vjust = 1, x = 0.5*(max(eric.dailyavg[[xvariable]], na.rm=T) +
-                                           min(eric.dailyavg[[xvariable]], na.rm=T)), 
-             y = max(na.omit(eric.dailyavg$GPP)),
-             label = paste0("p = ", signif(fit$coefficients[2,4], 2)))
-  
-  fit <- summary(lm(steve.dailyavg[["GPP"]] ~ steve.dailyavg[[xvariable]]))
-  b <- ggplot(data = steve.dailyavg, aes_string(x = xvariable, y = "GPP")) +
-    geom_point(shape = 1) +
-    theme_classic() + labs(x = NULL, y = NULL, tag = "B") +
-    annotate("text", vjust = 1, x = 0.5*(max(steve.dailyavg[[xvariable]], na.rm=T) +
-                                           min(steve.dailyavg[[xvariable]], na.rm=T)), 
-             y = max(na.omit(steve.dailyavg$GPP)),
-             label = paste0("p = ", signif(fit$coefficients[2,4], 2)))
-  
-  fit <- summary(lm(desoto.dailyavg[["GPP"]] ~ desoto.dailyavg[[xvariable]]))
-  c <- ggplot(data = desoto.dailyavg, aes_string(x = xvariable, y = "GPP")) +
-    geom_point(shape = 1) +
-    theme_classic() + labs(x = NULL, y = NULL, tag = "C") +
-    annotate("text", vjust = 1, x = 0.5*(max(desoto.dailyavg[[xvariable]], na.rm=T) +
-                                           min(desoto.dailyavg[[xvariable]], na.rm=T)), 
-             y = max(na.omit(desoto.dailyavg$GPP)),
-             label = paste0("p = ", signif(fit$coefficients[2,4], 2)))
-  
-  fit <- summary(lm(eric.dailyavg[["ER"]] ~ eric.dailyavg[[xvariable]]))
-  d <- ggplot(data = eric.dailyavg, aes_string(x = xvariable, y = "ER")) +
-    geom_point(shape = 1) + 
-    theme_classic() + labs(x = NULL, y = NULL, tag = "D") +
-    annotate("text", vjust = 1, x = 0.5*(max(eric.dailyavg[[xvariable]], na.rm=T) +
-                                           min(eric.dailyavg[[xvariable]], na.rm=T)), 
-             y = max(na.omit(eric.dailyavg$ER)),
-             label = paste0("p = ", signif(fit$coefficients[2,4], 2)))
-  
-  fit <- summary(lm(steve.dailyavg[["ER"]] ~ steve.dailyavg[[xvariable]]))
-  e <- ggplot(data = steve.dailyavg, aes_string(x = xvariable, y = "ER")) +
-    geom_point(shape = 1) +
-    theme_classic() + labs(x = NULL, y = NULL, tag = "E") +
-    annotate("text", vjust = 1, x = 0.5*(max(steve.dailyavg[[xvariable]], na.rm=T) +
-                                           min(steve.dailyavg[[xvariable]], na.rm=T)), 
-             y = max(na.omit(steve.dailyavg$ER)),
-             label = paste0("p = ", signif(fit$coefficients[2,4], 2)))
-  
-  fit <- summary(lm(desoto.dailyavg[["ER"]] ~ desoto.dailyavg[[xvariable]]))
-  f <- ggplot(data = desoto.dailyavg, aes_string(x = xvariable, y = "ER")) +
-    geom_point(shape = 1) +
-    theme_classic() + labs(x = NULL, y = NULL, tag = "F") +
-    annotate("text", vjust = 1, x = 0.5*(max(desoto.dailyavg[[xvariable]], na.rm=T) +
-                                           min(desoto.dailyavg[[xvariable]], na.rm=T)), 
-             y = max(na.omit(desoto.dailyavg$ER)),
-             label = paste0("p = ", signif(fit$coefficients[2,4], 2)))
-  
-  gridExtra::grid.arrange(arrangeGrob(a, b, c, left = ylabel_GPP, ncol = 3, nrow = 1),
-                          arrangeGrob(d, e, f, left = ylabel_ER, ncol = 3, nrow = 1),
-                          bottom = xlabel)
-}
-
-# [A] [D] eric
-# [B] [E] steve
-# [C] [F] desoto
-
-p1 <- dailyavg_plots(xvariable = "Q_m3s.mean", xlabel = xlabelQ)
-p2 <- dailyavg_plots(xvariable = "DO_mgL.mean", xlabel = xlabelDO_mgL)
-p3 <- dailyavg_plots(xvariable = "Light_PAR.mean", xlabel = xlabelPAR)
-p4 <- dailyavg_plots(xvariable = "WaterTemp_C.mean", xlabel = xlabelWaterTemp_C)
-p5 <- dailyavg_plots(xvariable = "Nitrate_mgL.mean", xlabel = xlabelNO3_mgL)
-
-# save to file
-ggsave(file = "./DailyAverageData/Q_GPPERplot.png", p1, width = 6, height = 4)
-ggsave(file = "./DailyAverageData/DO_GPPERplot.png", p2, width = 6, height = 4)
-ggsave(file = "./DailyAverageData/PAR_GPPERplot.png", p3, width = 6, height = 4)
-ggsave(file = "./DailyAverageData/Temp_GPPERplot.png", p4, width = 6, height = 4)
-ggsave(file = "./DailyAverageData/N_GPPERplot.png", p5, width = 6, height = 4)
+# Uptake and NO3
+# During pumping
+cor(x = subset(UptakeMetab, ReleaseStatus == "During")$Mean.Nitrate_mgL.eric, 
+    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_kgNm2day.eric, 
+    use = "pairwise.complete.obs", method = "pearson")
+cor(x = subset(UptakeMetab, ReleaseStatus == "During")$Mean.Nitrate_mgL.steve, 
+    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_kgNm2day.steve, 
+    use = "pairwise.complete.obs", method = "pearson")
+cor(x = subset(UptakeMetab, ReleaseStatus == "During")$Mean.Nitrate_mgL.desoto, 
+    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_kgNm2day.desoto, 
+    use = "pairwise.complete.obs", method = "pearson")
+# After pumping
+cor(x = subset(UptakeMetab, ReleaseStatus == "After")$Mean.Nitrate_mgL.eric, 
+    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_kgNm2day.eric, 
+    use = "pairwise.complete.obs", method = "pearson")
+cor(x = subset(UptakeMetab, ReleaseStatus == "After")$Mean.Nitrate_mgL.steve, 
+    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_kgNm2day.steve, 
+    use = "pairwise.complete.obs", method = "pearson")
+cor(x = subset(UptakeMetab, ReleaseStatus == "After")$Mean.Nitrate_mgL.desoto, 
+    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_kgNm2day.desoto, 
+    use = "pairwise.complete.obs", method = "pearson")
 ```
