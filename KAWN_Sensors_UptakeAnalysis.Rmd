@@ -221,7 +221,7 @@ UptakeMetab$ReleaseStatus <- factor(UptakeMetab$ReleaseStatus,
 
 # GPP vs Uptake
 Plot.uptake_GPP <- grid.arrange(
-  # Eric: GPP vs Uptake
+  # Eric
   ggplot(data = UptakeMetab, aes(x = GPP.eric, y = UaNO3_kgNm2day.eric)) +
     geom_point(shape = 21, fill = "white") +
     geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
@@ -236,7 +236,7 @@ Plot.uptake_GPP <- grid.arrange(
           legend.position = "none", strip.background = element_blank(),
           strip.text.x = element_blank()),
   
-  # Steve: GPP vs Uptake
+  # Steve
   ggplot(data = UptakeMetab, aes(x = GPP.steve, y = UaNO3_kgNm2day.steve)) +
     geom_point(shape = 21, fill = "white") +
     geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
@@ -251,7 +251,7 @@ Plot.uptake_GPP <- grid.arrange(
           legend.position = "none", strip.background = element_blank(),
           strip.text.x = element_blank()),
   
-  # Desoto: GPP vs Uptake
+  # Desoto
   ggplot(data = UptakeMetab, aes(x = GPP.desoto, y = UaNO3_kgNm2day.desoto)) +
     geom_point(shape = 21, fill = "white") +
     geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
@@ -277,7 +277,7 @@ ggsave("./Plots/Uptake_GPP.png", Plot.uptake_GPP,
 ```{r uptake.ER}
 # ER vs Uptake
 Plot.uptake_ER <- grid.arrange(
-  # Eric: GPP vs Uptake
+  # Eric
   ggplot(data = UptakeMetab, aes(x = ER.eric, y = UaNO3_kgNm2day.eric)) +
     geom_point(shape = 21, fill = "white") +
     geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
@@ -292,7 +292,7 @@ Plot.uptake_ER <- grid.arrange(
           legend.position = "none", strip.background = element_blank(),
           strip.text.x = element_blank()),
   
-  # Steve: GPP vs Uptake
+  # Steve
   ggplot(data = UptakeMetab, aes(x = ER.steve, y = UaNO3_kgNm2day.steve)) +
     geom_point(shape = 21, fill = "white") +
     geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
@@ -307,7 +307,7 @@ Plot.uptake_ER <- grid.arrange(
           legend.position = "none", strip.background = element_blank(),
           strip.text.x = element_blank()),
   
-  # Desoto: GPP vs Uptake
+  # Desoto
   ggplot(data = UptakeMetab, aes(x = ER.desoto, y = UaNO3_kgNm2day.desoto)) +
     geom_point(shape = 21, fill = "white") +
     geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
@@ -331,9 +331,9 @@ ggsave("./Plots/Uptake_ER.png", Plot.uptake_ER,
 ```
 
 ```{r uptake.Nitrate}
-# ER vs Uptake
+# Nitrate vs Uptake
 Plot.uptake_Nitrate <- grid.arrange(
-  # Eric: GPP vs Uptake
+  # Eric
   ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.eric, y = UaNO3_kgNm2day.eric)) +
     geom_point(shape = 21, fill = "white") +
     geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
@@ -348,7 +348,7 @@ Plot.uptake_Nitrate <- grid.arrange(
           legend.position = "none", strip.background = element_blank(),
           strip.text.x = element_blank()),
   
-  # Steve: GPP vs Uptake
+  # Steve
   ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.steve, y = UaNO3_kgNm2day.steve)) +
     geom_point(shape = 21, fill = "white") +
     geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
@@ -363,7 +363,7 @@ Plot.uptake_Nitrate <- grid.arrange(
           legend.position = "none", strip.background = element_blank(),
           strip.text.x = element_blank()),
   
-  # Desoto: GPP vs Uptake
+  # Desoto
   ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.desoto, y = UaNO3_kgNm2day.desoto)) +
     geom_point(shape = 21, fill = "white") +
     geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
@@ -455,3 +455,66 @@ cor(x = subset(UptakeMetab, ReleaseStatus == "After")$Mean.Nitrate_mgL.desoto,
     y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_kgNm2day.desoto, 
     use = "pairwise.complete.obs", method = "pearson")
 ```
+
+```{r UAGPP}
+# Calculate expected autotrophic assimilation of nitrate
+# based on GPP, as in Rode et al 2016
+# Assumptions:
+#   net autotrophic production is half of gross primary productivity
+#       (ra -> 0.5)
+#   net photosynthetic quotient is 1 (that is, 1 mol O2 produced = 
+#       1 mol C converted from CO2 to organic biomass)
+#   conversion rate of C to N is the same as the molar C:N ratio of 
+#       the periphyton in the system
+#       (using Whiles and Dodds 2002 for this value, site KR3 on the 
+#       Kansas River, which has C:N of about 9 during winter to spring)
+
+ra <- 0.5 # autotrophic production efficiency factor
+N.C <- 1/9 # C:N ratio in Kansas River = 9C:1N
+
+# Equation:
+# GPP [g O2 / (m^2 day)] * [1 mol O2 / 32 g O2] * [1 mol C / 1 mol O2] * 
+#   [1 mol N / 9 mol C ] C:N ratio * [14 g N / 1 mol N] * 
+#   0.5 efficiency factor = Ua-GPP [g N / (m^2 day)]
+
+UptakeMetab$UaGPP_gNm2day.eric <- UptakeMetab$GPP.eric * (1/32) * N.C * 14 * ra
+UptakeMetab$UaGPP_gNm2day.steve <- UptakeMetab$GPP.steve * (1/32) * N.C * 14 * ra
+UptakeMetab$UaGPP_gNm2day.desoto <- UptakeMetab$GPP.desoto * (1/32) * N.C * 14 * ra
+
+# Eric
+ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.eric, y = UaGPP_gNm2day.eric)) +
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
+              color = "#FF0000") +
+  facet_grid(.~ReleaseStatus) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none", strip.background = element_blank(),
+        strip.text.x = element_blank())
+  
+# Steve
+ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.steve, y = UaGPP_gNm2day.steve)) +
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
+              color = "#23baaf") +
+  facet_grid(.~ReleaseStatus) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none", strip.background = element_blank(),
+        strip.text.x = element_blank())
+  
+# Desoto
+ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.desoto, y = UaGPP_gNm2day.desoto)) +
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
+              color = "#F2AD00") +
+  facet_grid(.~ReleaseStatus) +
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none", strip.background = element_blank(),
+        strip.text.x = element_blank())
+```
+
