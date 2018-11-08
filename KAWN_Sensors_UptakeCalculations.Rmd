@@ -20,300 +20,35 @@ library(imputeTS)
 
 ```{r dataload}
 # Load in data that will be used for uptake calculations
-# Note: we're not directly downloading this from the
-# streamPULSE database because that will just return
-# only the data that's useful for metabolism modeling.
-# These CSV files are manually downloaded from the database
+#
+# Load from file: if TRUE, load results from file. If FALSE,
+# re-compile results based on NitrateUptake calculation script
+loadfromfile <- TRUE
 
-# Load in sensor data
-eric_data <- 
-  read.csv("./Data/StreamPULSE_DownloadedFrom/KS_KANSASREASTLAWRENCE_sensorData.csv",
-           header = TRUE)
-steve_data <- 
-  read.csv("./Data/StreamPULSE_DownloadedFrom/KS_KANSASRFALLLEAF_sensorData.csv", 
-           header = TRUE)
-desoto_data <- 
-  read.csv("./Data/StreamPULSE_DownloadedFrom/KS_KANSASR_sensorData.csv", 
-           header = TRUE)
+if (loadfromfile == TRUE){
+  NitrateUptake <- read.csv(file = "./Outputs/NitrateUptakeResults.csv")
+  NitrateUptake$Date <- lubridate::ymd(NitrateUptake$Date)
+}
 
+if (loadfromfile == FALSE){
+  source("KAWN_Compiler_NitrateUptakeCSV.R")
+  NitrateUptake <- read.csv(file = "./Outputs/NitrateUptakeResults.csv")
+  NitrateUptake$Date <- lubridate::ymd(NitrateUptake$Date)
+}
+```
+
+```{r merge_Uptake_Metabolism}
 # Load in metabolism model results
 modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
 modelfit.steve <- readRDS("./Outputs/MetabResults_Steve.RData")
 modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
-```
 
-```{r datasetup}
-# Function to setup the data for uptake calculations
-# Input: Sensor data frame
-# Output: Sensor data frame with added columns for
-#         local time, data flagged "Bad Data" removed
-
-prepper <- function(sensor_data){
-  # Format datetime column correctly
-  sensor_data$DateTime_UTC <- 
-    lubridate::ymd_hms(sensor_data$DateTime_UTC)
-  # Add column for local time
-  sensor_data$DateTime_CST <- 
-    lubridate::with_tz(sensor_data$DateTime_UTC, 
-                       tzone = "America/Chicago")
-  #
-  # Remove data that's been flagged as "Bad Data"
-  sensor_data$value[sensor_data$flagtype %in% c("Bad Data")] <- NA
-  # Remove flagtype and flagcomment columns
-  sensor_data$flagtype <- NULL
-  sensor_data$flagcomment <- NULL
-  # Reshape dataframe from long to wide format
-  sensor_data <- tidyr::spread(sensor_data, 
-                               key = variable, value = value)
-  # Create new dataframe with only data needed for uptake calculation
-  sensor_uptake <- sensor_data[c("DateTime_UTC", "DateTime_CST",
-                                 "Discharge_m3s", "Nitrate_mgL")]
-  #
-  # Extrapolate between missing values?
-  #
-  #
-  # Return new dataframe
-  return(sensor_uptake)
-}
-
-# Run function
-eric_uptake <- prepper(eric_data)
-steve_uptake <- prepper(steve_data)
-desoto_uptake <- prepper(desoto_data)
-```
-
-```{r NO3Uptake.Equation1}
-# Calculate NO3 uptake using the extrapolated diel method 
-# (Heffernan and Cohen 2010, Eqn. 1)
-
-# Input: the dataframe spit out by prepper()
-# Output: Calculated NO3 Uptake
-
-HC_Eqn1 <- function(prepped_df){
-  # Add date index vector
-  # (Based on CST local time)
-  # Extract date into new column
-  prepped_df$date <- 
-    lubridate::date(prepped_df$DateTime_CST)
-  # Count number of days since start
-  for (i in 1:nrow(prepped_df)){
-    prepped_df$day[i] <- 
-      as.numeric(prepped_df$date[i] - prepped_df$date[1])
-  }
-  #
-  # Find maximum nitrate concentration each 
-  # (local time) day
-  prepped_df <- prepped_df %>%
-    dplyr::group_by(date) %>%
-    dplyr::mutate(MaxNitrate = max(Nitrate_mgL, na.rm = TRUE))
-  #
-  # Use a static value for river bed area (m^2)
-  # Average discharge at desoto = 61.3 m3/s
-  # USGS field measuremnents
-  # 2018-03-01    Q = 1410 ft3/s      Channel area = 811 ft2
-  #                 = 39.93 m3/s                   = 75.34 m2
-  # 2018-04-24    Q = 2330 ft3/s      Channel area = 1400 ft2
-  #                 = 65.97 m3/s                   = 130.06 m2
-  # Approximate river bed area as 130 m2 (for now)
-  A_m2 <- 130
-  #
-  # Calculate water velocity [m/s]
-  prepped_df$v_ms <- prepped_df$Discharge_m3s/A_m2
-  # 
-  # Calculate difference betweeen preceeding day's NitrateMax 
-  # and Nitrate at time t
-  prepped_df$DiffNitrate <- NA
-  # Grab the row number of the start of day 1
-  start <- which(prepped_df$day == 1)[1]
-  # Loop from day 1 to end
-  for(i in start:nrow(prepped_df)){
-    # Get previous day: current day - 1
-    prevday <- prepped_df$day[i] - 1
-    # Get MaxNitrate during prevday
-    MaxNitrate.prev <- unique(prepped_df$MaxNitrate[prepped_df$day == prevday])
-    # Get current Nitrate
-    Nitrate <- prepped_df$Nitrate_mgL[i]
-    # Calculate difference
-    prepped_df$DiffNitrate[i] <- MaxNitrate.prev - Nitrate
-    # Iterate loop
-    i <- i + 1
-  }
-  
-  # Sum the differences from t = 0 to t = 24 for each day
-  prepped_df <- prepped_df %>%
-    group_by(day) %>%
-    mutate(SumDiffNitrate = sum(DiffNitrate))
-  # Multiply SumDiff and velocity, and correct for units
-  # Q [m3/s] / A [m2] = v [m/s]
-  # v [m/s] * [NO3] [mg-N/L] = U [m*mg-N / s*L]
-  # U [m*mg-N / s*L] * [1000 L / 1 m3] = U [mg-N / m2*s]
-  prepped_df$UaNO3_mgNm2s <- prepped_df$SumDiffNitrate * prepped_df$v_ms * 1000
-  #
-  # I don't know if this calculation is totally correct. The numbers seem
-  # super high.
-  #
-  # Rename columns
-  names(prepped_df)[names(prepped_df) == "MaxNitrate"] <- "Nitrate_DailyMax_mgNL"
-  names(prepped_df)[names(prepped_df) == "v_ms"] <- "Velocity_ms"
-  names(prepped_df)[names(prepped_df) == "DiffNitrate"] <- "DiffNitrate_mgNL"
-  names(prepped_df)[names(prepped_df) == "SumDiffNitrate"] <- "SumDiffNitrate_mgNL"
-  prepped_df$date <- NULL
-  # Return dataframe
-  return(prepped_df)
-}
-
-# Run function
-eric_uptake_Eqn1 <- HC_Eqn1(eric_uptake)
-steve_uptake_Eqn1 <- HC_Eqn1(steve_uptake)
-desoto_uptake_Eqn1 <- HC_Eqn1(desoto_uptake)
-
-# Plot
-ggplot(data = desoto_uptake_Eqn1, aes(DateTime_CST, UaNO3_mgNm2s)) +
-  geom_line() +
-  geom_point()
-ggplot(data = modelfit.desoto$predictions, aes(date, GPP)) +
-  geom_point()
-```
-
-```{r NO3Uptake.Eqn2}
-# Calculate NO3 uptake using the integrated diel method 
-# (Heffernan and Cohen 2010, Eqn. 2)
-
-# Differences between Eqn. 1 and 2:
-#   - Eqn 2 takes an hourly average of obervations (less
-#     sensitive to variations in Nitrate)
-
-# Input: the dataframe spit out by prepper()
-# Output: Calculated NO3 Uptake
-
-HC_Eqn2 <- function(prepped_df){
-  #
-  # Take an hourly average Nitrate concentration
-  prepped_df <- 
-    prepped_df %>%
-    dplyr::group_by(DateTime_CST = lubridate::floor_date(DateTime_CST, unit = "hour")) %>%
-    dplyr::summarise(Mean.Discharge_m3s = mean(Discharge_m3s),
-                     Mean.Nitrate_mgL = mean(Nitrate_mgL))
-  #
-  # Add date index vector
-  # (Based on CST local time)
-  # Extract date into new column
-  prepped_df$date <- 
-    lubridate::date(prepped_df$DateTime_CST)
-  # Count number of days since start
-  prepped_df$day <- numeric(length = nrow(prepped_df))
-  for (i in 1:nrow(prepped_df)){
-    prepped_df$day[i] <- 
-      as.numeric(prepped_df$date[i] - prepped_df$date[1])
-  }
-  # Get hour of day, as fraction of 24
-  prepped_df$hour <- lubridate::hour(prepped_df$DateTime_CST) / 24
-  #
-  # Find maximum nitrate concentration each 
-  # (local time) day
-  prepped_df <- prepped_df %>%
-    dplyr::group_by(date) %>%
-    dplyr::mutate(MaxNitrate = max(Mean.Nitrate_mgL, na.rm = TRUE))
-  #
-  # Use a static value for river bed area (m^2)
-  # Average discharge at desoto = 61.3 m3/s
-  # USGS field measuremnents
-  # 2018-03-01    Q = 1410 ft3/s      Channel area = 811 ft2
-  #                 = 39.93 m3/s                   = 75.34 m2
-  # 2018-04-24    Q = 2330 ft3/s      Channel area = 1400 ft2
-  #                 = 65.97 m3/s                   = 130.06 m2
-  # Approximate river bed area as 130 m2 (for now)
-  A_m2 <- 130
-  #
-  # Calculate water velocity [m/s]
-  prepped_df$v_ms <- prepped_df$Mean.Discharge_m3s/A_m2
-  # 
-  # Run loop to calculate uptake
-  prepped_df$DiffNitrate_mgL <- NA
-  # Grab the row number of the start of day 1
-  start <- which(prepped_df$day == 1)[1]
-  for (i in start:nrow(prepped_df)){
-    # Get previous day: current day - 1
-    prevday <- prepped_df$day[i] - 1
-    # Get MaxNitrate during prevday
-    MaxNitrate.prev <- unique(prepped_df$MaxNitrate[prepped_df$day == prevday])
-    # Get MaxNitrate during current day
-    MaxNitrate <- unique(prepped_df$MaxNitrate[prepped_df$day == prepped_df$day[i]])
-    # Get Nitrate at current hour
-    Nitrate <- prepped_df$Mean.Nitrate_mgL[i]
-    # Calculate DiffNitrate for each hour
-    prepped_df$DiffNitrate_mgL[i] <- 
-      MaxNitrate.prev * (1 - prepped_df$hour) + 
-      MaxNitrate * (prepped_df$hour) - Nitrate
-  }
-  #
-  # Sum the differences from t = 0 to t = 24 for each day
-  results <- prepped_df %>%
-    group_by(day) %>%
-    summarise(date = date[1],
-              Mean.Discharge_m3s = mean(Mean.Discharge_m3s, na.rm = TRUE),
-              Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE),
-              Mean.v_ms = mean(v_ms, na.rm = TRUE), 
-              SumDiffNitrate = sum(DiffNitrate_mgL))
-  # Multiply SumDiff by velocity
-  # Unit check:
-  # [mg / L] * [m / s] = [mg*m / L*s]
-  # [mg*m / L*s] * 1000 [L / m3] * 86400 [s / day] * 1 [kg] / 10^6 [mg]
-  results$UaNO3_kgNm2day <- 
-    results$SumDiffNitrate * results$Mean.v_ms * 1000 * 86400 / 10^6
-  #
-  # Clean up dataframe
-  names(results)[names(results) == "date"] <- "Date"
-  names(results)[names(results) == "Mean.v_ms"] <- "Mean.velocity_ms"
-  results$SumDiffNitrate <- NULL
-  results$day <- NULL
-  # Return dataframe
-  return(results)
-}
-
-# Execute function
-eric_uptake_Eqn2 <- HC_Eqn2(eric_uptake)
-steve_uptake_Eqn2 <- HC_Eqn2(steve_uptake)
-desoto_uptake_Eqn2 <- HC_Eqn2(desoto_uptake)
-```
-
-```{r uptakeMerge}
-# Merge uptake calculations into one dataframe
-# so things are easier to plot
-# Save merged dataframe
-
-# Join dataframes
-NitrateUptake <- dplyr::full_join(eric_uptake_Eqn2, steve_uptake_Eqn2, 
-                                  by = "Date", suffix = c(".eric", ".steve"))
-NitrateUptake <- dplyr::full_join(NitrateUptake, desoto_uptake_Eqn2, 
-                                  by = "Date")
-# Cleanup
-names(NitrateUptake)[names(NitrateUptake) == "Mean.Discharge_m3s"] <- 
-  "Mean.Discharge_m3s.desoto"
-names(NitrateUptake)[names(NitrateUptake) == "Mean.Nitrate_mgL"] <- 
-  "Mean.Nitrate_mgL.desoto"
-names(NitrateUptake)[names(NitrateUptake) == "Mean.velocity_ms"] <- 
-  "Mean.velocity_ms.desoto"
-names(NitrateUptake)[names(NitrateUptake) == "UaNO3_kgNm2day"] <- 
-  "UaNO3_kgNm2day.desoto"
-
-# Add column to denote during waste release or after
-# During: dates prior to 1 April 2018
-# After: dates post 1 April 2018
-NitrateUptake$ReleaseStatus <- "During"
-NitrateUptake$ReleaseStatus[NitrateUptake$Date >= ymd("2018-04-01")] <- "After"
-
-# Save dataframe
-write.csv(NitrateUptake, file = "./Outputs/NitrateUptakeResults.csv", row.names = FALSE)
-```
-
-```{r JoinUptakeMetab}
-# Join uptake dataframe with metabolism dataframes
+# Compile metabolism results into a single dataframe
 Metabolism <- dplyr::full_join(modelfit.eric$predictions, modelfit.steve$predictions,
                                by = "date", suffix = c(".eric", ".steve"))
 Metabolism <- dplyr::full_join(Metabolism, modelfit.desoto$predictions, by = "date")
 
-# Cleanup
+# Cleanup and rename columns
 Metabolism$msgs.fit.eric <- NULL
 Metabolism$warnings.eric <- NULL
 Metabolism$errors.eric <- NULL
@@ -331,19 +66,14 @@ names(Metabolism)[names(Metabolism) == "ER.lower"] <- "ER.lower.desoto"
 names(Metabolism)[names(Metabolism) == "ER.upper"] <- "ER.upper.desoto"
 names(Metabolism)[names(Metabolism) == "date"] <- "Date"
 
-# Join with uptake dataframe
+# # Join uptake dataframe with metabolism dataframes
 UptakeMetab <- dplyr::full_join(NitrateUptake, Metabolism, by = "Date")
 ```
 
-```{r uptake.timePlot}
-# Plotting nitrate uptake versus time
-# Nitrate uptake calculated using 
-# Heffernan and cohen 2010, Eqn. 2
-#
-# Combined plot of all sites together
-# Difficult to see differences between
-# during pumping and post-pumping
-#
+```{r uptake.time_singlepanel}
+# Plotting nitrate uptake versus time, nitrate uptake 
+# calculated using Heffernan and cohen 2010, Eqn. 2
+
 ggplot(data = UptakeMetab, aes(x = Date)) +
   # Discharge (Eric)
   geom_point(aes(y = UaNO3_kgNm2day.eric, color = "Discharge")) +
@@ -387,16 +117,17 @@ ggplot(data = UptakeMetab, aes(x = Date)) +
   theme(panel.border = element_rect(color = "black", fill = NA),
         legend.position = c(0.15, 0.79),
         legend.background = element_rect(color = "black"))
-#
+
 # Save plot
 ggsave("./Plots/Uptake_time_singleaxis.png",
        height = 4, width = 6, units = "in")
-#
-#
-# Version 2:
-# Plots of sites seperated by an axis break
-#
-# Eric, with linear model for during and after pumping
+```
+
+```{r uptake.time_twopanel}
+# Plotting nitrate uptake versus time, differing
+# axis scales seperated by an axis break
+
+# Eric
 plot_eric.lm <- 
   ggplot(data = UptakeMetab, aes(x = Date)) +
   # Discharge (Eric)
@@ -426,7 +157,7 @@ plot_eric.lm <-
   theme(panel.border = element_rect(color = "black", fill = NA),
         legend.position = c(0.15, 0.72),
         legend.background = element_rect(color = "black"))
-#
+
 # Steve and desoto, with linear model for during and after pumping
 plot_steve.desoto.lm <- 
   ggplot(data = UptakeMetab, aes(x = Date)) +
@@ -463,19 +194,28 @@ plot_steve.desoto.lm <-
   theme(panel.border = element_rect(color = "black", fill = NA),
         legend.position = "none")
 
+# Y-axis label
 yaxis <- textGrob(label = expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")"),
                   rot = 90)
-Plot.uptake_time <- grid.arrange(plot_eric.lm, 
-                                 plot_steve.desoto.lm, 
+# Arrange plots
+Plot.uptake_time <- grid.arrange(plot_eric.lm, plot_steve.desoto.lm, 
                                  left = yaxis)
+# Save plot
 ggsave("./Plots/Uptake_time.png", Plot.uptake_time, 
        height = 5, width = 6, units = "in")
+```
 
-# For updating the mass balance plots....
-#scale_shape_manual(values = c("After" = 21, "During" = 19),
-#                     breaks = c("During", "After"),
-#                     name = "Release period")
+```{r uptake.nitrate}
+# Reshape data so you can use a facet operator
+# Add a designator for site name
+# Add a designator for ReleaseStatus (done)
 
+
+
+```
+
+
+```{r uptake.timePlot}
 # Plotting Nitrate vs uptake
 ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.eric, y = UaNO3_kgNm2day.eric)) +
   geom_point(aes(color = ReleaseStatus))
