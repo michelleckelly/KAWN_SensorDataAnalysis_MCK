@@ -47,10 +47,8 @@ prepper <- function(sensor_data){
   # Create new dataframe with only data needed for uptake calculation
   sensor_uptake <- sensor_data[c("DateTime_UTC", "DateTime_CST",
                                  "Discharge_m3s", "Nitrate_mgL")]
-  #
-  # Extrapolate between missing values?
-  #
-  #
+  # Interpolate gaps in data
+  sensor_data <- imputeTS::na.interpolation(sensor_data)
   # Return new dataframe
   return(sensor_uptake)
 }
@@ -178,8 +176,8 @@ if (UptakeEqn == 2){
       prepped_df %>%
       dplyr::group_by(DateTime_CST = 
                         lubridate::floor_date(DateTime_CST, unit = "hour")) %>%
-      dplyr::summarise(Mean.Discharge_m3s = mean(Discharge_m3s),
-                       Mean.Nitrate_mgL = mean(Nitrate_mgL))
+      dplyr::summarise(Mean.Discharge_m3s = mean(Discharge_m3s, na.rm = TRUE),
+                       Mean.Nitrate_mgL = mean(Nitrate_mgL, na.rm = TRUE))
     #
     # Add date index vector
     # (Based on CST local time)
