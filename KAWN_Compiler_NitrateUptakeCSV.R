@@ -48,7 +48,7 @@ prepper <- function(sensor_data){
   sensor_uptake <- sensor_data[c("DateTime_UTC", "DateTime_CST",
                                  "Discharge_m3s", "Nitrate_mgL")]
   # Interpolate gaps in data
-  sensor_data <- imputeTS::na.interpolation(sensor_data)
+  sensor_uptake <- imputeTS::na.interpolation(sensor_uptake)
   # Return new dataframe
   return(sensor_uptake)
 }
@@ -227,24 +227,24 @@ if (UptakeEqn == 2){
       Nitrate <- prepped_df$Mean.Nitrate_mgL[i]
       # Calculate DiffNitrate for each hour
       prepped_df$DiffNitrate_mgL[i] <- 
-        MaxNitrate.prev * (1 - prepped_df$hour) + 
-        MaxNitrate * (prepped_df$hour) - Nitrate
+        MaxNitrate.prev * (1 - prepped_df$hour[i]) + 
+        MaxNitrate * prepped_df$hour[i] - Nitrate
     }
     #
     # Sum the differences from t = 0 to t = 24 for each day
     results <- prepped_df %>%
-      group_by(day) %>%
-      summarise(date = date[1],
-                Mean.Discharge_m3s = mean(Mean.Discharge_m3s, na.rm = TRUE),
-                Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE),
-                Mean.v_ms = mean(v_ms, na.rm = TRUE), 
-                SumDiffNitrate = sum(DiffNitrate_mgL))
+      dplyr::group_by(day) %>%
+      dplyr::summarise(date = date[1],
+                       Mean.Discharge_m3s = mean(Mean.Discharge_m3s, na.rm = TRUE),
+                       Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE),
+                       Mean.v_ms = mean(v_ms, na.rm = TRUE), 
+                       SumDiffNitrate = sum(DiffNitrate_mgL))
     # Multiply SumDiff by velocity
     # Unit check:
     # [mg / L] * [m / s] = [mg*m / L*s]
-    # [mg*m / L*s] * 1000 [L / m3] * 86400 [s / day] * 1 [kg] / 10^6 [mg]
-    results$UaNO3_kgNm2day <- 
-      results$SumDiffNitrate * results$Mean.v_ms * 1000 * 86400 / 10^6
+    # [mg*m / L*s] * 1000 [L / m3] * 86400 [s / day] * 1 [g] / 1000 [mg]
+    results$UaNO3_gNm2day <- 
+      results$SumDiffNitrate * results$Mean.v_ms * 86400
     #
     # Clean up dataframe
     names(results)[names(results) == "date"] <- "Date"
@@ -280,8 +280,8 @@ names(NitrateUptake)[names(NitrateUptake) == "Mean.Nitrate_mgL"] <-
   "Mean.Nitrate_mgL.desoto"
 names(NitrateUptake)[names(NitrateUptake) == "Mean.velocity_ms"] <- 
   "Mean.velocity_ms.desoto"
-names(NitrateUptake)[names(NitrateUptake) == "UaNO3_kgNm2day"] <- 
-  "UaNO3_kgNm2day.desoto"
+names(NitrateUptake)[names(NitrateUptake) == "UaNO3_gNm2day"] <- 
+  "UaNO3_gNm2day.desoto"
 
 # Add column to denote during waste release or after
 # During: dates prior to 1 April 2018
