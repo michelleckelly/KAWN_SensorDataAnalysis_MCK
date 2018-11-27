@@ -1,5 +1,5 @@
 # Michelle C. Kelly
-# Last modified: 8 November 2018
+# Last modified: 27 November 2018
 #
 # This is a script that will calculate autotrophic
 # nitrate uptake (Ua-NO3) based on Heffernan and 
@@ -70,31 +70,40 @@ desoto_uptake <- prepper(desoto_data)
 UptakeEqn <- 2
 ##################################################
 
-
+#prepped_df <- eric_uptake
 #### Calculate uptake using Equation 1 ###########
 if (UptakeEqn == 1) {
-  #
+
   # Function to calculate uptake
   # Input: the dataframe spit out by prepper()
   # Output: Calculated NO3 Uptake
+  
   HC_Eqn1 <- function(prepped_df){
-    # Add date index vector
-    # (Based on CST local time)
-    # Extract date into new column
-    prepped_df$date <- 
-      lubridate::date(prepped_df$DateTime_CST)
+    
+    # Take hourly average nitrate concentration
+    avg_df <- 
+      prepped_df %>%
+      dplyr::group_by(date = lubridate::date(DateTime_CST),
+                      hour = lubridate::hour(DateTime_CST)) %>%
+      dplyr::summarise(DateTime_CST = unique(floor_date(DateTime_CST, 
+                                                        unit = "hours")),
+                       Mean.Discharge_m3s = mean(Discharge_m3s),
+                       Mean.Nitrate_mgL = mean(Nitrate_mgL))
+    
     # Count number of days since start
-    for (i in 1:nrow(prepped_df)){
-      prepped_df$day[i] <- 
-        as.numeric(prepped_df$date[i] - prepped_df$date[1])
+    avg_df$day <- numeric(nrow(avg_df))
+    
+    for (i in 1:nrow(avg_df)){
+      avg_df$day[i] <- 
+        as.numeric(avg_df$date[i] - avg_df$date[1])
     }
-    #
-    # Find maximum nitrate concentration each 
-    # (local time) day
-    prepped_df <- prepped_df %>%
+    
+    # Find maximum nitrate concentration each (local time) day
+    avg_df <- 
+      avg_df %>%
       dplyr::group_by(date) %>%
-      dplyr::mutate(MaxNitrate = max(Nitrate_mgL, na.rm = TRUE))
-    #
+      dplyr::mutate(MaxNitrate = max(Mean.Nitrate_mgL))
+    
     # Use a static value for river bed area (m^2)
     # Average discharge at desoto = 61.3 m3/s
     # USGS field measuremnents
@@ -104,55 +113,98 @@ if (UptakeEqn == 1) {
     #                 = 65.97 m3/s                   = 130.06 m2
     # Approximate river bed area as 130 m2 (for now)
     A_m2 <- 130
-    #
+    
     # Calculate water velocity [m/s]
-    prepped_df$v_ms <- prepped_df$Discharge_m3s/A_m2
-    # 
-    # Calculate difference betweeen preceeding day's NitrateMax 
-    # and Nitrate at time t
-    prepped_df$DiffNitrate <- NA
+    avg_df$v_ms <- avg_df$Mean.Discharge_m3s / A_m2
+    
+    # Calculate difference betweeen preceeding day's NitrateMax and Nitrate at 
+    # time t
+    avg_df$DiffNitrate <- numeric(nrow(avg_df))
+    
     # Grab the row number of the start of day 1
-    start <- which(prepped_df$day == 1)[1]
+    start <- which(avg_df$day == 1)[1]
+    
     # Loop from day 1 to end
-    for(i in start:nrow(prepped_df)){
+    for(i in start:nrow(avg_df)){
       # Get previous day: current day - 1
-      prevday <- prepped_df$day[i] - 1
+      prevday <- avg_df$day[i] - 1
       # Get MaxNitrate during prevday
-      MaxNitrate.prev <- unique(prepped_df$MaxNitrate[prepped_df$day == prevday])
+      MaxNitrate.prev <- unique(avg_df$MaxNitrate[avg_df$day == prevday])
       # Get current Nitrate
-      Nitrate <- prepped_df$Nitrate_mgL[i]
-      # Calculate difference
-      prepped_df$DiffNitrate[i] <- MaxNitrate.prev - Nitrate
+      Nitrate <- avg_df$Mean.Nitrate_mgL[i]
+      # Calculate absolute value of difference
+      avg_df$DiffNitrate[i] <- MaxNitrate.prev - Nitrate
       # Iterate loop
       i <- i + 1
     }
     
     # Sum the differences from t = 0 to t = 24 for each day
-    prepped_df <- prepped_df %>%
+    avg_df <- avg_df %>%
       group_by(day) %>%
-      mutate(SumDiffNitrate = sum(DiffNitrate))
+      mutate(SumDiffNitrate_mgL = sum(DiffNitrate))
+    
     # Multiply SumDiff and velocity, and correct for units
     # Q [m3/s] / A [m2] = v [m/s]
     # v [m/s] * [NO3] [mg-N/L] = U [m*mg-N / s*L]
-    # U [m*mg-N / s*L] * [1000 L / 1 m3] = U [mg-N / m2*s]
-    prepped_df$UaNO3_mgNm2s <- prepped_df$SumDiffNitrate * prepped_df$v_ms * 1000
-    #
+    # U [m*mg-N / s*L] * [1000 L / 1 m3] * 86400 [s / day] = U [mg-N / m2*day]
+    avg_df$UaNO3_mgNm2day <- 
+      avg_df$SumDiffNitrate_mgL * avg_df$v_ms * 1000 * 86400
+    
     # I don't know if this calculation is totally correct. The numbers seem
     # super high.
     #
     # Rename columns
-    names(prepped_df)[names(prepped_df) == "MaxNitrate"] <- "Nitrate_DailyMax_mgNL"
-    names(prepped_df)[names(prepped_df) == "v_ms"] <- "Velocity_ms"
-    names(prepped_df)[names(prepped_df) == "DiffNitrate"] <- "DiffNitrate_mgNL"
-    names(prepped_df)[names(prepped_df) == "SumDiffNitrate"] <- "SumDiffNitrate_mgNL"
-    prepped_df$date <- NULL
+    names(avg_df)[names(avg_df) == "MaxNitrate"] <- "DailyMaxNitrate_mgNL"
+    names(avg_df)[names(avg_df) == "v_ms"] <- "Velocity_ms"
+    names(avg_df)[names(avg_df) == "DiffNitrate"] <- "DiffNitrate_mgNL"
+    avg_df$date <- NULL
+    avg_df$hour <- NULL
+    avg_df$day <- NULL
     # Return dataframe
-    return(prepped_df)
+    return(avg_df)
   }
+  
   # Execute function
-  eric_uptake <- HC_Eqn1(eric_uptake)
-  steve_uptake <- HC_Eqn1(steve_uptake)
-  desoto_uptake <- HC_Eqn1(desoto_uptake)
+  eric_uptake_Eqn1 <- HC_Eqn1(eric_uptake)
+  steve_uptake_Eqn1 <- HC_Eqn1(steve_uptake)
+  desoto_uptake_Eqn1 <- HC_Eqn1(desoto_uptake)
+  
+  # Merge calculations into a single dataframe and save to CSV file
+  Uptake_Eqn1 <- dplyr::full_join(eric_uptake_Eqn1, steve_uptake_Eqn1, 
+                                  by = "DateTime_CST", 
+                                  suffix = c(".eric", ".steve"))
+  
+  Uptake_Eqn1 <- dplyr::full_join(Uptake_Eqn1, desoto_uptake_Eqn1, 
+                                  by = "DateTime_CST")
+  
+  # Cleanup
+  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Mean.Discharge_m3s"] <- 
+    "Mean.Discharge_m3s.desoto"
+  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Mean.Nitrate_mgL"] <- 
+    "Mean.Nitrate_mgL.desoto"
+  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "DailyMaxNitrate_mgNL"] <- 
+    "DailyMaxNitrate_mgNL.desoto"
+  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Velocity_ms"] <- 
+    "Velocity_ms.desoto"
+  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "DiffNitrate_mgNL"] <- 
+    "DiffNitrate_mgNL.desoto"
+  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "SumDiffNitrate_mgL"] <- 
+    "SumDiffNitrate_mgNL.desoto"
+  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "UaNO3_mgNm2day"] <- 
+    "UaNO3_mgNm2day.desoto"
+  
+  # Add column to denote during waste release or after
+  # During: dates prior to 1 April 2018
+  # After: dates post 1 April 2018
+  Uptake_Eqn1$ReleaseStatus <- "During"
+  Uptake_Eqn1$ReleaseStatus[Uptake_Eqn1$DateTime_CST >= 
+                              ymd_hms("2018-04-01 00:00:00", 
+                                      tz = "America/Chicago")] <- "After"
+  
+  # Save dataframe
+  write.csv(Uptake_Eqn1, file = "./Outputs/NitrateUptakeResults_Eqn1.csv", 
+            row.names = FALSE)
+  
 }
 ##################################################
 
@@ -220,22 +272,26 @@ if (UptakeEqn == 2){
       # Get previous day: current day - 1
       prevday <- prepped_df$day[i] - 1
       # Get MaxNitrate during prevday
-      MaxNitrate.prev <- unique(prepped_df$MaxNitrate[prepped_df$day == prevday])
+      MaxNitrate.prev <- unique(prepped_df$MaxNitrate[prepped_df$day == 
+                                                        prevday])
       # Get MaxNitrate during current day
-      MaxNitrate <- unique(prepped_df$MaxNitrate[prepped_df$day == prepped_df$day[i]])
+      MaxNitrate <- unique(prepped_df$MaxNitrate[prepped_df$day == 
+                                                   prepped_df$day[i]])
       # Get Nitrate at current hour
       Nitrate <- prepped_df$Mean.Nitrate_mgL[i]
       # Calculate DiffNitrate for each hour
-      prepped_df$DiffNitrate_mgL[i] <- 
-        MaxNitrate.prev * (1 - prepped_df$hour[i]) + 
-        MaxNitrate * prepped_df$hour[i] - Nitrate
+      prepped_df$DiffNitrate_mgL[i] <- MaxNitrate.prev * 
+                                             (1 - prepped_df$hour[i]) + 
+                                             MaxNitrate * prepped_df$hour[i] - 
+                                             Nitrate
     }
     #
     # Sum the differences from t = 0 to t = 24 for each day
     results <- prepped_df %>%
       dplyr::group_by(day) %>%
       dplyr::summarise(date = date[1],
-                       Mean.Discharge_m3s = mean(Mean.Discharge_m3s, na.rm = TRUE),
+                       Mean.Discharge_m3s = mean(Mean.Discharge_m3s, 
+                                                 na.rm = TRUE),
                        Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE),
                        Mean.v_ms = mean(v_ms, na.rm = TRUE), 
                        SumDiffNitrate = sum(DiffNitrate_mgL))
@@ -256,39 +312,43 @@ if (UptakeEqn == 2){
   }
   
   # Execute function
-  eric_uptake <- HC_Eqn2(eric_uptake)
-  steve_uptake <- HC_Eqn2(steve_uptake)
-  desoto_uptake <- HC_Eqn2(desoto_uptake)
-}
-##################################################
-
-
-#### Merge uptake calculations ###################
-# Merge calculations into a single dataframe and
-# save to CSV file
-#
-# Join dataframes
-NitrateUptake <- dplyr::full_join(eric_uptake, steve_uptake, 
+  eric_uptake_Eqn2 <- HC_Eqn2(eric_uptake)
+  steve_uptake_Eqn2 <- HC_Eqn2(steve_uptake)
+  desoto_uptake_Eqn2 <- HC_Eqn2(desoto_uptake)
+  
+  # Merge calculations into a single dataframe and save to CSV file
+  Uptake_Eqn2 <- dplyr::full_join(eric_uptake_Eqn2, steve_uptake_Eqn2, 
                                   by = "Date", 
                                   suffix = c(".eric", ".steve"))
-NitrateUptake <- dplyr::full_join(NitrateUptake, desoto_uptake, 
+  
+  Uptake_Eqn2 <- dplyr::full_join(Uptake_Eqn2, desoto_uptake_Eqn2, 
                                   by = "Date")
-# Cleanup
-names(NitrateUptake)[names(NitrateUptake) == "Mean.Discharge_m3s"] <- 
-  "Mean.Discharge_m3s.desoto"
-names(NitrateUptake)[names(NitrateUptake) == "Mean.Nitrate_mgL"] <- 
-  "Mean.Nitrate_mgL.desoto"
-names(NitrateUptake)[names(NitrateUptake) == "Mean.velocity_ms"] <- 
-  "Mean.velocity_ms.desoto"
-names(NitrateUptake)[names(NitrateUptake) == "UaNO3_gNm2day"] <- 
-  "UaNO3_gNm2day.desoto"
+  
+  # Cleanup
+  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "Mean.Discharge_m3s"] <- 
+    "Mean.Discharge_m3s.desoto"
+  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "Mean.Nitrate_mgL"] <- 
+    "Mean.Nitrate_mgL.desoto"
+  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "DailyMaxNitrate_mgNL"] <- 
+    "DailyMaxNitrate_mgNL.desoto"
+  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "Velocity_ms"] <- 
+    "Velocity_ms.desoto"
+  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "DiffNitrate_mgNL"] <- 
+    "DiffNitrate_mgNL.desoto"
+  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "SumDiffNitrate_mgL"] <- 
+    "SumDiffNitrate_mgNL.desoto"
+  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "UaNO3_mgNm2day"] <- 
+    "UaNO3_mgNm2day.desoto"
+  
+  # Add column to denote during waste release or after
+  # During: dates prior to 1 April 2018
+  # After: dates post 1 April 2018
+  Uptake_Eqn2$ReleaseStatus <- "During"
+  Uptake_Eqn2$ReleaseStatus[Uptake_Eqn2$Date >= ymd("2018-04-01")] <- "After"
+  
+  # Save dataframe
+  write.csv(Uptake_Eqn2, file = "./Outputs/NitrateUptakeResults_Eqn2.csv", 
+            row.names = FALSE)
+}
 
-# Add column to denote during waste release or after
-# During: dates prior to 1 April 2018
-# After: dates post 1 April 2018
-NitrateUptake$ReleaseStatus <- "During"
-NitrateUptake$ReleaseStatus[NitrateUptake$Date >= ymd("2018-04-01")] <- "After"
-
-# Save dataframe
-write.csv(NitrateUptake, file = "./Outputs/NitrateUptakeResults.csv", row.names = FALSE)
 ##################################################
