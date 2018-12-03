@@ -331,14 +331,14 @@ if (UptakeEqn == 2){
     "Mean.Nitrate_mgL.desoto"
   names(Uptake_Eqn2)[names(Uptake_Eqn2) == "DailyMaxNitrate_mgNL"] <- 
     "DailyMaxNitrate_mgNL.desoto"
-  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "Velocity_ms"] <- 
-    "Velocity_ms.desoto"
+  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "Mean.velocity_ms"] <- 
+    "Mean.velocity_ms.desoto"
   names(Uptake_Eqn2)[names(Uptake_Eqn2) == "DiffNitrate_mgNL"] <- 
     "DiffNitrate_mgNL.desoto"
   names(Uptake_Eqn2)[names(Uptake_Eqn2) == "SumDiffNitrate_mgL"] <- 
     "SumDiffNitrate_mgNL.desoto"
-  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "UaNO3_mgNm2day"] <- 
-    "UaNO3_mgNm2day.desoto"
+  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "UaNO3_gNm2day"] <- 
+    "UaNO3_gNm2day.desoto"
   
   # Add column to denote during waste release or after
   # During: dates prior to 1 April 2018

@@ -69,9 +69,7 @@ ggplot(data = massBal, aes(x = date)) +
   ylab(expression(NO[3]^{"-"}-N * "  (mg" ~~ L^{-1} * ")"))+
   # plot theme
   theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = c(0.1, 0.79),
-        legend.background = element_rect(color = "black"))
+  theme(panel.border = element_rect(color = "black", fill = NA))
 
 ggsave(filename = "./Plots/Nitrate_time.png", device = "png", 
        width = 7.5, height = 4, units = "in")
@@ -99,6 +97,8 @@ ggplot(data = massBal, aes(x = date)) +
   geom_line(aes(y = NitrateLoad.steve_kgNday, color = "Downstream")) +
   geom_point(aes(y = NitrateLoad.steve_kgNday, color = "Downstream")) +
   #
+  # Vertical line at 1-Apr-18
+  geom_vline(aes(xintercept = as_date("2018-04-01")), linetype = 2) +
   # axis and color scales
   scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
                date_breaks = "2 weeks", date_labels = "%b %e" ) + 
@@ -108,16 +108,14 @@ ggplot(data = massBal, aes(x = date)) +
                      name = "Site") +
   scale_shape_manual(values = 21) +
   # axis labels
-  xlab("Date") + 
+  xlab(NULL) + 
   ylab(expression(NO[3]^{"-"}-N ~~ "Load  (kg" ~~ day^{-1} * ")"))+
   # plot theme
   theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = c(0.1, 0.79),
-        legend.background = element_rect(color = "black"))
+  theme(panel.border = element_rect(color = "black", fill = NA))
 
 ggsave(filename = "./Plots/NitrateLoad_time.png", device = "png", 
-       width = 7.5, height = 4, units = "in")
+       width = 6.75, height = 2.5, units = "in")
 ```
 
 ```{r ReshapeData}
