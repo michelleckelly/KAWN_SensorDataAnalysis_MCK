@@ -165,6 +165,35 @@ ggplot(modelfit.steve$predictions, aes(x = date)) +
         legend.background = element_rect(color = "black"))
 ggsave("./Plots/MetabPlot_Steve.png",height = 2.5, width = 7, units = "in")
 
+
+#### For Amy's AGU Poster ###########
+ggplot(filter(modelfit.steve$predictions, date < ymd("2018-03-30") | 
+                date > ymd("2018-04-09")), aes(x = date)) +
+  # Add rectangle for 24 hr sampling periods
+  annotate("rect", 
+           xmin = ymd("2018-03-28"),
+           xmax = ymd("2018-03-30"),
+           ymin = -25, ymax = 25, fill = "grey", alpha = 0.5) +
+  annotate("rect", 
+           xmin = ymd("2018-04-09"),
+           xmax = ymd("2018-04-11"),
+           ymin = -25, ymax = 25, fill = "grey", alpha = 0.5) +
+  # ER and error bars
+  geom_errorbar(aes(ymin = ER.lower, ymax = ER.upper), color = "black") +
+  geom_point(aes(y = ER), color = "black", shape = 21, fill = "white") +
+  # GPP and error bars
+  geom_errorbar(aes(ymin = GPP.lower, ymax = GPP.upper), color = "#008B00") +
+  geom_point(aes(y = GPP), color = "#008B00", shape = 21, fill = "white") +
+  # Labels
+  labs(x = NULL, y = expression(O[2] ~ "(g" ~ m^-2 ~ d^-1 ~")")) +
+  scale_x_date(date_breaks = "5 days", date_labels = "%e %b") +
+  coord_cartesian(xlim =  c(as.Date("2018-03-17"), as.Date("2018-04-20")),
+                  ylim = c(-25, 25)) +
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA))
+ggsave("./Plots/KAWN24Hr_DownstreamMetab.png",height = 3.5, width = 8, units = "in")
+
+#####################################
 # Desoto
 ggplot(modelfit.desoto$predictions, aes(x = date)) +
   geom_line(aes(y = GPP, color = "GPP")) +
