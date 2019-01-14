@@ -1,0 +1,118 @@
+---
+title: "Simple river flow model"
+author: "Michelle Kelly"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, echo = FALSE}
+library(magrittr)
+library(dplyr)
+library(lubridate)
+```
+
+Procedure:
+(done) 1. Section reach into 1km long modeling blocks
+  - Assume: constant slope within modeling block
+  - Assume: constant width within modeling block
+  - Assume: river channel is approximated by a rectangular cross-section
+(done) 2. Get slope for each block using Army Corps document
+(done) 3. Use GIS or other program to measure aerial width at each segment
+  - (Improvement in future) also use GIS to measure side slope of river, then 
+    use a trapezoidal cross-section to calculate cross sectional area
+4. Calculate cross-sectional area of each block using aerial width and depth
+5. calculate velocity leaving cell, which becomes the velocity entering the next cell
+
+Chosen timestep:
+  We choose this using the "Courant condition"
+  $v = \frac{\Delta L} {\Delta t}$
+  Where:
+    $v$ = average velocity over reach during study = 0.5 m/s
+    $\Delta L$ = length of modeling blocks = 1 km = 1000 m
+    Solve for $\Delta t$ to find appropriate timestep for evaluating the model
+    $\therefore \Delta t$ = 2000 sec = 33.33 min $\approx$ 30 min
+
+Governing equations: 
+1. Conservation of mass
+$\Delta{S} = \sum{Q_{in}} - \sum{Q_{out}}$
+
+$\Delta{S} = \sum{M_{in}} - \sum{M_{out}}$
+
+Where:
+  $\Delta{S}$ = storage
+  $Q_{in}$ = water in to system
+  $Q_{out}$ = water out of system
+  
+  $\Delta{S}$ = storage
+  $M_{in}$ = mass of N in to system
+  $M_{out}$ = mass of N out of system
+
+2. Conservation of momentum
+$v = \frac{1} {n} \times R^{\frac{2} {3}} \times S^{\frac{1} {2}}$
+
+$R = \frac{A} {p_w}$
+(if approximating using a rectangle)
+$p_w = 2 \times depth + width$
+Where:
+  $R$ = hydraulic radius
+  $S$ = channel slope
+  $n$ = coefficient of roughness
+  $v$ = channel velocity
+  
+  $A$ = cross sectional area
+  $p_w$ = wetted perimeter
+
+Need:
+- pull equation to relate d50 to coeff of roughness or use coeff of roughness for sandy rivers as basepoint
+- cross sectional area for each river section
+- slope for each river section (army corps)
+
+Leopold and Maddock, 1953, "The Hydraulic Geometry of Stream Channels and Some 
+Physiographic Implications." PG 42, Second table on page
+
+|                         |Mean annual discharge, cfs |Slope  |Roughness (n)|
+|-------------------------|---------------------------|-------|-------------|
+|Kansas River at Ogden    |2300                       |0.0004 |0.035        |
+|Kansas River at LeCompton|6200                       |0.0004 |0.034        |
+
+```{r Constants}
+S <- 0.0004
+n <- 0.034
+```
+
+Load in discharge data and take a 30-min average
+
+```{r LoadQ}
+# Discharge (Q) is in units of m^3 sec^-1
+# dateTime is in CST timezone
+
+# Each Q refers to a USGS gauging station (Except for Q2.Farmland, which was
+# data provided by the City of Lawrence)
+Q <- read.csv("./Data/SensorData_CompiledFiles/KAWN_USGSDischarge_instantaneous.csv")
+
+# Cleanup data
+Q$Q5.desoto <- Q$Q5.desoto * -1
+Q$dateTime <- lubridate::ymd_hms(Q$dateTime, tz = "America/Chicago")
+
+# Take 30 min average
+Q <- Q %>%
+  group_by(dateTime = round_date(dateTime, unit = "30 minutes")) %>%
+  summarise(Dam0_m3s = mean(Q1.lawrence, na.rm = TRUE),
+            Farmland4_m3s = mean(Q2.Farmland, na.rm = TRUE),
+            Wakarusa16_m3s = mean(Q3.wakarusa, na.rm = TRUE),
+            Stranger28_m3s = mean(Q4.stranger, na.rm = TRUE),
+            Desoto33_m3s = mean(Q5.desoto, na.rm = TRUE))
+
+# Linear interpolation between missing time points
+```
+
+Load in area data
+
+Book Order:
+1. compute flow area, velocity, and energy gradient (conserv of momentum) at section j+1 given current stage
+2. assume value for the stage at section j, call it Zj or something
+3. compute flow area, velocity, and energy gradient at section j
+4. compute S according to eqn 3.59
+5. substitute values of necessary variables into eqn 3.58, if this eqn is balanced then assumed value for Zj is good, otherwise repeat 2 thru 5 until balanced
+
+
