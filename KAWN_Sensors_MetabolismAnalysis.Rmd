@@ -112,6 +112,7 @@ NEP.steve <- NEP_calcs(modelfit.steve$predictions)
 NEP.desoto <- NEP_calcs(modelfit.desoto$predictions)
 ```
 
+
 ```{r metabolism.plot}
 # Eric
 ggplot(modelfit.eric$predictions, aes(x = date)) +
