@@ -47,46 +47,40 @@ uptake$Date <- lubridate::ymd(uptake$Date)
 # Metbolism plot
 ggplot(data = metab, aes(x = date)) +
   # Eric
-  geom_line(aes(y = GPP.eric, color = "GPP.eric")) +
-  geom_point(aes(y = GPP.eric, color = "GPP.eric")) +
-  geom_ribbon(aes(ymin = GPP.lower.eric, ymax = GPP.upper.eric, 
-                  fill = "GPP.eric"), alpha = 0.3) +
-  geom_line(aes(y = ER.eric, color = "ER.eric")) +
-  geom_point(aes(y = ER.eric, color = "ER.eric")) +
-  geom_ribbon(aes(ymin = ER.lower.eric, ymax = ER.upper.eric, 
-                  fill = "ER.eric"), alpha = 0.3) +
+  #geom_line(aes(y = GPP.eric, color = "Discharge")) +
+  geom_ribbon(aes(ymin = GPP.lower.eric, ymax = GPP.upper.eric, fill = "Discharge"), alpha = 0.15) +
+  geom_point(aes(y = GPP.eric, color = "Discharge")) +
+  #geom_line(aes(y = ER.eric, color = "Discharge")) +
+  #geom_point(aes(y = ER.eric, color = "Discharge"), shape = 21, fill = "white") +
   # Steve
-  geom_line(aes(y = GPP.steve, color = "GPP.steve")) +
-  geom_point(aes(y = GPP.steve, color = "GPP.steve")) +
-  geom_ribbon(aes(ymin = GPP.lower.steve, ymax = GPP.upper.steve, 
-                  fill = "GPP.steve"), alpha = 0.3) +
-  geom_line(aes(y = ER.steve, color = "ER.steve")) +
-  geom_point(aes(y = ER.steve, color = "ER.steve")) +
-  geom_ribbon(aes(ymin = ER.lower.steve, ymax = ER.upper.steve, 
-                  fill = "ER.steve"), alpha = 0.3) +
+  geom_ribbon(aes(ymin = GPP.lower.steve, ymax = GPP.upper.steve, fill = "Downstream"), alpha = 0.15) +
+  #geom_line(aes(y = GPP.steve, color = "Downstream")) +
+  geom_point(aes(y = GPP.steve, color = "Downstream")) +
+  #geom_line(aes(y = ER.steve, color = "Downstream")) +
+  #geom_point(aes(y = ER.steve, color = "Downstream"), shape = 21, fill = "white") +
   # Desoto
-  geom_line(aes(y = GPP.desoto, color = "GPP.desoto")) +
-  geom_point(aes(y = GPP.desoto, color = "GPP.desoto")) +
-  geom_ribbon(aes(ymin = GPP.lower.desoto, ymax = GPP.upper.desoto, 
-                  fill = "GPP.desoto"), alpha = 0.3) +
-  geom_line(aes(y = ER.desoto, color = "ER.desoto")) +
-  geom_point(aes(y = ER.desoto, color = "ER.desoto")) +
-  geom_ribbon(aes(ymin = ER.lower.desoto, ymax = ER.upper.desoto, 
-                  fill = "ER.desoto"), alpha = 0.3) +
+  geom_ribbon(aes(ymin = GPP.lower.desoto, ymax = GPP.upper.desoto, fill = "Desoto"), alpha = 0.15) +
+  #geom_line(aes(y = GPP.desoto, color = "Desoto")) +
+  geom_point(aes(y = GPP.desoto, color = "Desoto")) +
+  #geom_line(aes(y = ER.desoto, color = "ER")) +
+  #geom_point(aes(y = ER.desoto, color = "ER")) +
   # Axis labels
   labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
   # Scaling
   scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01")), 
                date_breaks = "2 weeks", date_labels = "%e %b") +
   # Line at y = 0
-  geom_line(aes(y = 0), color = "black") +
+  #geom_line(aes(y = 0), color = "black") +
   # Theme adjustments
   theme_classic() +
-  #scale_color_manual(values = c("GPP" = "#FF0000", "ER" = "#000000"), 
-  #                  name = "Discharge") +
+  scale_color_manual(values = c("Discharge" = "#FF0000", 
+                                "Downstream" = "#23baaf", "Desoto" = "#F2AD00"),
+                     breaks = c("Discharge", "Downstream", "Desoto")) +
+    scale_fill_manual(values = c("Discharge" = "#FF0000", 
+                                 "Downstream" = "#23baaf", "Desoto" = "#F2AD00"),
+                     breaks = c("Discharge", "Downstream", "Desoto")) +
   theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = c(0.17, 0.88), legend.direction = "horizontal",
-        legend.background = element_rect(color = "black"))
+        legend.position = "bottom", legend.direction = "horizontal")
 
 # N supply plot
 
@@ -94,12 +88,12 @@ ggplot(data = metab, aes(x = date)) +
 # as daily average nitrate concentration * daily average
 # flow
 
-ggplot(data = massBal, aes(x = date)) +
+ggplot(data = massbal, aes(x = date)) +
   # Upstream (Bowersock)
   geom_line(aes(y = NitrateLoad.bowersock_kgNday, color = "Upstream")) +
   geom_point(aes(y = NitrateLoad.bowersock_kgNday, color = "Upstream")) +
   # Bowersock: BDL designation
-  geom_point(data = massBal[massBal$Nitrate.bowersock_mgNL < 0.1,],
+  geom_point(data = massbal[massbal$Nitrate.bowersock_mgNL < 0.1,],
              aes(y = NitrateLoad.bowersock_kgNday), shape = 21, fill = "white") +
   # Discharge (Eric)
   geom_line(aes(y = NitrateLoad.eric_kgNday, color = "Discharge")) +
@@ -116,6 +110,7 @@ ggplot(data = massBal, aes(x = date)) +
   # axis and color scales
   scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
                date_breaks = "2 weeks", date_labels = "%b %e" ) + 
+  scale_y_log10()+
   scale_color_manual(values = c("Upstream" = "#000000", "Discharge" = "#FF0000", 
                                  "Downstream" = "#23baaf", "Desoto" = "#F2AD00"),
                      breaks = c("Upstream", "Discharge", "Downstream", "Desoto"),
@@ -126,5 +121,6 @@ ggplot(data = massBal, aes(x = date)) +
   ylab(expression(NO[3]^{"-"}-N ~~ "Load  (kg" ~~ day^{-1} * ")"))+
   # plot theme
   theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA))
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "bottom", legend.title = element_blank())
 ```

@@ -82,13 +82,110 @@ prepper <- function(sensor_data){
 }
 
 # Run function
-eric_uptake <- prepper(eric_data)
-steve_uptake <- prepper(steve_data)
-desoto_uptake <- prepper(desoto_data)
-##################################################
+eric_uptake <- prepper(eric)
+steve_uptake <- prepper(steve)
+desoto_uptake <- prepper(desoto)
+
+##### Take out some of the variability due to changing Q #######################
+
+variability.smoother <- function(uptake_data){
+  # Section dates before 1 May 2018
+  uptake_data <- uptake_data[uptake_data$DateTime_CST < 
+                               ymd_hms("2018-05-01 00:00:00"),]
+  # Visualize discharge through time
+  plot(y = uptake_data$Discharge_m3s, 
+     x = uptake_data$DateTime_CST, 
+     main = "Discharge at Desoto",
+     ylab = "Discharge, m3 / s", xlab = "DateTime")
+  # Take the difference between each discharge measurement using diff()
+  varib <- data.frame(DateTime_CST = uptake_data$DateTime_CST
+                           [2:length(uptake_data$DateTime_CST)],
+                           month = months(uptake_data$DateTime_CST)
+                           [2:length(uptake_data$DateTime_CST)], 
+                           diff.Discharge = diff(uptake_data$Discharge_m3s))
+  # Extract outliers of all observations using base boxplot
+  stats <- boxplot(varib$diff.Discharge)
+  # Boxplot statistics output:
+  # [1,1] extreme of lower whisker, [2,1] Q1, [3,1] median, 
+  # [4,1] Q3, [5,1] extreme of upper whisker
+  Q1 <- stats$stats[2,1]
+  Q3 <- stats$stats[4,1]
+  IQR <- Q3 - Q1
+  
+  # Boxplot to visualize variability
+  #ggplot(varib) + 
+    #stat_boxplot(aes(x = "All", y = diff.Discharge), geom = "errorbar", 
+                 #width = 0.5) +
+    #geom_boxplot(aes(x = "All", y = diff.Discharge), outlier.shape = 1) +
+    #stat_boxplot(aes(x = month, y = diff.Discharge), geom = "errorbar",
+                 #width = 0.5) +
+    #geom_boxplot(aes(x = month, y = diff.Discharge), outlier.shape = 1) +
+    #geom_hline(yintercept = Q3 + 5*IQR, linetype = 2) +
+    #geom_hline(yintercept = Q1 - 5*IQR, linetype = 2) +
+    #scale_x_discrete(limits = c("All", "January", "February", "March", 
+                                #"April")) +
+    #labs(x = NULL, y = "delta Discharge, m3 / s", 
+         #title = "Change in discharge between \nmeasurements at Desoto") +
+    #theme_classic()
+  
+  # Select extreme outliers
+  # > Q3 + 3*IQR or < Q1 - 3*IQR
+  varib$flag[varib$diff.Discharge > Q3 + 5*IQR] <- "outlier"
+  varib$flag[varib$diff.Discharge < Q1 - 5*IQR] <- "outlier"
+  # Transfer over outlier flags to original data
+  uptake_data <- dplyr::full_join(uptake_data, varib[c(-2)], by = "DateTime_CST")
+  
+  # Visualize the points that have been selected as extreme outliers
+  # Selected outliers in red
+  #ggplot(uptake_data, aes(x = DateTime_CST)) +
+    #geom_line(aes(y = diff.Discharge), shape = 1) +
+    #geom_point(aes(y = diff.Discharge[flag == "outlier"]), color = "red", 
+               #shape = 1) +
+    #labs(x = NULL, y = "delta Discharge, m3 / s", 
+         #title = "Change in discharge between \nmeasurements at Desoto") +
+    #theme_classic()
+  
+  #ggplot(uptake_data) +
+    #geom_point(data = subset(uptake_data, is.na(uptake_data$flag)),
+                             #aes(x = DateTime_CST[is.na(flag)], 
+                                 #y = Discharge_m3s[is.na(flag)]), shape = 1) +
+    #geom_point(data = uptake_data, 
+               #aes(x = DateTime_CST[flag == "outlier"],
+                   #y = Discharge_m3s[flag == "outlier"]), color = "red", 
+               #shape = 1) +
+    #labs(x = NULL, y = "Discharge, m3 / s", 
+         #title = "Discharge at Desoto") +
+    #theme_classic()
+  
+  # Add column for corrected nitrate concentrations (where outlier data is now NA)
+  uptake_data$Nitrate_mgL.corr <- uptake_data$Nitrate_mgL
+  uptake_data$Nitrate_mgL.corr[uptake_data$flag == "outlier"] <- NA
+  # Remove hours of data where there are 3 or more outliers present
+  uptake_data <- uptake_data %>%
+    group_by(date = lubridate::date(DateTime_CST), 
+             hour = lubridate::hour(DateTime_CST)) %>%
+    mutate(na.count = sum(is.na(Nitrate_mgL.corr))) %>%
+    mutate(Nitrate_mgL.corr = ifelse(na.count >= 3, NA, Nitrate_mgL.corr))
+  
+  # visualize removed outliers (in red)
+  #ggplot(uptake_data) +
+    #geom_point(aes(x = DateTime_CST, y = Nitrate_mgL), shape = 1, col = "red") +
+      #geom_point(aes(x = DateTime_CST, y = Nitrate_mgL.corr), shape = 1)
+  
+  # Amend Nitrate_mgL data with corrected data
+  uptake_data$Nitrate_mgL <- uptake_data$Nitrate_mgL.corr
+  # Return datatframe
+  return(uptake_data)
+}
+
+eric_smooth <- variability.smoother(eric_uptake)
+steve_smooth <- variability.smoother(steve_uptake)
+desoto_smooth <- variability.smoother(desoto_uptake)
 
 
-#### Specify equation used to calculate uptake ###
+
+#### Specify equation used to calculate uptake #################################
+
 # If UptakeEqn == 1, calculate uptake using the 
 # extrapolated diel method (Heffernan and Cohen 
 # 2010, Eqn. 1)
@@ -96,10 +193,8 @@ desoto_uptake <- prepper(desoto_data)
 # integrated diel method (Heffernan and Cohen 
 # 2010, Eqn. 2)
 UptakeEqn <- 2
-##################################################
 
-#prepped_df <- eric_uptake
-#### Calculate uptake using Equation 1 ###########
+#### Calculate uptake using Equation 1 ########################################
 if (UptakeEqn == 1) {
 
   # Function to calculate uptake
@@ -234,10 +329,9 @@ if (UptakeEqn == 1) {
             row.names = FALSE)
   
 }
-##################################################
 
+#### Calculate uptake using Equation 2 #########################################
 
-#### Calculate uptake using Equation 2 ###########
 if (UptakeEqn == 2){
   # Calculate NO3 uptake using the integrated diel method 
   # (Heffernan and Cohen 2010, Eqn. 2)
@@ -338,17 +432,28 @@ if (UptakeEqn == 2){
     # Return dataframe
     return(results)
   }
-  
+
   # Execute function
+  eric_uptake_Eqn2_smooth <- HC_Eqn2(eric_smooth)
   eric_uptake_Eqn2 <- HC_Eqn2(eric_uptake)
   steve_uptake_Eqn2 <- HC_Eqn2(steve_uptake)
   desoto_uptake_Eqn2 <- HC_Eqn2(desoto_uptake)
   
+  #plot(y = eric_uptake_Eqn2$UaNO3_gNm2day[eric_uptake_Eqn2$Date < ymd("2018-05-01")]/1000, 
+       #x = eric_uptake_Eqn2$Date[eric_uptake_Eqn2$Date < ymd("2018-05-01")],
+       #ylab = "Ua-NO3, kg-N / (m^2 day)", xlab = "DateTime",
+       #main = "Uptake at Eric, using original data")
+  #plot(y = eric_uptake_Eqn2_smooth$UaNO3_gNm2day/1000, 
+       #x = eric_uptake_Eqn2_smooth$Date,
+       #ylab = "Ua-NO3, kg-N / (m^2 day)", xlab = "DateTime",
+       #main = "Uptake at Eric, with readings associated \nwith high Q variability removed")
+  # plot(eric_uptake_Eqn2_smooth$UaNO3_gNm2day)
+    
   # Merge calculations into a single dataframe and save to CSV file
   Uptake_Eqn2 <- dplyr::full_join(eric_uptake_Eqn2, steve_uptake_Eqn2, 
                                   by = "Date", 
                                   suffix = c(".eric", ".steve"))
-  
+    
   Uptake_Eqn2 <- dplyr::full_join(Uptake_Eqn2, desoto_uptake_Eqn2, 
                                   by = "Date")
   
@@ -378,16 +483,12 @@ if (UptakeEqn == 2){
   write.csv(Uptake_Eqn2, file = "./Outputs/NitrateUptakeResults_Eqn2.csv", 
             row.names = FALSE)
 }
-
-##################################################
-
-
 ```
 
 
 
 ```{r Uptake Calculations}
-
+plot(x = a_uptake$Date, y = a_uptake$UaNO3_gNm2day/1000, ylim = c(0,450))
 ```
 
 
