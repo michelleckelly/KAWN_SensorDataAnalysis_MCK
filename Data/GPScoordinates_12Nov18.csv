@@ -1,0 +1,16 @@
+SiteNumber,SiteNickname,long,lat,ShortDescription,Distancefromdischargepoint_mi,Distancefromdischargepoint_km
+NA,Bowersock,-95.235424,38.974036,"Sensor deployment location #1, within the bowersock dam",-2.29,-3.68
+1,Dam,,,"Float sampling site 1, downstream of bowersock dam outflow",-1.54,-2.48
+2,WWTP,,,"Float sampling site 2, slightly downstream of waste water treatment plant outflow",-1.23,-1.98
+3,Discharge pt (or Disch pt),,,"Float sampling site 3, at the discharge point (which is the mouth of Burroughs Creek)",0,0
+NA,Eric,-95.193127,38.963609,Sensor deployment location #2,0.24,0.39
+4,Site 4,,,Float sampling site 4,0.93,1.5
+5,Site 5,,,Float sampling site 5,2.1,3.38
+6,Steve,-95.14598,38.97458,"Float sampling site 6, Sensor deployment location #3",3.45,5.55
+7,Site 7,,,Float sampling site 7,5.47,8.8
+8,Eudora (or Wakarusa),,,Float sampling site 8,7.65,12.31
+9,Site 9,,,Float sampling site 9,8.9,14.32
+10,Site 10,,,Float sampling site 10,11.9,19.15
+11,Site 11,,,Float sampling site 11,15.2,24.46
+12,Desoto,,,"Float sampling site 12, Riverfest park in Desoto KS",18.5,29.77
+NA,Desoto,-94.9648333,38.9820638,"USGS sensor location (sensor deployment location #4) at highway 2 bridge, Desoto KS",19,30.57

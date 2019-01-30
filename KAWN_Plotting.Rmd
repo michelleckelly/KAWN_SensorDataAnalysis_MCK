@@ -9,16 +9,33 @@ editor_options:
 library(lubridate)
 library(ggplot2)
 library(dplyr)
+library(ggmap) # Mapping libraries
+library(maps)
+library(mapdata)
+library(ggpubr)
 ```
 
 ```{r Load data}
-# Sensor data
+#### Site location data ###
+coords <- read.csv("./Data/GPScoordinates_12Nov18.csv", 
+                   stringsAsFactors = FALSE)
+# Rename site names
+coords$SiteNickname[coords$SiteNickname == "Bowersock"] <- "S0"
+coords$SiteNickname[coords$SiteNickname == "Eric"] <- "S1"
+coords$SiteNickname[coords$SiteNickname == "Steve"] <- "S2"
+coords$SiteNickname[coords$SiteNickname == "Desoto"] <- "S3"
 
-# N mass balance data
+### Sensor data ###
+
+### N mass balance data ###
 massbal <- read.csv("./Outputs/NMassBalance.csv")
 massbal$date <- lubridate::ymd(massbal$date)
+# bowersock load gets down to 0 which doesnt show up well on a log10 scaled 
+# plot, so bump up to 20 for plotting
+massbal$NitrateLoad.bowersock_kgNday[massbal$date > ymd("2018-02-26")] <- 20
+massbal$Nitrate.bowersock_mgNL[massbal$date == ymd("2018-03-31")] <- 0
 
-# Metabolism results
+### Metabolism results ###
 metab_eric <- readRDS("./Outputs/MetabResults_Eric.RData")$predictions
 metab_steve <- readRDS("./Outputs/MetabResults_Steve.RData")$predictions
 metab_desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")$predictions
@@ -26,6 +43,59 @@ names(metab_desoto)[2:10] <- paste0(names(metab_desoto)[2:10], ".desoto")
 metab <- dplyr::full_join(metab_eric, metab_steve, by = "date", 
                           suffix = c(".eric", ".steve")) %>%
   dplyr::full_join(., metab_desoto, by = "date")
+# Metabolism bad dates removal
+# Eric
+metab$GPP.eric[metab$date >= ymd("2018-02-20") & 
+                 metab$date <= ymd("2018-02-24")] <- NA
+metab$ER.eric[metab$date >= ymd("2018-02-20") & 
+                 metab$date <= ymd("2018-02-24")] <- NA
+metab$GPP.lower.eric[metab$date >= ymd("2018-02-20") & 
+                       metab$date <= ymd("2018-02-24")] <- NA
+metab$GPP.eric[metab$date >= ymd("2018-03-05") & 
+                 metab$date <= ymd("2018-03-12")] <- NA
+metab$ER.eric[metab$date >= ymd("2018-03-05") & 
+                 metab$date <= ymd("2018-03-12")] <- NA
+metab$GPP.lower.eric[metab$date >= ymd("2018-03-05") & 
+                       metab$date <= ymd("2018-03-12")] <- NA
+metab$GPP.eric[metab$date == ymd("2018-03-28")] <- NA #Uncaught sensor burial?
+metab$ER.eric[metab$date == ymd("2018-03-28")] <- NA #Uncaught sensor burial?
+metab$GPP.lower.eric[metab$date == ymd("2018-03-28")] <- NA 
+metab$GPP.eric[metab$date > ymd("2018-04-01") & 
+                 metab$date <= ymd("2018-04-05")] <- NA
+metab$ER.eric[metab$date > ymd("2018-04-01") & 
+                 metab$date <= ymd("2018-04-05")] <- NA
+metab$GPP.lower.eric[metab$date > ymd("2018-04-01") & 
+                       metab$date <= ymd("2018-04-05")] <- NA
+metab$GPP.eric[metab$date >= ymd("2018-04-14") & 
+                 metab$date < ymd("2018-04-17")] <- NA
+metab$ER.eric[metab$date >= ymd("2018-04-14") & 
+                 metab$date < ymd("2018-04-17")] <- NA
+metab$GPP.lower.eric[metab$date >= ymd("2018-04-14") & 
+                       metab$date < ymd("2018-04-17")] <- NA
+metab$GPP.eric[metab$date >= ymd("2018-04-25") & 
+                 metab$date <= ymd("2018-04-30")] <- NA
+metab$ER.eric[metab$date >= ymd("2018-04-25") & 
+                 metab$date <= ymd("2018-04-30")] <- NA
+metab$GPP.lower.eric[metab$date >= ymd("2018-04-25") & 
+                       metab$date <= ymd("2018-04-30")] <- NA
+# Steve
+#metab$GPP.steve[metab$date >= ymd("2018-02-01") & 
+                 #metab$date <= ymd("2018-02-10")] # Double check this
+# Likely dates but need double checking with O2 record:
+metab$GPP.steve[metab$date >= ymd("2018-03-09") & 
+                 metab$date <= ymd("2018-03-10")] <- NA # marked "bad data"
+metab$GPP.lower.steve[metab$date >= ymd("2018-03-09") & 
+                        metab$date <= ymd("2018-03-10")] <- NA
+metab$GPP.steve[metab$date >= ymd("2018-03-30") & 
+                 metab$date <= ymd("2018-04-09")] <- NA # No O2 data here 
+# because I shut the sensor off accidentally
+metab$GPP.lower.steve[metab$date >= ymd("2018-03-30") & 
+                        metab$date <= ymd("2018-04-09")] <- NA
+metab$GPP.steve[metab$date >= ymd("2018-04-20") & 
+                 metab$date <= ymd("2018-05-01")] <- NA
+metab$GPP.lower.steve[metab$date >= ymd("2018-04-20") & 
+                        metab$date <= ymd("2018-05-01")] <- NA
+
 
 # Edits that need to happen: taking out dates that have bad data
 # For eric:
@@ -38,90 +108,191 @@ metab <- dplyr::full_join(metab_eric, metab_steve, by = "date",
 # 2018-02-01 thru 2018-02-10 N sensor not yet deployed
 # 2018-03-10 thru 2018-03-22 N sensor burial
 
-# Nitrate uptake results
+### Nitrate uptake results ###
 # HAVE bad dates removed
 uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn2.rds")
+uptake$date <- uptake$Date # lazy fix for merging
+```
+
+```{r Reshape data for boxplots}
+### Reshape metab data ########################################################
+# Factorize release status
+metab$ReleaseStatus <- NA
+metab$ReleaseStatus[metab$date < ymd("2018-04-01")] <- "During"
+metab$ReleaseStatus[metab$date >= ymd("2018-04-01")] <- "After"
+metab$ReleaseStatus <- factor(metab$ReleaseStatus, 
+                              levels = c("During", "After"))
+# Adjust from wide to long format
+metab.long <- tidyr::gather(metab[c(-3:-4,-6:-10, -12:-13, -15:-19, -21:-22, 
+                                    -24:-28)], key = site, value = value,
+                            GPP.eric:ER.desoto)
+# Factorize site and change labels
+metab.long$site <- factor(metab.long$site)
+# Initialize column to store metab model type (GPP or ER)
+metab.long$model <- metab.long$site
+# Rename factor levels
+levels(metab.long$model)[levels(metab.long$site)=="GPP.eric"] <- "GPP"
+levels(metab.long$site)[levels(metab.long$site)=="GPP.eric"] <- "S1"
+levels(metab.long$model)[levels(metab.long$site)=="GPP.steve"] <- "GPP"
+levels(metab.long$site)[levels(metab.long$site)=="GPP.steve"] <- "S2"
+levels(metab.long$model)[levels(metab.long$site)=="GPP.desoto"] <- "GPP"
+levels(metab.long$site)[levels(metab.long$site)=="GPP.desoto"] <- "S3"
+levels(metab.long$model)[levels(metab.long$site)=="ER.eric"] <- "ER"
+levels(metab.long$site)[levels(metab.long$site)=="ER.eric"] <- "S1"
+levels(metab.long$model)[levels(metab.long$site)=="ER.steve"] <- "ER"
+levels(metab.long$site)[levels(metab.long$site)=="ER.steve"] <- "S2"
+levels(metab.long$model)[levels(metab.long$site)=="ER.desoto"] <- "ER"
+levels(metab.long$site)[levels(metab.long$site)=="ER.desoto"] <- "S3"
+metab.long$model <- factor(metab.long$model, levels = c("GPP", "ER")) # Reorder
+metab.long$site <- factor(metab.long$site, levels = c("S1", "S2", "S3"))
+
+### Reshape uptake data ########################################################
+# Factorize release status
+uptake$ReleaseStatus <- factor(uptake$ReleaseStatus, 
+                               levels = c("During", "After"))
+# Adjust from wide to long format
+uptake.long <- tidyr::gather(uptake[c(-2:-4, -6:-8, -10:-12)], key = site, 
+                             value = UaNO3_gNm2day,
+                             UaNO3_gNm2day.eric:UaNO3_gNm2day.desoto)
+# Factorize site name
+uptake.long$site <- factor(uptake.long$site, levels = c("UaNO3_gNm2day.eric", 
+                                                        "UaNO3_gNm2day.steve", 
+                                                        "UaNO3_gNm2day.desoto"))
+levels(uptake.long$site)[levels(uptake.long$site)=="UaNO3_gNm2day.eric"] <- 
+  "S1"
+levels(uptake.long$site)[levels(uptake.long$site)=="UaNO3_gNm2day.steve"] <- 
+  "S2"
+levels(uptake.long$site)[levels(uptake.long$site)=="UaNO3_gNm2day.desoto"] <- 
+  "S3"
 ```
 
 ```{r Join data for comparison plots}
-# See the uptake analysis script for some of this
+# merge uptake data and metabolism data
+uptake.metab <- dplyr::full_join(metab, uptake, by = "date")
+uptake.metab$Date <- NULL
+
+# merge with mass balance data
+uptake.metab <- dplyr::full_join(uptake.metab, massbal, by = "date")
+uptake.metab <- subset(uptake.metab, uptake.metab$date >= ymd("2018-02-01") &
+                         uptake.metab$date < ymd("2018-05-01"))
 ```
 
 ```{r Fig 1: Mapping}
+# Pull country, state, county map data
+state.map <- map_data("state")
+kansas.map <- subset(state.map, region == "kansas")
+counties.map <- subset(map_data("county"), region == "kansas")
+
+# Pull rivers map data:
+# Data provided by Esri, National Atlas of the United States and the United 
+# States Geological Survey, accessed 26-Jan-19, ArcGIS "USA Rivers and Streams" 
+# dataset www.arcgis.com
+load(url("https://vrzkj25a871bpq7t1ugcgmn9-wpengine.netdna-ssl.com/wp-content/datasets/usa_rivers.RData"))
+lines.rivers <- subset(lines.rivers, STATE %in% c("KS"))
+ks_rivers <- fortify(lines.rivers)
+
+# Plot state map
+ggplot() +
+  theme_nothing() +
+  # Rivers
+  #geom_path(data = ks_rivers, aes(x = long, y = lat, group = group), col = "#23baaf") +
+  # Counties
+  geom_polygon(data = counties.map, aes(x = long, y = lat, group = group), 
+               fill = NA, color = "grey") +
+  # State border
+  geom_polygon(data = kansas.map, aes(x = long, y = lat, group = group), 
+               fill = NA, color = "black") +
+  # Location marker
+  geom_point(data = coords, mapping = aes(x = long[5], y = lat[5]), 
+             col = "black", shape = 0, size = 12, stroke = 2) +
+  coord_fixed(1.3) +
+  guides(fill = FALSE)
+# Save plot
+ggsave("./Plots/Map_state.png", height = 2, width = 3.5, units = "in")
+
+
+# Plot local map
+ggplot() +
+  theme_nothing() +
+  # Rivers
+  geom_path(data = ks_rivers, aes(x = long, y = lat, group = group), 
+            col = "#23baaf") +
+  # Counties
+  geom_polygon(data = counties.map, aes(x = long, y = lat, group = group), 
+               fill = NA, color = "grey") +
+  # Site location bubbles
+  geom_point(data = coords, mapping = aes(x = long, y = lat), 
+             col = "black", shape = 1, size = 5, stroke = 2) +
+  # Site names
+  geom_text(data = coords, aes(x = long, y = lat, label = SiteNickname), 
+            nudge_y = 0.017, size = 7) +
+  coord_fixed(1.3)  +
+  coord_quickmap(xlim = c(-95.3, -94.9), ylim = c(38.83, 39.1)) +
+  theme(panel.border = element_rect(color = "black", fill = NA))
+# Save plot
+ggsave("./Plots/Map_local.png", height = 5, width = 6, units = "in")
+
+
+# Set up a map box using coordinates
+coord.box <- make_bbox(lon = coords$long[5], lat = coords$lat[5])
+googmap <- get_stamenmap(bbox = coord.box, zoom = 10, maptype = "watercolor")
+ggmap(googmap)
 ```
 
 ```{r Fig 2: Metabolism and N supply vs time}
+### Assemble data into a boxplot ###############################################
 # Metbolism plot
-ggplot(data = metab, aes(x = date)) +
-  # Eric
-  #geom_line(aes(y = GPP.eric, color = "Discharge")) +
-  geom_ribbon(aes(ymin = GPP.lower.eric, ymax = GPP.upper.eric, fill = "Discharge"), alpha = 0.15) +
-  geom_point(aes(y = GPP.eric, color = "Discharge")) +
-  #geom_line(aes(y = ER.eric, color = "Discharge")) +
-  #geom_point(aes(y = ER.eric, color = "Discharge"), shape = 21, fill = "white") +
-  # Steve
-  geom_ribbon(aes(ymin = GPP.lower.steve, ymax = GPP.upper.steve, fill = "Downstream"), alpha = 0.15) +
-  #geom_line(aes(y = GPP.steve, color = "Downstream")) +
-  geom_point(aes(y = GPP.steve, color = "Downstream")) +
-  #geom_line(aes(y = ER.steve, color = "Downstream")) +
-  #geom_point(aes(y = ER.steve, color = "Downstream"), shape = 21, fill = "white") +
-  # Desoto
-  geom_ribbon(aes(ymin = GPP.lower.desoto, ymax = GPP.upper.desoto, fill = "Desoto"), alpha = 0.15) +
-  #geom_line(aes(y = GPP.desoto, color = "Desoto")) +
-  geom_point(aes(y = GPP.desoto, color = "Desoto")) +
-  #geom_line(aes(y = ER.desoto, color = "ER")) +
-  #geom_point(aes(y = ER.desoto, color = "ER")) +
+ggplot(data = metab.long, aes(ReleaseStatus, value, color= site)) +
+  facet_wrap(~model + site) +
+  # Error bars
+  stat_boxplot(geom = "errorbar", width = 0.5, 
+               position = position_dodge(width = 0.75)) +
+  # Boxplot
+  geom_boxplot(outlier.shape = NA) +
+  # Jitter points
+  geom_point(position = position_jitterdodge(dodge.width = 0.75, 
+                                             jitter.width = 0.7), 
+             alpha = 0.4, shape = 16) +
+  # Add text for significance
+  ggpubr::stat_compare_means(aes(group = ReleaseStatus), label = "p.format") +
   # Axis labels
-  labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
-  # Scaling
-  scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01")), 
-               date_breaks = "2 weeks", date_labels = "%e %b") +
-  # Line at y = 0
-  #geom_line(aes(y = 0), color = "black") +
+  labs(x = "Release status", 
+       y = bquote("GPP or ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
   # Theme adjustments
   theme_classic() +
-  scale_color_manual(values = c("Discharge" = "#FF0000", 
-                                "Downstream" = "#23baaf", "Desoto" = "#F2AD00"),
-                     breaks = c("Discharge", "Downstream", "Desoto")) +
-    scale_fill_manual(values = c("Discharge" = "#FF0000", 
-                                 "Downstream" = "#23baaf", "Desoto" = "#F2AD00"),
-                     breaks = c("Discharge", "Downstream", "Desoto")) +
+  scale_color_manual(values = c("S1" = "#FF0000", 
+                                "S2" = "#23baaf", "S3" = "#F2AD00"),
+                     breaks = c("S1", "S2", "S3")) +
   theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "bottom", legend.direction = "horizontal")
+        legend.position = "none")
+ggsave("./Plots/MetabPlot.png", height = 2.75, width = 6, units = "in")
 
-# N supply plot
-
-# Plot of daily average nitrate load, calculated 
-# as daily average nitrate concentration * daily average
-# flow
-
+# N load plot
 ggplot(data = massbal, aes(x = date)) +
   # Upstream (Bowersock)
-  geom_line(aes(y = NitrateLoad.bowersock_kgNday, color = "Upstream")) +
-  geom_point(aes(y = NitrateLoad.bowersock_kgNday, color = "Upstream")) +
+  geom_line(aes(y = NitrateLoad.bowersock_kgNday, color = "S0")) +
+  geom_point(aes(y = NitrateLoad.bowersock_kgNday, color = "S0")) +
   # Bowersock: BDL designation
-  geom_point(data = massbal[massbal$Nitrate.bowersock_mgNL < 0.1,],
+  geom_point(data = massbal[massbal$Nitrate.bowersock_mgNL <= 0.1,],
              aes(y = NitrateLoad.bowersock_kgNday), shape = 21, fill = "white") +
   # Discharge (Eric)
-  geom_line(aes(y = NitrateLoad.eric_kgNday, color = "Discharge")) +
-  geom_point(aes(y = NitrateLoad.eric_kgNday, color = "Discharge")) +
-  # Desoto
-  geom_line(aes(y = NitrateLoad.desoto_kgNday, color = "Desoto")) +
-  geom_point(aes(y = NitrateLoad.desoto_kgNday, color = "Desoto")) +
+  geom_line(aes(y = NitrateLoad.eric_kgNday, color = "S1")) +
+  geom_point(aes(y = NitrateLoad.eric_kgNday, color = "S1")) +
   # Downstream (Steve)
-  geom_line(aes(y = NitrateLoad.steve_kgNday, color = "Downstream")) +
-  geom_point(aes(y = NitrateLoad.steve_kgNday, color = "Downstream")) +
-  #
+  geom_line(aes(y = NitrateLoad.steve_kgNday, color = "S2")) +
+  geom_point(aes(y = NitrateLoad.steve_kgNday, color = "S2")) +
+  # Desoto
+  geom_line(aes(y = NitrateLoad.desoto_kgNday, color = "S3")) +
+  geom_point(aes(y = NitrateLoad.desoto_kgNday, color = "S3")) +
   # Vertical line at 1-Apr-18
   geom_vline(aes(xintercept = as_date("2018-04-01")), linetype = 2) +
   # axis and color scales
   scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
                date_breaks = "2 weeks", date_labels = "%b %e" ) + 
   scale_y_log10()+
-  scale_color_manual(values = c("Upstream" = "#000000", "Discharge" = "#FF0000", 
-                                 "Downstream" = "#23baaf", "Desoto" = "#F2AD00"),
-                     breaks = c("Upstream", "Discharge", "Downstream", "Desoto"),
-                     name = "Site") +
+  scale_color_manual(values = c("S0" = "#000000", "S1" = "#FF0000", 
+                                 "S2" = "#23baaf", "S3" = "#F2AD00"),
+                     breaks = c("S0", "S1", "S2", "S3")) +
   scale_shape_manual(values = 21) +
   # axis labels
   xlab(NULL) + 
@@ -130,34 +301,62 @@ ggplot(data = massbal, aes(x = date)) +
   theme_classic() +
   theme(panel.border = element_rect(color = "black", fill = NA),
         legend.position = "bottom", legend.title = element_blank())
+ggsave("./Plots/NitrateLoad_time.png", height = 3, width = 6, units = "in")
 ```
 
-```{Fig 3: Uptake vs time plotting}
+```{r Uptake vs time significance testing}
+## Significance testing ########################################################
+# Get summary statistics for each group
+uptake.long %>%
+  group_by(site, ReleaseStatus) %>%
+  filter(!is.na(UaNO3_gNm2day)) %>%
+  summarise(n = n(),
+            mean = mean(UaNO3_gNm2day/1000, na.rm = TRUE),
+            sd = sd(UaNO3_gNm2day/1000, na.rm = TRUE))
+# Perform two-way anova to assess the affect of two grouping variables 
+# (site & release status) on response (uptake)
+anova.uptake <- aov(UaNO3_gNm2day ~ ReleaseStatus * site, data = uptake.long)
+summary(anova.uptake)
+# Get multiple pairwise comparisons between the means of groups (to see specifically which groups differ) using Tukey honest significant differences
+TukeyHSD(anova.uptake) # differences between sites
+
+# Set up positions for significance letters
+positions <- data.frame(site = c("S1", "S1", "S2", "S2", "S3", "S3"),
+                              UaNO3_gNm2day = c(1E7,2E6,9E5,1E5,9E5,3E5),
+                              ReleaseStatus = factor(c("During", "After",
+                                                       "During", 
+                                                       "After", "During",  
+                                                       "After"), 
+                                                     levels = c("During", 
+                                                                "After")))
+```
+
+```{r Fig 3: Uptake vs time plotting}
 ggplot(data = uptake, aes(x = Date)) +
   # Discharge (Eric)
   geom_smooth(data = subset(uptake, ReleaseStatus == "During"), 
-              aes(y = UaNO3_gNm2day.eric/1000, color = "Discharge"), 
+              aes(y = UaNO3_gNm2day.eric/1000, color = "S1"), 
               formula = y~x, method = "lm", se = FALSE) +
   geom_smooth(data = subset(uptake, ReleaseStatus == "After"), 
-              aes(y = UaNO3_gNm2day.eric/1000, color = "Discharge"), 
+              aes(y = UaNO3_gNm2day.eric/1000, color = "S1"), 
               formula = y~x, method = "lm", se = FALSE) +
-  geom_point(aes(y = UaNO3_gNm2day.eric/1000, color = "Discharge")) +
+  geom_point(aes(y = UaNO3_gNm2day.eric/1000, color = "S1")) +
   # Steve
   geom_smooth(data = subset(uptake, ReleaseStatus == "During"), 
-              aes(y = UaNO3_gNm2day.steve/1000, color = "Downstream"), 
+              aes(y = UaNO3_gNm2day.steve/1000, color = "S2"), 
               formula = y~x, method = "lm", se = FALSE) +
   geom_smooth(data = subset(uptake, ReleaseStatus == "After"), 
-              aes(y = UaNO3_gNm2day.steve/1000, color = "Downstream"), 
+              aes(y = UaNO3_gNm2day.steve/1000, color = "S2"), 
               formula = y~x, method = "lm", se = FALSE) +
-  geom_point(aes(y = UaNO3_gNm2day.steve/1000, color = "Downstream")) +
+  geom_point(aes(y = UaNO3_gNm2day.steve/1000, color = "S2")) +
   # Desoto
   geom_smooth(data = subset(uptake, ReleaseStatus == "During"), 
-              aes(y = UaNO3_gNm2day.desoto/1000, color = "Desoto"), 
+              aes(y = UaNO3_gNm2day.desoto/1000, color = "S3"), 
               formula = y~x, method = "lm", se = FALSE) +
   geom_smooth(data = subset(uptake, ReleaseStatus == "After"), 
-              aes(y = UaNO3_gNm2day.desoto/1000, color = "Desoto"), 
+              aes(y = UaNO3_gNm2day.desoto/1000, color = "S3"), 
               formula = y~x, method = "lm", se = FALSE) +
-  geom_point(aes(y = UaNO3_gNm2day.desoto/1000, color = "Desoto")) +
+  geom_point(aes(y = UaNO3_gNm2day.desoto/1000, color = "S3")) +
   # Horizontal line at 1 April, pump shutoff date
   geom_vline(aes(xintercept = as_date("2018-04-01")), linetype = 2) +
   # Axis scales
@@ -165,9 +364,9 @@ ggplot(data = uptake, aes(x = Date)) +
   scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
                date_breaks = "2 weeks", date_labels = "%b %e") + 
   # Color scales
-  scale_color_manual(values = c("Upstream" = "#000000", "Discharge" = "#FF0000", 
-                                 "Downstream" = "#23baaf", "Desoto" = "#F2AD00"),
-                     limits = c("Discharge", "Downstream", "Desoto")) +
+  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
   # axis labels
   xlab(NULL) + 
   ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")")) +
@@ -175,7 +374,130 @@ ggplot(data = uptake, aes(x = Date)) +
   theme_classic() +
   theme(panel.border = element_rect(color = "black", fill = NA),
         legend.position = "bottom", legend.title = element_blank())
-
 # Save plot
-ggsave("./Plots/Uptake_time.png", height = 5, width = 6, units = "in")
+ggsave("./Plots/Uptake_time.png", height = 3, width = 6, units = "in")
+
+### Assemble data into a boxplot ##############################################
+
+# Boxplot
+ggplot(data = uptake.long, aes(x = ReleaseStatus, y = UaNO3_gNm2day/1000, 
+                               color = site)) +
+  facet_wrap(~site) +
+  # Error bars
+  stat_boxplot(geom = "errorbar", width = 0.5, 
+               position = position_dodge(width = 0.75)) +
+  # Add text for significance
+  stat_compare_means(method = "t.test", comparisons = list(c("During", 
+                                                             "After"))) +
+  # Boxplots
+  geom_boxplot(outlier.shape = NA) +
+  # Jitter points
+  geom_point(position = position_jitterdodge(dodge.width = 0.75, 
+                                             jitter.width = 0.7), 
+             alpha = 0.4, shape = 16) +
+  scale_y_log10(breaks = c(1,10,100,1E3,1E4)) +
+  # Color scales
+  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # axis labels
+  xlab("Release status") + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
+# Save
+ggsave("./Plots/Uptake_boxplot.png", height = 3.5, width = 4.5, units = "in")
+```
+
+```{r Fig 4: Uptake vs metabolism}
+# Theres no really strong correlations here. perhaps think about that metabolism may not be driving removal, look at lydia + amys microbe assays to perhaps argue for microbial removal? would that be reflected in ER tho?
+uptake.metab <- subset(uptake.metab, date < ymd("2018-05-01"))
+
+ggplot(uptake.metab, aes(x = GPP.eric, y = UaNO3_gNm2day.eric/1000))+
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
+  facet_grid(.~ReleaseStatus)
+ggplot(uptake.metab, aes(x = GPP.steve, y = UaNO3_gNm2day.steve/1000))+
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
+  facet_grid(.~ReleaseStatus)
+ggplot(uptake.metab, aes(x = GPP.desoto, y = UaNO3_gNm2day.desoto/1000))+
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
+  facet_grid(.~ReleaseStatus)
+
+ggplot(uptake.metab, aes(x = ER.eric, y = UaNO3_gNm2day.eric/1000))+
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
+  facet_grid(.~ReleaseStatus)
+ggplot(uptake.metab, aes(x = ER.steve, y = UaNO3_gNm2day.steve/1000))+
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
+  facet_grid(.~ReleaseStatus)
+ggplot(uptake.metab, aes(x = ER.desoto, y = UaNO3_gNm2day.desoto/1000))+
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
+  facet_grid(.~ReleaseStatus)
+
+str(uptake.metab)
+corm <- cor(uptake.metab[c(2,5,11,14,20,23,30:41)], method = "pearson", use = "complete.obs")
+```
+
+```{r Fig 5}
+# Fig 5 nitrate load vs nitrate uptake
+
+ggplot(uptake.metab, aes(x = NitrateLoad.eric_kgNday, y = UaNO3_gNm2day.eric/1000))+
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = F, fullrange = TRUE) +
+  geom_abline(slope = 1, intercept = 0) +
+  facet_grid(.~ReleaseStatus, scale = "free")
+ggplot(uptake.metab, aes(x = NitrateLoad.steve_kgNday, y = UaNO3_gNm2day.steve/1000))+
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = F, fullrange = TRUE) +
+  geom_abline(slope = 1, intercept = 0) +
+  facet_grid(.~ReleaseStatus, scale = "free")
+ggplot(uptake.metab, aes(x = NitrateLoad.desoto_kgNday, y = UaNO3_gNm2day.desoto/1000))+
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = F, fullrange = TRUE) +
+  geom_abline(slope = 1, intercept = 0) +
+  facet_grid(.~ReleaseStatus, scale = "free")
+
+
+
+ggplot(uptake.metab, aes(x = date))+
+  geom_area(aes(y = NitrateLoad.eric_kgNday, fill = "eric load")) +
+  geom_area(aes(y= UaNO3_gNm2day.eric/1000, fill = "eric uptake")) +
+  geom_line(aes(y= NitrateLoad.eric_kgNday - UaNO3_gNm2day.eric/1000, fill = "difference")) 
+  scale_y_log10()
+ggplot(uptake.metab, aes(x = date))+
+  geom_area(aes(y = NitrateLoad.steve_kgNday, fill = "steve load")) +
+  geom_area(aes(y= UaNO3_gNm2day.steve/1000, fill = "steve uptake")) +
+  geom_line(aes(y= NitrateLoad.steve_kgNday - UaNO3_gNm2day.steve/1000, fill = "difference"))
+  scale_y_log10()
+ggplot(uptake.metab, aes(x = date))+
+  geom_area(aes(y = NitrateLoad.desoto_kgNday, fill = "desoto load")) +
+  geom_area(aes(y= UaNO3_gNm2day.desoto/1000, fill = "desoto uptake")) +
+  geom_line(aes(y= NitrateLoad.desoto_kgNday - UaNO3_gNm2day.desoto/1000, fill = "difference"))
+  scale_y_log10()
+
+uptake.metab.long <- tidyr::gather(uptake[c(-2:-4, -6:-8, -10:-12)], key = site, 
+                             value = UaNO3_gNm2day,
+                             UaNO3_gNm2day.eric:UaNO3_gNm2day.desoto)
+ggplot(data = uptake.metab, aes(NitrateLoad.eric_kgNday, UaNO3_gNm2day.eric/1000), group = site) +
+  geom_boxplot() +
+  facet_grid(.~ReleaseStatus, scales = "free_x")
+
+
+ggplot(uptake.metab, aes(x = ER.steve, y = UaNO3_gNm2day.steve/1000))+
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
+  facet_grid(.~ReleaseStatus)
+ggplot(uptake.metab, aes(x = ER.desoto, y = UaNO3_gNm2day.desoto/1000))+
+  geom_point(shape = 21, fill = "white") +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
+  facet_grid(.~ReleaseStatus)
 ```
