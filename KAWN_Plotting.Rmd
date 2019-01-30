@@ -112,9 +112,7 @@ metab$GPP.lower.steve[metab$date >= ymd("2018-04-20") &
 # HAVE bad dates removed
 uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn2.rds")
 uptake$date <- uptake$Date # lazy fix for merging
-```
 
-```{r Reshape data for boxplots}
 ### Reshape metab data ########################################################
 # Factorize release status
 metab$ReleaseStatus <- NA
@@ -164,17 +162,40 @@ levels(uptake.long$site)[levels(uptake.long$site)=="UaNO3_gNm2day.steve"] <-
   "S2"
 levels(uptake.long$site)[levels(uptake.long$site)=="UaNO3_gNm2day.desoto"] <- 
   "S3"
-```
 
-```{r Join data for comparison plots}
-# merge uptake data and metabolism data
-uptake.metab <- dplyr::full_join(metab, uptake, by = "date")
-uptake.metab$Date <- NULL
+### Join data for comparison plotting ##########################################
+# Merge uptake data and metabolism data
+uptake.metab.long <- dplyr::full_join(metab.long, uptake.long, 
+                                      by = c("date", "site", "ReleaseStatus"))
+uptake.metab.long$Date <- NULL
+uptake.metab.long <- subset(uptake.metab.long, date < ymd("2018-05-01"))
 
-# merge with mass balance data
-uptake.metab <- dplyr::full_join(uptake.metab, massbal, by = "date")
-uptake.metab <- subset(uptake.metab, uptake.metab$date >= ymd("2018-02-01") &
-                         uptake.metab$date < ymd("2018-05-01"))
+# Merge uptake with N load
+str(massbal)
+# Make massbal long
+massbal.long <- tidyr::gather(massbal[c(1, 19:21)], "site", 
+                              "NitrateLoad_kgNday", 2:4)
+# Rename factors & add columns
+massbal.long$site <-  factor(massbal.long$site)
+levels(massbal.long$site)[levels(massbal.long$site) == 
+                            "NitrateLoad.eric_kgNday"] <- 
+  "S1"
+levels(massbal.long$site)[levels(massbal.long$site) == 
+                                "NitrateLoad.steve_kgNday"] <- 
+  "S2"
+levels(massbal.long$site)[levels(massbal.long$site) == 
+                            "NitrateLoad.desoto_kgNday"] <- 
+  "S3"
+massbal.long$site <- factor(massbal.long$site, levels = c("S1", "S2", "S3"))
+# Join
+uptake.metab.mass.long <- dplyr::full_join(uptake.metab.long, massbal.long, 
+                                           by = c("date", "site"))
+# Subset dates
+uptake.metab.mass.long <- subset(uptake.metab.mass.long, 
+                                 uptake.metab.mass.long$date < ymd("2018-05-01"))
+uptake.metab.mass.long <- subset(uptake.metab.mass.long, 
+                                 uptake.metab.mass.long$date >= ymd("2018-02-01"))
+
 ```
 
 ```{r Fig 1: Mapping}
@@ -239,11 +260,16 @@ googmap <- get_stamenmap(bbox = coord.box, zoom = 10, maptype = "watercolor")
 ggmap(googmap)
 ```
 
+```{r Fig 2: Metabolism vs ReleaseStatus statistical testing}
+ggpubr::compare_means(value~ReleaseStatus, data = metab.long, 
+                      group.by = c("model","site"))
+```
+
 ```{r Fig 2: Metabolism and N supply vs time}
 ### Assemble data into a boxplot ###############################################
 # Metbolism plot
 ggplot(data = metab.long, aes(ReleaseStatus, value, color= site)) +
-  facet_wrap(~model + site) +
+  facet_grid(model ~ site, scales = "free", switch = "y") +
   # Error bars
   stat_boxplot(geom = "errorbar", width = 0.5, 
                position = position_dodge(width = 0.75)) +
@@ -254,10 +280,12 @@ ggplot(data = metab.long, aes(ReleaseStatus, value, color= site)) +
                                              jitter.width = 0.7), 
              alpha = 0.4, shape = 16) +
   # Add text for significance
-  ggpubr::stat_compare_means(aes(group = ReleaseStatus), label = "p.format") +
+  ggpubr::stat_compare_means(aes(group = ReleaseStatus),
+                             label = "p.signif", 
+                             label.x = 1.4, hide.ns = TRUE) +
   # Axis labels
   labs(x = "Release status", 
-       y = bquote("GPP or ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
+       y = bquote("(g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
   # Theme adjustments
   theme_classic() +
   scale_color_manual(values = c("S1" = "#FF0000", 
@@ -265,7 +293,7 @@ ggplot(data = metab.long, aes(ReleaseStatus, value, color= site)) +
                      breaks = c("S1", "S2", "S3")) +
   theme(panel.border = element_rect(color = "black", fill = NA),
         legend.position = "none")
-ggsave("./Plots/MetabPlot.png", height = 2.75, width = 6, units = "in")
+ggsave("./Plots/MetabPlot2.png", height = 4.5, width = 5.5, units = "in")
 
 # N load plot
 ggplot(data = massbal, aes(x = date)) +
@@ -304,7 +332,7 @@ ggplot(data = massbal, aes(x = date)) +
 ggsave("./Plots/NitrateLoad_time.png", height = 3, width = 6, units = "in")
 ```
 
-```{r Uptake vs time significance testing}
+```{r Fig 3: Uptake vs time significance testing}
 ## Significance testing ########################################################
 # Get summary statistics for each group
 uptake.long %>%
@@ -316,9 +344,9 @@ uptake.long %>%
 # Perform two-way anova to assess the affect of two grouping variables 
 # (site & release status) on response (uptake)
 anova.uptake <- aov(UaNO3_gNm2day ~ ReleaseStatus * site, data = uptake.long)
-summary(anova.uptake)
-# Get multiple pairwise comparisons between the means of groups (to see specifically which groups differ) using Tukey honest significant differences
-TukeyHSD(anova.uptake) # differences between sites
+summary(anova.uptake) 
+# Get multiple pairwise comparisons between the means of groups (to see specifically which groups differ) using Tukey honest significant differences 
+TukeyHSD(anova.uptake) # differences between sites 
 
 # Set up positions for significance letters
 positions <- data.frame(site = c("S1", "S1", "S2", "S2", "S3", "S3"),
@@ -332,6 +360,42 @@ positions <- data.frame(site = c("S1", "S1", "S2", "S2", "S3", "S3"),
 ```
 
 ```{r Fig 3: Uptake vs time plotting}
+### Assemble data into a boxplot ##############################################
+
+# Boxplot
+ggplot(data = uptake.long, aes(x = ReleaseStatus, y = UaNO3_gNm2day/1000, 
+                               color = site)) +
+  facet_wrap(~site) +
+  # Error bars
+  stat_boxplot(geom = "errorbar", width = 0.5, 
+               position = position_dodge(width = 0.75)) +
+  # Add text for significance
+  ggpubr::stat_compare_means(aes(group = ReleaseStatus),
+                             label = "p.signif", 
+                             label.x = 1.4, hide.ns = TRUE) +
+  # Boxplots
+  geom_boxplot(outlier.shape = NA) +
+  # Jitter points
+  geom_point(position = position_jitterdodge(dodge.width = 0.75, 
+                                             jitter.width = 0.7), 
+             alpha = 0.4, shape = 16) +
+  scale_y_log10(breaks = c(1,10,100,1E3,1E4)) +
+  # Color scales
+  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # axis labels
+  xlab("Release status") + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+# Save
+ggsave("./Plots/Uptake_boxplot.png", height = 4, width = 5.5, units = "in")
+
+### x axis as time ###
 ggplot(data = uptake, aes(x = Date)) +
   # Discharge (Eric)
   geom_smooth(data = subset(uptake, ReleaseStatus == "During"), 
@@ -376,79 +440,90 @@ ggplot(data = uptake, aes(x = Date)) +
         legend.position = "bottom", legend.title = element_blank())
 # Save plot
 ggsave("./Plots/Uptake_time.png", height = 3, width = 6, units = "in")
+```
 
-### Assemble data into a boxplot ##############################################
+```{r Fig 4: Uptake vs metabolism.... think about a diff fig}
+# Theres no really strong correlations here. perhaps think about that metabolism may not be driving removal, look at lydia + amys microbe assays to perhaps argue for microbial removal? would that be reflected in ER tho?
 
-# Boxplot
-ggplot(data = uptake.long, aes(x = ReleaseStatus, y = UaNO3_gNm2day/1000, 
-                               color = site)) +
-  facet_wrap(~site) +
-  # Error bars
-  stat_boxplot(geom = "errorbar", width = 0.5, 
-               position = position_dodge(width = 0.75)) +
-  # Add text for significance
-  stat_compare_means(method = "t.test", comparisons = list(c("During", 
-                                                             "After"))) +
-  # Boxplots
-  geom_boxplot(outlier.shape = NA) +
-  # Jitter points
-  geom_point(position = position_jitterdodge(dodge.width = 0.75, 
-                                             jitter.width = 0.7), 
-             alpha = 0.4, shape = 16) +
-  scale_y_log10(breaks = c(1,10,100,1E3,1E4)) +
+# Scatterplot GPP vs Ua
+ggplot(subset(uptake.metab.long, model == "GPP"), aes(x = value, 
+                                                      y = UaNO3_gNm2day/1000, 
+                                                      color = site)) +
+  facet_grid(site~ReleaseStatus, scales = "free", switch = "y") +
+  geom_point(alpha = 0.4, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE, fullrange = TRUE) +
+  # Add correlation coeff
+  ggpubr::stat_cor(color = "black") +
   # Color scales
   scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
                                 "S3" = "#F2AD00"),
                      limits = c("S1", "S2", "S3")) +
-  # axis labels
-  xlab("Release status") + 
+  # Axis labels
+  xlab(bquote("GPP (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  # plot theme
+  # Plot theme
   theme_classic() +
   theme(legend.position = "none", legend.title = element_blank(),
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"))
 
-# Save
-ggsave("./Plots/Uptake_boxplot.png", height = 3.5, width = 4.5, units = "in")
+# Scatterplot ER vs Ua
+ggplot(subset(uptake.metab.long, model == "ER"), aes(x = value, 
+                                                     y = UaNO3_gNm2day/1000, 
+                                                     color = site)) +
+  facet_grid(site~ReleaseStatus, scales = "free", switch = "y") +
+  geom_point(alpha = 0.4, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE, fullrange = TRUE) +
+  # Add correlation coeff
+  ggpubr::stat_cor(color = "black") +
+  # Color scales
+  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # Axis labels
+  xlab(bquote("ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # Plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
+# All together graph
+ggplot(uptake.metab.long, aes(x = value, 
+                                                     y = UaNO3_gNm2day/1000, 
+                                                     color = ReleaseStatus)) +
+  facet_grid(site ~ model, scales = "free", switch = "y") +
+  geom_point(alpha = 0.4, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE) +
+  # Add correlation coeff
+  ggpubr::stat_cor(color = "black") +
+  # Color scales
+  #scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+   #                             "S3" = "#F2AD00"),
+    #                 limits = c("S1", "S2", "S3")) +
+  # Axis labels
+  xlab(bquote("GPP or ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(kg-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # Plot theme
+  theme_classic() +
+  theme(#legend.position = "none", 
+        legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
 ```
 
-```{r Fig 4: Uptake vs metabolism}
-# Theres no really strong correlations here. perhaps think about that metabolism may not be driving removal, look at lydia + amys microbe assays to perhaps argue for microbial removal? would that be reflected in ER tho?
-uptake.metab <- subset(uptake.metab, date < ymd("2018-05-01"))
-
-ggplot(uptake.metab, aes(x = GPP.eric, y = UaNO3_gNm2day.eric/1000))+
-  geom_point(shape = 21, fill = "white") +
-  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
-  facet_grid(.~ReleaseStatus)
-ggplot(uptake.metab, aes(x = GPP.steve, y = UaNO3_gNm2day.steve/1000))+
-  geom_point(shape = 21, fill = "white") +
-  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
-  facet_grid(.~ReleaseStatus)
-ggplot(uptake.metab, aes(x = GPP.desoto, y = UaNO3_gNm2day.desoto/1000))+
-  geom_point(shape = 21, fill = "white") +
-  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
-  facet_grid(.~ReleaseStatus)
-
-ggplot(uptake.metab, aes(x = ER.eric, y = UaNO3_gNm2day.eric/1000))+
-  geom_point(shape = 21, fill = "white") +
-  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
-  facet_grid(.~ReleaseStatus)
-ggplot(uptake.metab, aes(x = ER.steve, y = UaNO3_gNm2day.steve/1000))+
-  geom_point(shape = 21, fill = "white") +
-  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
-  facet_grid(.~ReleaseStatus)
-ggplot(uptake.metab, aes(x = ER.desoto, y = UaNO3_gNm2day.desoto/1000))+
-  geom_point(shape = 21, fill = "white") +
-  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE) +
-  facet_grid(.~ReleaseStatus)
-
-str(uptake.metab)
-corm <- cor(uptake.metab[c(2,5,11,14,20,23,30:41)], method = "pearson", use = "complete.obs")
-```
-
-```{r Fig 5}
+```{r Fig 5: Nitrate load vs uptake}
 # Fig 5 nitrate load vs nitrate uptake
+ggplot(subset(uptake.metab.mass.long, site == "S1"), aes(x = NitrateLoad_kgNday, 
+                                                         y = UaNO3_gNm2day/1000, 
+                                                         color = ReleaseStatus)) +
+  #facet_grid(~site, scales = "free") +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  # Add correlation coeff
+  ggpubr::stat_cor(color = "black")
+
 
 ggplot(uptake.metab, aes(x = NitrateLoad.eric_kgNday, y = UaNO3_gNm2day.eric/1000))+
   geom_point(shape = 21, fill = "white") +
