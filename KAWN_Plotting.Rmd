@@ -302,36 +302,7 @@ ggpubr::compare_means(value~ReleaseStatus, data = metab.long,
                       group.by = c("model","site"))
 ```
 
-```{r Fig 2: Metabolism and N supply vs time}
-### Assemble data into a boxplot ###############################################
-# Metbolism plot
-ggplot(data = metab.long, aes(ReleaseStatus, value, color= site)) +
-  facet_grid(model ~ site, scales = "free", switch = "y") +
-  # Error bars
-  stat_boxplot(geom = "errorbar", width = 0.5, 
-               position = position_dodge(width = 0.75)) +
-  # Boxplot
-  geom_boxplot(outlier.shape = NA) +
-  # Jitter points
-  geom_point(position = position_jitterdodge(dodge.width = 0.75, 
-                                             jitter.width = 0.7), 
-             alpha = 0.4, shape = 16) +
-  # Add text for significance
-  ggpubr::stat_compare_means(aes(group = ReleaseStatus),
-                             label = "p.signif", 
-                             label.x = 1.4, hide.ns = TRUE) +
-  # Axis labels
-  labs(x = "Release status", 
-       y = bquote("(g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
-  # Theme adjustments
-  theme_classic() +
-  scale_color_manual(values = c("S1" = "#FF0000", 
-                                "S2" = "#23baaf", "S3" = "#F2AD00"),
-                     breaks = c("S1", "S2", "S3")) +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
-ggsave("./Plots/MetabPlot2.png", height = 4.5, width = 5.5, units = "in")
-
+```{r Fig 2: N load vs ReleaseStatus}
 # N load plot
 ggplot(data = massbal, aes(x = date)) +
   # Upstream (Bowersock)
@@ -404,6 +375,37 @@ ggplot(data = massbal, aes(x = date)) +
         legend.position = "bottom", legend.title = element_blank())
 ```
 
+```{r Fig 3: Metabolism vs ReleaseStatus}
+### Assemble data into a boxplot ###############################################
+# Metbolism plot
+ggplot(data = metab.long, aes(ReleaseStatus, value, color= site)) +
+  facet_grid(model ~ site, scales = "free", switch = "y") +
+  # Error bars
+  stat_boxplot(geom = "errorbar", width = 0.5, 
+               position = position_dodge(width = 0.75)) +
+  # Boxplot
+  geom_boxplot(outlier.shape = NA) +
+  # Jitter points
+  geom_point(position = position_jitterdodge(dodge.width = 0.75, 
+                                             jitter.width = 0.7), 
+             alpha = 0.4, shape = 16) +
+  # Add text for significance
+  ggpubr::stat_compare_means(aes(group = ReleaseStatus),
+                             label = "p.signif", 
+                             label.x = 1.4, hide.ns = TRUE) +
+  # Axis labels
+  labs(x = "Release status", 
+       y = bquote("(g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
+  # Theme adjustments
+  theme_classic() +
+  scale_color_manual(values = c("S1" = "#FF0000", 
+                                "S2" = "#23baaf", "S3" = "#F2AD00"),
+                     breaks = c("S1", "S2", "S3")) +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none")
+ggsave("./Plots/MetabPlot2.png", height = 4.5, width = 5.5, units = "in")
+```
+
 ```{r Fig 3: Uptake vs time significance testing}
 ## Significance testing ########################################################
 # Get summary statistics for each group
@@ -431,7 +433,7 @@ positions <- data.frame(site = c("S1", "S1", "S2", "S2", "S3", "S3"),
                                                                 "After")))
 ```
 
-```{r Fig 3: Uptake vs time plotting}
+```{r Fig 4: Uptake vs time plotting}
 ### Assemble data into a boxplot ##############################################
 
 # Boxplot
@@ -514,7 +516,144 @@ ggplot(data = uptake, aes(x = Date)) +
 ggsave("./Plots/Uptake_time.png", height = 3, width = 6, units = "in")
 ```
 
-```{r Fig 4: Uptake vs metabolism.... think about a diff fig}
+```{r Fig 5: Uptake vs metabolism.... think about a diff fig}
+# Scatterplot GPP vs Ua
+ggplot(subset(uptake.metab.long, model == "GPP"), aes(x = value, 
+                                                      y = UaNO3_gNm2day, 
+                                                      color = site)) +
+  facet_grid(site~ReleaseStatus, scales = "free", switch = "y") +
+  geom_point(alpha = 0.4, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE, fullrange = TRUE) +
+  # Add correlation coeff
+  ggpubr::stat_cor(method = "spearman", color = "black") +
+  # Color scales
+  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # Axis labels
+  xlab(bquote("GPP (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # Plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
+# Scatterplot ER vs Ua
+ggplot(subset(uptake.metab.long, model == "ER"), aes(x = value, 
+                                                     y = UaNO3_gNm2day, 
+                                                     color = site)) +
+  facet_grid(site~ReleaseStatus, scales = "free", switch = "y") +
+  geom_point(alpha = 0.4, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE, fullrange = TRUE) +
+  # Add correlation coeff
+  ggpubr::stat_cor(method = "spearman", color = "black") +
+  # Color scales
+  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # Axis labels
+  xlab(bquote("ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # Plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
+# All together graph
+ggplot(uptake.metab.long, aes(x = value, y = UaNO3_gNm2day, 
+                              color = ReleaseStatus)) +
+  facet_grid(site ~ model, scales = "free", switch = "y") +
+  geom_point(alpha = 0.4, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE) +
+  # Add correlation coeff
+  ggpubr::stat_cor(color = "black") +
+  # Color scales
+  #scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+   #                             "S3" = "#F2AD00"),
+    #                 limits = c("S1", "S2", "S3")) +
+  # Axis labels
+  xlab(bquote("GPP or ER (g-" *O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ d^{-1} * ")")) +
+  # Plot theme
+  theme_classic() +
+  theme(#legend.position = "none", 
+        legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+```
+
+```{r Fig 6: Nitrate load vs uptake}
+# Fig 5 nitrate load vs nitrate uptake scatterplot
+ggplot(uptake.metab.mass.long, aes(x = NitrateSupply_gNm2day, y = UaNO3_gNm2day, 
+                                   color =site)) +
+  facet_grid(site~ReleaseStatus, scales = "free", switch = "y") +
+  geom_point(alpha = 0.4, shape = 16) +
+  #scale_x_log10() +
+  #scale_y_log10() +
+  geom_smooth(method = "lm", se = FALSE) +
+  # Add correlation coeff
+  ggpubr::stat_cor(color = "black", method = "spearman") +
+  # Color scales
+  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # Axis labels
+  xlab(expression(NO[3]^{"-"} ~~ "Supply  (g-N" ~~ m^{-2} ~ day^{-1} * ")")) + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # Plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
+# Supply:demand
+ggplot(uptake.metab.mass.long, aes(x = ReleaseStatus, 
+                                   y = NitrateSupply_gNm2day/UaNO3_gNm2day,
+                                   color = site)) +
+  facet_grid(~site) +
+  # Add line at median of data
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, 
+               geom = "crossbar", width = 0.6) +
+  # Add data points
+  geom_jitter(width = 0.2, alpha = 0.4, shape = 16) +
+  # Add text for significance
+  ggpubr::stat_compare_means(aes(group = ReleaseStatus)) +
+  # Color scales
+  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # Axis labels
+  xlab("Release status") + 
+  ylab(expression("N supply :" ~ Ua-NO[3]^{"-"})) +
+  # Plot theme
+  theme_classic() +
+  scale_y_log10() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
+# Broken up by week
+ggplot(uptake.metab.mass.long, aes(x = week(date), 
+                                   y = NitrateSupply_gNm2day/UaNO3_gNm2day,
+                                   color = ReleaseStatus)) +
+  facet_grid(~site) +
+  # Add line at median of data
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, 
+               geom = "crossbar", width = 1) +
+  # Add data points
+  geom_point(alpha = 0.4, shape = 16) +
+  # Add text for significance
+  ggpubr::stat_compare_means(aes(group = ReleaseStatus)) +
+  # Color scales
+ # scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+  #                              "S3" = "#F2AD00"),
+   #                  limits = c("S1", "S2", "S3")) +
+  scale_y_log10()
+```
+
+```{r supplemental}
 # Plotting gpp vs water temp to see if gpp vs ua relationships are temp dependent
 # eric
 ggplot(data = sensor_eric, aes(x = GPP, y = WaterTemp_C)) +
@@ -608,139 +747,4 @@ ggplot(data = sensor_desoto, aes(x = ER.desoto, y = WaterTemp_C)) +
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"))
 
-
-# Scatterplot GPP vs Ua
-ggplot(subset(uptake.metab.long, model == "GPP"), aes(x = value, 
-                                                      y = UaNO3_gNm2day, 
-                                                      color = site)) +
-  facet_grid(site~ReleaseStatus, scales = "free", switch = "y") +
-  geom_point(alpha = 0.4, shape = 16) +
-  geom_smooth(method = "lm", se = FALSE, fullrange = TRUE) +
-  # Add correlation coeff
-  ggpubr::stat_cor(method = "spearman", color = "black") +
-  # Color scales
-  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-                                "S3" = "#F2AD00"),
-                     limits = c("S1", "S2", "S3")) +
-  # Axis labels
-  xlab(bquote("GPP (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-
-# Scatterplot ER vs Ua
-ggplot(subset(uptake.metab.long, model == "ER"), aes(x = value, 
-                                                     y = UaNO3_gNm2day, 
-                                                     color = site)) +
-  facet_grid(site~ReleaseStatus, scales = "free", switch = "y") +
-  geom_point(alpha = 0.4, shape = 16) +
-  geom_smooth(method = "lm", se = FALSE, fullrange = TRUE) +
-  # Add correlation coeff
-  ggpubr::stat_cor(method = "spearman", color = "black") +
-  # Color scales
-  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-                                "S3" = "#F2AD00"),
-                     limits = c("S1", "S2", "S3")) +
-  # Axis labels
-  xlab(bquote("ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-
-# All together graph
-ggplot(uptake.metab.long, aes(x = value, y = UaNO3_gNm2day, 
-                              color = ReleaseStatus)) +
-  facet_grid(site ~ model, scales = "free", switch = "y") +
-  geom_point(alpha = 0.4, shape = 16) +
-  geom_smooth(method = "lm", se = FALSE) +
-  # Add correlation coeff
-  ggpubr::stat_cor(color = "black") +
-  # Color scales
-  #scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-   #                             "S3" = "#F2AD00"),
-    #                 limits = c("S1", "S2", "S3")) +
-  # Axis labels
-  xlab(bquote("GPP or ER (g-" *O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ d^{-1} * ")")) +
-  # Plot theme
-  theme_classic() +
-  theme(#legend.position = "none", 
-        legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-```
-
-```{r Fig 5: Nitrate load vs uptake}
-# Fig 5 nitrate load vs nitrate uptake scatterplot
-ggplot(uptake.metab.mass.long, aes(x = NitrateSupply_gNm2day, y = UaNO3_gNm2day, 
-                                   color =site)) +
-  facet_grid(~site+ReleaseStatus, scales = "free", switch = "y") +
-  geom_point(alpha = 0.4, shape = 16) +
-  #scale_x_log10() +
-  #scale_y_log10() +
-  geom_smooth(method = "lm", se = FALSE) +
-  # Add correlation coeff
-  ggpubr::stat_cor(color = "black", method = "spearman") +
-  # Color scales
-  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-                                "S3" = "#F2AD00"),
-                     limits = c("S1", "S2", "S3")) +
-  # Axis labels
-  xlab(expression(NO[3]^{"-"} ~~ "Supply  (g-N" ~~ m^{-2} ~ day^{-1} * ")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-
-# Supply:demand
-ggplot(uptake.metab.mass.long, aes(x = ReleaseStatus, 
-                                   y = NitrateSupply_gNm2day/UaNO3_gNm2day,
-                                   color = site)) +
-  facet_grid(~site) +
-  # Add line at median of data
-  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, 
-               geom = "crossbar", width = 0.6) +
-  # Add data points
-  geom_jitter(width = 0.2, alpha = 0.4, shape = 16) +
-  # Add text for significance
-  ggpubr::stat_compare_means(aes(group = ReleaseStatus)) +
-  # Color scales
-  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-                                "S3" = "#F2AD00"),
-                     limits = c("S1", "S2", "S3")) +
-  # Axis labels
-  xlab("Release status") + 
-  ylab(expression("N supply :" ~ Ua-NO[3]^{"-"})) +
-  # Plot theme
-  theme_classic() +
-  scale_y_log10() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-
-# Broken up by week
-ggplot(uptake.metab.mass.long, aes(x = week(date), 
-                                   y = NitrateSupply_gNm2day/UaNO3_gNm2day,
-                                   color = ReleaseStatus)) +
-  facet_grid(~site) +
-  # Add line at median of data
-  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, 
-               geom = "crossbar", width = 1) +
-  # Add data points
-  geom_point(alpha = 0.4, shape = 16) +
-  # Add text for significance
-  ggpubr::stat_compare_means(aes(group = ReleaseStatus)) +
-  # Color scales
- # scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-  #                              "S3" = "#F2AD00"),
-   #                  limits = c("S1", "S2", "S3")) +
-  scale_y_log10()
 ```
