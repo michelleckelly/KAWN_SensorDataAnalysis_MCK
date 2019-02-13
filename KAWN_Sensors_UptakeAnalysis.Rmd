@@ -377,19 +377,21 @@ if (UptakeEqn == 2){
       dplyr::group_by(date) %>%
       dplyr::mutate(MaxNitrate = max(Mean.Nitrate_mgL, na.rm = TRUE))
     #
+    #### Below is depreciated, instead using King et al 2014 approach
     # Use a static value for river bed area (m^2)
     # Average discharge at desoto = 61.3 m3/s
     # USGS field measuremnents
-    # 2018-03-01    Q = 1410 ft3/s      Channel area = 811 ft2
+    # 2018-04-24    Q = 1410 ft3/s      Channel area = 811 ft2
     #                 = 39.93 m3/s                   = 75.34 m2
-    # 2018-04-24    Q = 2330 ft3/s      Channel area = 1400 ft2
+    # 2018-06-13    Q = 2330 ft3/s      Channel area = 1400 ft2
     #                 = 65.97 m3/s                   = 130.06 m2
     # Approximate river bed area as 130 m2 (for now)
-    A_m2 <- 130
+    #A_m2 <- 130
     #
     # Calculate water velocity [m/s]
-    prepped_df$v_ms <- prepped_df$Mean.Discharge_m3s/A_m2
-    # 
+    #prepped_df$v_ms <- prepped_df$Mean.Discharge_m3s/A_m2
+    ####
+     
     # Run loop to calculate uptake
     prepped_df$DiffNitrate_mgL <- NA
     # Grab the row number of the start of day 1
@@ -419,19 +421,18 @@ if (UptakeEqn == 2){
       dplyr::summarise(date = date[1],
                        Mean.Discharge_m3s = mean(Mean.Discharge_m3s, 
                                                  na.rm = TRUE),
-                       Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE),
-                       Mean.v_ms = mean(v_ms, na.rm = TRUE), 
+                       Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE), 
                        SumDiffNitrate = sum(DiffNitrate_mgL))
-    # Multiply SumDiff by velocity
-    # Unit check:
-    # [mg / L] * [m / s] = [mg*m / L*s]
-    # [mg*m / L*s] * 1000 [L / m3] * 86400 [s / day] * 1 [g] / 1000 [mg]
-    results$UaNO3_gNm2day <- 
-      results$SumDiffNitrate * results$Mean.v_ms * 86400
+    
+    # Multiply SumDiff by discharge
+    # Uptake [g-N s-1] = SumDiff [mg-N L-1] * Q [m3 s-1] * 1000 [L m-3] / 1000 [g mg-1]
+    #                  = SumDiff [mg-N L-1] * Q [m3 s-1]
+    # Uptake [g-N d-1] = SumDiff [mg-N L-1] * Q [m3 s-1] * 86400 [sec day-1]
+    results$UaNO3_gNd <- results$SumDiffNitrate * results$Mean.Discharge_m3s * 
+      86400
     #
     # Clean up dataframe
     names(results)[names(results) == "date"] <- "Date"
-    names(results)[names(results) == "Mean.v_ms"] <- "Mean.velocity_ms"
     results$SumDiffNitrate <- NULL
     results$day <- NULL
     # Return dataframe
@@ -442,6 +443,26 @@ if (UptakeEqn == 2){
   eric_uptake_Eqn2 <- HC_Eqn2(eric_smooth)
   steve_uptake_Eqn2 <- HC_Eqn2(steve_smooth)
   desoto_uptake_Eqn2 <- HC_Eqn2(desoto_smooth)
+  
+  # Normalize to area
+  # Uptake [g-N m-2 d-1] = Uptake [g-N d-1] / (w [m] * L [m])
+  # where 
+  #   w     aerial stream width
+  #   L     stream reach length, choosing arbitrary 100m (King et al 2014)
+
+  # Site      w (as measured using google maps, in RiverModel_AerialWidths.xlsx)
+  # Eric      210.9 m
+  # Steve     113.4 m
+  # Desoto    138.07 m
+  eric_uptake_Eqn2$UaNO3_gNm2day <- eric_uptake_Eqn2$UaNO3_gNd / (210.9 * 100)
+  steve_uptake_Eqn2$UaNO3_gNm2day <- steve_uptake_Eqn2$UaNO3_gNd / (113.4 * 100)
+  desoto_uptake_Eqn2$UaNO3_gNm2day <- desoto_uptake_Eqn2$UaNO3_gNd / 
+    (138.07 * 100)
+  
+  # Null
+  eric_uptake_Eqn2$UaNO3_gNd <- NULL
+  steve_uptake_Eqn2$UaNO3_gNd <- NULL
+  desoto_uptake_Eqn2$UaNO3_gNd <- NULL
   
   # Date cleanup: remove calculations for dates with bad raw data
   # Eric:
@@ -483,8 +504,6 @@ if (UptakeEqn == 2){
     "Mean.Nitrate_mgL.desoto"
   names(Uptake_Eqn2)[names(Uptake_Eqn2) == "DailyMaxNitrate_mgNL"] <- 
     "DailyMaxNitrate_mgNL.desoto"
-  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "Mean.velocity_ms"] <- 
-    "Mean.velocity_ms.desoto"
   names(Uptake_Eqn2)[names(Uptake_Eqn2) == "DiffNitrate_mgNL"] <- 
     "DiffNitrate_mgNL.desoto"
   names(Uptake_Eqn2)[names(Uptake_Eqn2) == "SumDiffNitrate_mgL"] <- 
