@@ -150,8 +150,7 @@ metab$GPP.lower.steve[metab$date >= ymd("2018-04-20") &
 
 ### Nitrate uptake results ###
 # HAVE bad dates removed
-uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn2.rds")
-uptake$date <- uptake$Date # lazy fix for merging
+uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1.rds")
 
 ### Reshape metab data ########################################################
 # Factorize release status
@@ -205,13 +204,13 @@ levels(uptake.long$site)[levels(uptake.long$site)=="UaNO3_gNm2day.desoto"] <-
 
 ### Join data for comparison plotting ##########################################
 # Merge uptake data and metabolism data
+metab.long$Date <- metab.long$date
 uptake.metab.long <- dplyr::full_join(metab.long, uptake.long, 
-                                      by = c("date", "site", "ReleaseStatus"))
-uptake.metab.long$Date <- NULL
-uptake.metab.long <- subset(uptake.metab.long, date < ymd("2018-05-01"))
+                                      by = c("Date", "site", "ReleaseStatus"))
+uptake.metab.long$date <- NULL
+uptake.metab.long <- subset(uptake.metab.long, Date < ymd("2018-05-01"))
 
 # Merge uptake with N load
-str(massbal)
 # Make massbal long
 massbal.long <- tidyr::gather(massbal[c(1, 26:28)], "site", 
                               "NitrateSupply_gNm2day", 2:4)
@@ -225,8 +224,10 @@ levels(massbal.long$site)[levels(massbal.long$site) ==
                             "NitrateSupply.desoto_gNm2day"] <- "S3"
 massbal.long$site <- factor(massbal.long$site, levels = c("S1", "S2", "S3"))
 # Join
+massbal.long$Date <- massbal.long$date
 uptake.metab.mass.long <- dplyr::full_join(uptake.metab.long, massbal.long, 
-                                           by = c("date", "site"))
+                                           by = c("Date", "site"))
+massbal.long$date <- NULL
 # Subset dates
 uptake.metab.mass.long <- subset(uptake.metab.mass.long, 
                                  uptake.metab.mass.long$date < ymd("2018-05-01"))
@@ -446,7 +447,7 @@ ggplot(data = uptake.long, aes(x = ReleaseStatus, y = UaNO3_gNm2day,
   # Add text for significance
   ggpubr::stat_compare_means(aes(group = ReleaseStatus),
                              label = "p.signif", 
-                             label.x = 1.4, hide.ns = TRUE) +
+                             label.x = 1.4, hide.ns = F) +
   # Boxplots
   geom_boxplot(outlier.shape = NA) +
   # Jitter points
