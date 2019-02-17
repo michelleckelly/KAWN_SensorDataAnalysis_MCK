@@ -60,7 +60,6 @@ dailyavg <- function(sensor_data){
                                       levels = c("During", "After"))
   return(sensor_data)
 }
-
 sensor_eric <- dailyavg(sensor_eric)
 sensor_steve <- dailyavg(sensor_steve)
 sensor_desoto <- dailyavg(sensor_desoto)
@@ -188,9 +187,12 @@ metab.long$site <- factor(metab.long$site, levels = c("S1", "S2", "S3"))
 uptake$ReleaseStatus <- factor(uptake$ReleaseStatus, 
                                levels = c("During", "After"))
 # Adjust from wide to long format
-uptake.long <- tidyr::gather(uptake[c(-2:-3, -5:-6, -8:-9)], key = site, 
+uptake.long <- tidyr::gather(uptake[c(-2:-4, -6:-9, -11:-14, -16)], key = site, 
                              value = UaNO3_gNm2day,
                              UaNO3_gNm2day.eric:UaNO3_gNm2day.desoto)
+supply.long <- tidyr::gather(uptake[c(-2:-5, -7:-10, -12:-15, -17)], key = site, 
+                             value = NitrateSupply_gNm2day,
+                             NitrateSupply_gNm2day.eric:NitrateSupply_gNm2day.desoto)
 # Factorize site name
 uptake.long$site <- factor(uptake.long$site, levels = c("UaNO3_gNm2day.eric", 
                                                         "UaNO3_gNm2day.steve", 
@@ -201,6 +203,16 @@ levels(uptake.long$site)[levels(uptake.long$site)=="UaNO3_gNm2day.steve"] <-
   "S2"
 levels(uptake.long$site)[levels(uptake.long$site)=="UaNO3_gNm2day.desoto"] <- 
   "S3"
+supply.long$site <- factor(supply.long$site, 
+                           levels = c("NitrateSupply_gNm2day.eric", 
+                                      "NitrateSupply_gNm2day.steve", 
+                                      "NitrateSupply_gNm2day.desoto"))
+levels(supply.long$site)[levels(supply.long$site)==
+                           "NitrateSupply_gNm2day.eric"] <- "S1"
+levels(supply.long$site)[levels(supply.long$site)==
+                           "NitrateSupply_gNm2day.steve"] <- "S2"
+levels(supply.long$site)[levels(supply.long$site)==
+                           "NitrateSupply_gNm2day.desoto"] <- "S3"
 
 ### Join data for comparison plotting ##########################################
 # Merge uptake data and metabolism data
@@ -211,28 +223,13 @@ uptake.metab.long$date <- NULL
 uptake.metab.long <- subset(uptake.metab.long, Date < ymd("2018-05-01"))
 
 # Merge uptake with N load
-# Make massbal long
-massbal.long <- tidyr::gather(massbal[c(1, 26:28)], "site", 
-                              "NitrateSupply_gNm2day", 2:4)
-# Rename factors & add columns
-massbal.long$site <-  factor(massbal.long$site)
-levels(massbal.long$site)[levels(massbal.long$site) == 
-                            "NitrateSupply.eric_gNm2day"] <- "S1"
-levels(massbal.long$site)[levels(massbal.long$site) == 
-                                "NitrateSupply.steve_gNm2day"] <- "S2"
-levels(massbal.long$site)[levels(massbal.long$site) == 
-                            "NitrateSupply.desoto_gNm2day"] <- "S3"
-massbal.long$site <- factor(massbal.long$site, levels = c("S1", "S2", "S3"))
-# Join
-massbal.long$Date <- massbal.long$date
-uptake.metab.mass.long <- dplyr::full_join(uptake.metab.long, massbal.long, 
+uptake.metab.mass.long <- dplyr::full_join(uptake.metab.long, supply.long, 
                                            by = c("Date", "site"))
-massbal.long$date <- NULL
 # Subset dates
 uptake.metab.mass.long <- subset(uptake.metab.mass.long, 
-                                 uptake.metab.mass.long$date < ymd("2018-05-01"))
+                                 uptake.metab.mass.long$Date < ymd("2018-05-01"))
 uptake.metab.mass.long <- subset(uptake.metab.mass.long, 
-                                 uptake.metab.mass.long$date >= ymd("2018-02-01"))
+                                 uptake.metab.mass.long$Date >= ymd("2018-02-01"))
 
 ```
 
@@ -438,14 +435,46 @@ positions <- data.frame(site = c("S1", "S1", "S2", "S2", "S3", "S3"),
 ### Assemble data into a boxplot ##############################################
 
 # Boxplot
-ggplot(data = uptake.long, aes(x = ReleaseStatus, y = UaNO3_gNm2day, 
-                               color = site)) +
+# Broken up by ReleaseStatus
+ggplot(data = uptake.metab.mass.long, aes(x = ReleaseStatus, 
+                                          y = UaNO3_gNm2day, color = site)) +
   facet_wrap(~site) +
   # Error bars
   stat_boxplot(geom = "errorbar", width = 0.5, 
                position = position_dodge(width = 0.75)) +
   # Add text for significance
-  ggpubr::stat_compare_means(aes(group = ReleaseStatus),
+  ggpubr::stat_compare_means(aes(group = ReleaseStatus), label = "p.signif", 
+                             label.x = 1.4, hide.ns = F) +
+  # Boxplots
+  geom_boxplot(outlier.shape = NA) +
+  # Jitter points
+  geom_point(position = position_jitterdodge(dodge.width = 0.75, 
+                                             jitter.width = 0.7), 
+             alpha = 0.4, shape = 16) +
+  scale_y_log10(breaks = c(1,10,100,1E3,1E4)) +
+  # Color scales
+  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # axis labels
+  xlab("date") + 
+  ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+# Broken up monthly
+ggplot(data = uptake.metab.mass.long, aes(x = factor(month(Date, label = TRUE, 
+                                                           abbr = TRUE)), 
+                                          y = UaNO3_gNm2day, color = site)) +
+  facet_wrap(~site) +
+  # Error bars
+  stat_boxplot(geom = "errorbar", width = 0.5, 
+               position = position_dodge(width = 0.75)) +
+  # Add text for significance
+  ggpubr::stat_compare_means(aes(group = factor(month(Date, label = TRUE, 
+                                                      abbr = TRUE))),
                              label = "p.signif", 
                              label.x = 1.4, hide.ns = F) +
   # Boxplots
@@ -460,7 +489,7 @@ ggplot(data = uptake.long, aes(x = ReleaseStatus, y = UaNO3_gNm2day,
                                 "S3" = "#F2AD00"),
                      limits = c("S1", "S2", "S3")) +
   # axis labels
-  xlab("Release status") + 
+  xlab("date") + 
   ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
   # plot theme
   theme_classic() +
@@ -468,7 +497,7 @@ ggplot(data = uptake.long, aes(x = ReleaseStatus, y = UaNO3_gNm2day,
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"))
 # Save
-ggsave("./Plots/Uptake_boxplot.png", height = 4, width = 5.5, units = "in")
+ggsave("./Plots/Uptake_boxplot.png", height = 3.5, width = 5.5, units = "in")
 
 ### x axis as time ###
 ggplot(data = uptake, aes(x = Date)) +
@@ -519,7 +548,7 @@ ggsave("./Plots/Uptake_time.png", height = 3, width = 6, units = "in")
 
 ```{r Fig 5: Uptake vs metabolism.... think about a diff fig}
 # Scatterplot GPP vs Ua
-ggplot(subset(uptake.metab.long, model == "GPP"), aes(x = value, 
+ggplot(subset(uptake.metab.mass.long, model == "GPP"), aes(x = value, 
                                                       y = UaNO3_gNm2day, 
                                                       color = site)) +
   facet_grid(site~ReleaseStatus, scales = "free", switch = "y") +
@@ -541,7 +570,7 @@ ggplot(subset(uptake.metab.long, model == "GPP"), aes(x = value,
         axis.text = element_text(color = "black"))
 
 # Scatterplot ER vs Ua
-ggplot(subset(uptake.metab.long, model == "ER"), aes(x = value, 
+ggplot(subset(uptake.metab.mass.long, model == "ER"), aes(x = value, 
                                                      y = UaNO3_gNm2day, 
                                                      color = site)) +
   facet_grid(site~ReleaseStatus, scales = "free", switch = "y") +
@@ -563,13 +592,13 @@ ggplot(subset(uptake.metab.long, model == "ER"), aes(x = value,
         axis.text = element_text(color = "black"))
 
 # All together graph
-ggplot(uptake.metab.long, aes(x = value, y = UaNO3_gNm2day, 
+ggplot(uptake.metab.mass.long, aes(x = value, y = UaNO3_gNm2day, 
                               color = ReleaseStatus)) +
   facet_grid(site ~ model, scales = "free", switch = "y") +
   geom_point(alpha = 0.4, shape = 16) +
   geom_smooth(method = "lm", se = FALSE) +
   # Add correlation coeff
-  ggpubr::stat_cor(color = "black") +
+  #ggpubr::stat_cor(color = "black") +
   # Color scales
   #scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
    #                             "S3" = "#F2AD00"),
@@ -608,6 +637,33 @@ ggplot(uptake.metab.mass.long, aes(x = NitrateSupply_gNm2day, y = UaNO3_gNm2day,
   theme(legend.position = "none", legend.title = element_blank(),
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"))
+
+
+ggplot(uptake.metab.mass.long, aes(x = factor(month(Date, label = TRUE, abbr = TRUE)), 
+                                   y = NitrateSupply_gNm2day/UaNO3_gNm2day,
+                                   color = site)) +
+  facet_grid(~site) +
+  # Add line at median of data
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, 
+               geom = "crossbar", width = 0.6) +
+  # Add data points
+  geom_jitter(width = 0.2, alpha = 0.4, shape = 16) +
+  # Add text for significance
+  ggpubr::stat_compare_means(aes(group = factor(month(Date, label = TRUE, abbr = TRUE)))) +
+  # Color scales
+  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # Axis labels
+  xlab("Release status") + 
+  ylab(expression("N supply :" ~ Ua-NO[3]^{"-"})) +
+  # Plot theme
+  theme_classic() +
+  scale_y_log10() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
 
 # Supply:demand
 ggplot(uptake.metab.mass.long, aes(x = ReleaseStatus, 

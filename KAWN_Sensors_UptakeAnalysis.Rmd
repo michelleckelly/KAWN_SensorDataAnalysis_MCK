@@ -241,7 +241,8 @@ if (UptakeEqn == 1) {
     uptake_df <- 
       uptake_df %>%
       dplyr::group_by(Date = date) %>%
-      summarise(Mean.Discharge_m3s = mean(Mean.Discharge_m3s),
+      summarise(Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE),
+                Mean.Discharge_m3s = mean(Mean.Discharge_m3s),
                 SumDiff_mgNL = sum(DiffNitrate))
     return(uptake_df)
   }
@@ -251,28 +252,47 @@ if (UptakeEqn == 1) {
   steve_uptake_Eqn1 <- HC_Eqn1(steve_uptake)
   desoto_uptake_Eqn1 <- HC_Eqn1(desoto_uptake)
   
-  # Calculate Ua with specific scaling for each site
+  # Calculate Uptake (Ua) and Supply with specific scaling for each site
+  
   # Ua = SumNitrateDiff [mg/L] * Q [m3/s] / (w [m] * L[m] ) 
   #       * 1000 [L/m3] / 1000 [g/mg] * 86400 [sec/day]
+  
+  # Supply [g-N m-2 d-1] = 
+  #             ( Q [L s-1] * C [g-N L-1] * 86400 [s d-1] ) / (w [m] * L [m])
+  #                      = mass N load [g-N d-1] / (w [m] * L [m])
+  
+  # where 
+  #   w     aerial stream width
+  #   L     stream reach length, choosing arbitrary 100m (King et al 2014)
+  # Site      w (as measured using google maps, in RiverModel_AerialWidths.xlsx)
+  # Eric      210.9 m
+  # Steve     113.4 m
+  # Desoto    138.07 m
   
   # Eric
   # Set days where no uptake occured (negative values) to NA
   # These days will be termed "non-detectable", are likely due to changes in Q
-  eric_uptake_Eqn1$SumDiff_mgNL[eric_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
   eric_uptake_Eqn1$UaNO3_gNm2day <- eric_uptake_Eqn1$SumDiff_mgNL *
     eric_uptake_Eqn1$Mean.Discharge_m3s / (210.9 * 100) * 86400
+  eric_uptake_Eqn1$UaNO3_gNm2day[eric_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+  eric_uptake_Eqn1$NitrateSupply_gNm2day <- eric_uptake_Eqn1$Mean.Nitrate_mgL*
+    eric_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (210.9 * 100)
   
   # Steve
-  steve_uptake_Eqn1$SumDiff_mgNL[steve_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
   steve_uptake_Eqn1$UaNO3_gNm2day <- steve_uptake_Eqn1$SumDiff_mgNL *
     steve_uptake_Eqn1$Mean.Discharge_m3s / (113.4 * 100) * 86400
+  steve_uptake_Eqn1$UaNO3_gNm2day[steve_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+  steve_uptake_Eqn1$NitrateSupply_gNm2day <- steve_uptake_Eqn1$Mean.Nitrate_mgL*
+    steve_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (113.4 * 100)
   
   # Desoto
   # Set days where no uptake occured (negative values) to NA
   # These days will be termed "non-detectable", are likely due to changes in Q
-  desoto_uptake_Eqn1$SumDiff_mgNL[desoto_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
   desoto_uptake_Eqn1$UaNO3_gNm2day <- desoto_uptake_Eqn1$SumDiff_mgNL *
     desoto_uptake_Eqn1$Mean.Discharge_m3s / (138.07 * 100) * 86400
+  desoto_uptake_Eqn1$UaNO3_gNm2day[desoto_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+  desoto_uptake_Eqn1$NitrateSupply_gNm2day <- desoto_uptake_Eqn1$Mean.Nitrate_mgL *
+    desoto_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (138.07 * 100)
   
   # Merge calculations into a single dataframe and save to CSV file
   Uptake_Eqn1 <- dplyr::full_join(eric_uptake_Eqn1, steve_uptake_Eqn1, 
@@ -286,12 +306,16 @@ if (UptakeEqn == 1) {
   Uptake_Eqn1$ReleaseStatus <- "During"
   Uptake_Eqn1$ReleaseStatus[Uptake_Eqn1$Date >= ymd("2018-04-01")] <- "After"
   
+  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Mean.Nitrate_mgL"] <- 
+    "Mean.Nitrate_mgL.desoto"
   names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Mean.Discharge_m3s"] <- 
     "Mean.Discharge_m3s.desoto"
   names(Uptake_Eqn1)[names(Uptake_Eqn1) == "SumDiff_mgNL"] <- 
     "SumDiff_mgNL.desoto"
   names(Uptake_Eqn1)[names(Uptake_Eqn1) == "UaNO3_gNm2day"] <- 
     "UaNO3_gNm2day.desoto"
+  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "NitrateSupply_gNm2day"] <- 
+    "NitrateSupply_gNm2day.desoto"
   
   # Date cleanup: remove calculations for dates with bad raw data
   # Eric:
@@ -322,7 +346,6 @@ if (UptakeEqn == 1) {
   write.csv(Uptake_Eqn1, file = "./Outputs/NitrateUptakeResults_Eqn1.csv", 
             row.names = FALSE)
   saveRDS(Uptake_Eqn1, file = "./Outputs/NitrateUptakeResults_Eqn1.rds")
-  
 }
 
 #### Calculate uptake using Equation 2 #########################################
