@@ -944,7 +944,7 @@ round_date(uptake.metab.mass.long$Date, unit = period(week = 2))
 ```
 
 ```{r Fig 7: Meta-analysis}
-### Assemble means of our data
+### Assemble means of our data #################################################
 # Set up empty data frame
 means <- data.frame(Site = c("S1", "S2", "S3"),
                     Nitrate_mgL.Overall = numeric(length = 3),
@@ -988,14 +988,100 @@ means$Discharge_m3s.Overall <-
                                           uptake$Date < "2018-05-01"], na.rm = TRUE))
 # Uptake
 means$U_gNm2day.Overall <- 
-  c(mean(uptake$Mean.Discharge_m3s.eric[uptake$Date >= "2018-02-01" & 
-                                        uptake$Date < "2018-05-01"], na.rm = TRUE),
-    mean(uptake$Mean.Discharge_m3s.steve[uptake$Date >= "2018-02-01" & 
-                                         uptake$Date < "2018-05-01"], na.rm = TRUE),
-    mean(uptake$Mean.Discharge_m3s.desoto[uptake$Date >= "2018-02-01" & 
-                                          uptake$Date < "2018-05-01"], na.rm = TRUE))
+  c(mean(uptake$UaNO3_gNm2day.eric[uptake$Date >= "2018-02-01" & 
+                                   uptake$Date < "2018-05-01"], na.rm = TRUE),
+    mean(uptake$UaNO3_gNm2day.steve[uptake$Date >= "2018-02-01" & 
+                                    uptake$Date < "2018-05-01"], na.rm = TRUE),
+    mean(uptake$UaNO3_gNm2day.desoto[uptake$Date >= "2018-02-01" & 
+                                     uptake$Date < "2018-05-01"], na.rm = TRUE))
 means$U_gNm2day.During <- 
+  c(mean(uptake$UaNO3_gNm2day.eric[uptake$Date >= "2018-02-01" & 
+                                   uptake$Date < "2018-04-01"], na.rm = TRUE),
+    mean(uptake$UaNO3_gNm2day.steve[uptake$Date >= "2018-02-01" & 
+                                    uptake$Date < "2018-04-01"], na.rm = TRUE),
+    mean(uptake$UaNO3_gNm2day.desoto[uptake$Date >= "2018-02-01" & 
+                                     uptake$Date < "2018-04-01"], na.rm = TRUE))
 means$U_gNm2day.After <- 
+  c(mean(uptake$UaNO3_gNm2day.eric[uptake$Date >= "2018-04-01" & 
+                                   uptake$Date < "2018-05-01"], na.rm = TRUE),
+    mean(uptake$UaNO3_gNm2day.steve[uptake$Date >= "2018-04-01" & 
+                                    uptake$Date < "2018-05-01"], na.rm = TRUE),
+    mean(uptake$UaNO3_gNm2day.desoto[uptake$Date >= "2018-04-01" & 
+                                     uptake$Date < "2018-05-01"], na.rm = TRUE))
+# GPP
+means$GPP_gO2m2day.Overall <- 
+  c(mean(metab$GPP.eric[metab$date >= "2018-02-01" & 
+                          metab$date < "2018-05-01"], na.rm = TRUE),
+    mean(metab$GPP.steve[metab$date >= "2018-02-01" & 
+                           metab$date < "2018-05-01"], na.rm = TRUE),
+    mean(metab$GPP.desoto[metab$date >= "2018-02-01" & 
+                           metab$date < "2018-05-01"], na.rm = TRUE))
+# ER
+means$ER_gO2m2day.Overall <- 
+  c(-mean(metab$ER.eric[metab$date >= "2018-02-01" & 
+                          metab$date < "2018-05-01"], na.rm = TRUE),
+    -mean(metab$ER.steve[metab$date >= "2018-02-01" & 
+                           metab$date < "2018-05-01"], na.rm = TRUE),
+    -mean(metab$ER.desoto[metab$date >= "2018-02-01" & 
+                           metab$date < "2018-05-01"], na.rm = TRUE))
+
+### Meta-analysis Discharge vs GPP, Hall et al 2016 Data #######################
+ggplot() +
+  # Meta-analysis data
+  geom_point(data = hall, aes(x = q_m3s, y = gpp_gm2d), shape = 21, 
+             color = "darkgrey") +
+  # Our data
+  geom_point(data = means, aes(x = Discharge_m3s.Overall, 
+                               y = GPP_gO2m2day.Overall, fill = Site), 
+             size = 3, shape = 21) +
+  # Add correlation coeff
+  #ggpubr::stat_cor(color = "black", method = "spearman") +
+  # Axis scales
+  scale_x_log10() +
+  scale_y_log10() +
+  # Axis labels
+  xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
+  ylab(expression("GPP (g" ~ O[2] ~ m^{-2} ~ d^{-1}*")")) +
+  # Color scales
+  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # Plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+# Save plot
+ggsave("./Plots/Meta_Q.GPP.png", height = 3.5, width = 4.25, units = "in")
+
+### Meta-analysis Discharge vs ER, Hall et al 2016 Data #######################
+ggplot() +
+  # Meta-analysis data
+  geom_point(data = hall, aes(x = q_m3s, y = er_gm2d), shape = 21, 
+             color = "darkgrey") +
+  # Our data
+  geom_point(data = means, aes(x = Discharge_m3s.Overall, 
+                               y = ER_gO2m2day.Overall, fill = Site), 
+             size = 3, shape = 21) +
+  # Add correlation coeff
+  #ggpubr::stat_cor(color = "black", method = "spearman") +
+  # Axis scales
+  scale_x_log10() +
+  scale_y_log10() +
+  # Axis labels
+  xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
+  ylab(expression("|ER| (g" ~ O[2] ~ m^{-2} ~ d^{-1}*")")) +
+  # Color scales
+  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # Plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+# Save plot
+ggsave("./Plots/Meta_Q.ER.png", height = 3.5, width = 4.25, units = "in")
 
 
 # discharge vs uptake velocity dotplot
@@ -1016,59 +1102,6 @@ ggplot(data = tank, aes(x = Discharge_Ls, y = NO3_Vf_mmmin)) +
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"))
 
-
-
-# Overall means
-desoto_uptakemeans$Nitrate_mgL.Overall <- 
-  mean(uptake$Mean.Nitrate_mgL.desoto[uptake$Date < "2018-05-01"], 
-       na.rm = TRUE)
-desoto_uptakemeans$Discharge_m3s.Overall <- 
-  mean(uptake$Mean.Discharge_m3s.desoto[uptake$Date < "2018-05-01"], 
-       na.rm = TRUE)
-
-desoto_uptakemeans$UaNO3_gNm2day.Overall <- 
-  mean(uptake$UaNO3_gNm2day.desoto[uptake$Date < "2018-05-01"], 
-       na.rm = TRUE)
-# During pumping
-desoto_uptakemeans$Nitrate_mgL.During <- 
-  mean(uptake$Mean.Nitrate_mgL.desoto[uptake$Date > "2018-02-01" & 
-                                        uptake$Date < "2018-04-01"], 
-       na.rm = TRUE)
-desoto_uptakemeans$Discharge_m3s.During <- 
-  mean(uptake$Mean.Discharge_m3s.desoto[uptake$Date > "2018-02-01" & 
-                                        uptake$Date < "2018-04-01"], 
-       na.rm = TRUE)
-desoto_uptakemeans$UaNO3_gNm2day.During <- 
-  mean(uptake$UaNO3_gNm2day.desoto[uptake$Date > "2018-02-01" & 
-                                        uptake$Date < "2018-04-01"], 
-       na.rm = TRUE)
-# After
-desoto_uptakemeans$Nitrate_mgL.After <- 
-  mean(uptake$Mean.Nitrate_mgL.desoto[uptake$Date > "2018-04-01" & 
-                                      uptake$Date < "2018-05-01"], 
-       na.rm = TRUE)
-desoto_uptakemeans$Discharge_m3s.After <- 
-  mean(uptake$Mean.Discharge_m3s.desoto[uptake$Date > "2018-04-01" & 
-                                        uptake$Date < "2018-05-01"], 
-       na.rm = TRUE)
-desoto_uptakemeans$UaNO3_gNm2day.After <- 
-  mean(uptake$UaNO3_gNm2day.desoto[uptake$Date > "2018-04-01" & 
-                                        uptake$Date < "2018-05-01"], 
-       na.rm = TRUE)
-desoto_uptakemeans <- as.data.frame(desoto_uptakemeans)
-# Average stats
-mean(subset(metab_eric, date >= "2018-02-01" & date < "2018-05-01")$GPP, 
-            na.rm = TRUE)
-mean(subset(metab_steve, date >= "2018-02-01" & date < "2018-05-01")$GPP, 
-            na.rm = TRUE)
-mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$GPP.desoto, 
-            na.rm = TRUE)
-mean(subset(metab_eric, date >= "2018-02-01" & date < "2018-05-01")$ER, 
-            na.rm = TRUE)
-mean(subset(metab_steve, date >= "2018-02-01" & date < "2018-05-01")$ER, 
-            na.rm = TRUE)
-mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER.desoto, 
-            na.rm = TRUE)
 
 # vf mm/min * NO3 mg/L *[1000L/m3] *[1m/1000mm] *[1g/1000mg] * [1440 min/d] = gN/day*m2
 # I don't think the snake r is included in this dataset
@@ -1103,26 +1136,9 @@ ggplot() +
 
 # Discharge vs metabolism dotplot
 # Extract mean GPP
-metab.long %>%
-  subset(site == "S1" & Date < "2018-05-01" & model = "GPP") %>%
-  summarise(mean(na.rm = TRUE))
 
-ggplot(data = hall, aes(x = q_m3s, y = gpp_gm2d)) +
-  geom_point(color = "darkgrey") +
-  #geom_smooth(method = "lm") +
-  # Add correlation coeff
-  #ggpubr::stat_cor(color = "black", method = "spearman") +
-  # Axis scales
-  scale_x_log10() +
-  scale_y_log10() +
-  # Axis labels
-  xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
-  ylab(expression("GPP (g" ~ O[2] ~ m^{-2} ~ d^{-1}*")")) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
+
+
 
 ```
 
