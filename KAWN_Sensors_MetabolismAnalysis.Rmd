@@ -26,7 +26,7 @@ library(tidyr)
 ```
 
 ```{r metabolism.load}
-loadfromfile <- TRUE # if loadfromfile TRUE, load metabolsim model from saved RData file
+loadfromfile <- FALSE # if loadfromfile TRUE, load metabolsim model from saved RData file
 
 if (loadfromfile) {
   modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
@@ -61,8 +61,10 @@ if (!loadfromfile){
   # request data from API
   steve_data <- request_data(site_code.steve, token = user_token) 
   # format data for modeling
-  fitdata.steve <- prep_metabolism(steve_data, type = model_type, model = model_name,
-                                    rm_flagged = "Bad Data", fillgaps = "interpolation")
+  fitdata.steve <- prep_metabolism(steve_data, type = model_type, 
+                                   model = model_name,
+                                    rm_flagged = "Bad Data", 
+                                   fillgaps = "interpolation")
   # fit metabolism model (about 1hr of run time)
   modelfit.steve <- fit_metabolism(fitdata.steve)
   # save model results to folder
@@ -73,8 +75,10 @@ if (!loadfromfile){
   site_code.desoto <- "KS_KANSASR"
   desoto_data <- request_data(site_code.desoto, token = user_token)
   # formatting data for metabolism modeling
-  fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, model = model_name,
-                                    rm_flagged = "Bad Data", fillgaps = "interpolation")
+  fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, 
+                                    model = model_name,
+                                    rm_flagged = "Bad Data", 
+                                    fillgaps = "interpolation")
   # use streamMetabolizer to fit model
   modelfit.desoto <- fit_metabolism(fitdata.desoto)
   # save model results to folder, as .RData and as .csv

@@ -338,8 +338,8 @@ if (UptakeEqn == 1) {
   # Sensor not deployed until Feb 10 at 15:00
   Uptake_Eqn1$UaNO3_gNm2day.steve[Uptake_Eqn1$Date >= ymd("2018-02-01") &
                                     Uptake_Eqn1$Date <= ymd("2018-02-10")] <- NA
-  # Sensor burial 2018-03-10 thru 2018-03-22
-  Uptake_Eqn1$UaNO3_gNm2day.steve[Uptake_Eqn1$Date >= ymd("2018-03-10") &
+  # Sensor burial 2018-03-09 thru 2018-03-22
+  Uptake_Eqn1$UaNO3_gNm2day.steve[Uptake_Eqn1$Date >= ymd("2018-03-09") &
                                     Uptake_Eqn1$Date <= ymd("2018-03-22")] <- NA
   
   # Save dataframe
