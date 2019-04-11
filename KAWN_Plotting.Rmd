@@ -273,6 +273,7 @@ uptake.metab.mass.long <- subset(uptake.metab.mass.long,
 tank <- read.csv("./Data/Meta-analysis/Tank_2008_uptakedata.csv",
                  header = TRUE)
 tank$NO3_Cb_mgNL <- tank$NO3_Cb_ugNL/1000
+rode.hensley <- read.csv("./Data/Meta-analysis/Rode_Hensley_SensorUptake.csv")
 
 # Load in Hall et al 2016 metabolism meta-analysis
 hall <- read.csv("./Data/Meta-analysis/Hall_2016_metabolismdata.csv", 
@@ -285,8 +286,50 @@ DOC <- read.csv("./Data/KAW_RAPID_DOC.csv", header = TRUE,
 DOC$SamplingDate <- lubridate::mdy(DOC$SamplingDate)
 ```
 
-```{r Statistical tests}
+```{r Calculation: Vf}
+## Calculate uptake velocity ###################################################
+
+# vf = U [g-N / m2 day] / NO3 [mg-N / L] * 1000 [mg-N / g-N] / 1000 [m3 / L] 
+#    = vf [m / day] / 1440 [day / min] * 1000 [mm/m] = vf [mm/min]
+uptake$vf_mmmin.eric <- 
+  uptake$UaNO3_gNm2day.eric / uptake$Mean.Nitrate_mgL.eric / 1440 * 1000
+uptake$vf_mmmin.steve <- 
+  uptake$UaNO3_gNm2day.steve / uptake$Mean.Nitrate_mgL.steve / 1440 * 1000
+uptake$vf_mmmin.desoto <- 
+  uptake$UaNO3_gNm2day.desoto / uptake$Mean.Nitrate_mgL.desoto / 1440 * 1000
+# Adjust data frame structure
+vf <- tidyr::gather(uptake, key = site, value = vf_mmmin, 
+                    vf_mmmin.eric:vf_mmmin.desoto)
+vf$site <- factor(vf$site, levels = c("vf_mmmin.eric", "vf_mmmin.steve", 
+                                      "vf_mmmin.desoto"))
+levels(vf$site)[levels(vf$site)=="vf_mmmin.eric"] <- "S1"
+levels(vf$site)[levels(vf$site)=="vf_mmmin.steve"] <- "S2"
+levels(vf$site)[levels(vf$site)=="vf_mmmin.desoto"] <- "S3"
+vf <- vf[-c(2:16)]
+vf <- subset(vf, Date < "2018-05-01")
+vf$Month <- lubridate::month(vf$Date, label = TRUE, abbr = TRUE)
+
+# Join with metabolism data
+vf.metab <- dplyr::full_join(metab.long, vf, by = c("Date", "site", "ReleaseStatus"))
+vf.metab$date <- NULL
+```
+
+```{r Calculation: P/R}
+PR <- 
+  metab.long %>%
+  tidyr::spread(model, value) %>%
+  group_by(site) %>%
+  mutate(PR = GPP/abs(ER))
+```
+
+```{r Stats}
 metab.long$Month <- lubridate::month(metab.long$Date)
+# Correct date spans
+metab.long <- 
+  metab.long[metab.long$Date < "2018-05-01" & metab.long$Date >= "2018-02-01",]
+PR <- PR[PR$date < "2018-05-01" & PR$date >= "2018-02-01",]
+vf.metab <- vf.metab[vf.metab$Date < "2018-05-01" & vf.metab$Date >="2018-02-01",]
+
 
 ## Metabolism ##################################################################
 # Test whether GPP was significanly different between sites using non-parametric 
@@ -303,6 +346,11 @@ ggpubr::compare_means(value~site, data = subset(metab.long, model == "ER"),
 ggpubr::compare_means(value~Month, data = subset(metab.long, model == "ER"),
                       group.by = c("site"), method = "kruskal.test") 
 
+#P/R difference between sites
+ggpubr::compare_means(PR~site, data = PR, method = "kruskal.test")
+#P/R difference within a site through time
+
+
 ## Uptake ######################################################################
 # Test whether mean U was different between sites
 uptake.metab.mass.long$Month <- lubridate::month(uptake.metab.mass.long$Date)
@@ -312,29 +360,107 @@ ggpubr::compare_means(UaNO3_gNm2day~site, data = uptake.metab.mass.long,
 ggpubr::compare_means(UaNO3_gNm2day~ReleaseStatus, data = uptake.metab.mass.long, 
                       method = "kruskal.test", group.by = c("site"))
 ## Uptake velocity #############################################################
-
+# Test whether mean Vf was different between sites
+ggpubr::compare_means(vf_mmmin~site, data = vf, method = "kruskal.test")
+# Test Vf during vs after
+ggpubr::compare_means(vf_mmmin~ReleaseStatus, data = vf, method = "kruskal.test", group.by = c("site"))
 
 ## Uptake vs GPP & ER ##########################################################
-# Overall
+# U
 cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.mass.long, model == "GPP"),
+         data = subset(uptake.metab.mass.long, model == "GPP" & 
+                         ReleaseStatus == "During"),
+         method = c("spearman"))
+cor.test(~UaNO3_gNm2day+value, 
+         data = subset(uptake.metab.mass.long, model == "GPP" & 
+                         ReleaseStatus == "After"),
          method = c("spearman"))
 # S1
 cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.mass.long, model == "GPP" & site == "S1"),
+         data = subset(uptake.metab.mass.long, model == "GPP" & 
+                         site == "S1"),
+         method = c("spearman"))
+cor.test(~UaNO3_gNm2day+value, 
+         data = subset(uptake.metab.mass.long, model == "ER" & 
+                         site == "S1"),
          method = c("spearman"))
 # S2
 cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.mass.long, model == "GPP" & site == "S2"),
+         data = subset(uptake.metab.mass.long, model == "GPP" & 
+                         site == "S2"),
+         method = c("spearman"))
+cor.test(~UaNO3_gNm2day+value, 
+         data = subset(uptake.metab.mass.long, model == "ER" & 
+                         site == "S2"),
          method = c("spearman"))
 # S3
-cor.test(~value+UaNO3_gNm2day, 
-         data = subset(uptake.metab.mass.long, model == "GPP" & site == "S3"),
+cor.test(~UaNO3_gNm2day+value, 
+         data = subset(uptake.metab.mass.long, model == "GPP" & 
+                         site == "S3"),
          method = c("spearman"))
-ggpubr::stat_cor()
+cor.test(~UaNO3_gNm2day+value, 
+         data = subset(uptake.metab.mass.long, model == "ER" & 
+                         site == "S3"),
+         method = c("spearman"))
+# Vf
+cor.test(~vf_mmmin+value, 
+         data = subset(vf.metab, model == "GPP" & site == "S1"), 
+         method = c("spearman"))
+cor.test(~vf_mmmin+value, 
+         data = subset(vf.metab, model == "ER" & site == "S1"), 
+         method = c("spearman"))
+cor.test(~vf_mmmin+value, 
+         data = subset(vf.metab, model == "GPP" & site == "S2"), 
+         method = c("spearman"))
+cor.test(~vf_mmmin+value, 
+         data = subset(vf.metab, model == "ER" & site == "S2"), 
+         method = c("spearman"))
+cor.test(~vf_mmmin+value, 
+         data = subset(vf.metab, model == "GPP" & site == "S3"), 
+         method = c("spearman"))
+cor.test(~vf_mmmin+value, 
+         data = subset(vf.metab, model == "ER" & site == "S3"), 
+         method = c("spearman"))
+
+
+
+
+
+
+
+# The below portion has not been editied
+## Significance testing ########################################################
+# Get summary statistics for each group
+uptake.long %>%
+  subset(Date < "2018-05-01") %>%
+  group_by(site, ReleaseStatus) %>%
+  filter(!is.na(UaNO3_gNm2day)) %>%
+  summarise(n = n(),
+            mean = mean(UaNO3_gNm2day, na.rm = TRUE),
+            sd = sd(UaNO3_gNm2day, na.rm = TRUE))
+# Perform two-way anova to assess the affect of two grouping variables 
+# (site & release status) on response (uptake)
+anova.uptake <- aov(UaNO3_gNm2day ~ ReleaseStatus * site, data = subset(uptake.long, Date<"2018-05-01"))
+summary(anova.uptake) 
+# Get multiple pairwise comparisons between the means of groups (to see specifically which groups differ) using Tukey honest significant differences 
+TukeyHSD(anova.uptake) # differences between sites 
+
+# Set up positions for significance letters
+positions <- data.frame(site = c("S1", "S1", "S2", "S2", "S3", "S3"),
+                              UaNO3_gNm2day = c(1E7,2E6,9E5,1E5,9E5,3E5),
+                              ReleaseStatus = factor(c("During", "After",
+                                                       "During", 
+                                                       "After", "During",  
+                                                       "After"), 
+                                                     levels = c("During", 
+                                                                "After")))
+
+ggpubr::compare_means(data = uptake.metab.mass.long, UaNO3_gNm2day~ReleaseStatus, 
+                      group.by = c("site"))
+
 ```
 
-```{r Mean data}
+```{r Calculation: Mean data}
 ### Assemble means of our data #################################################
 # Set up empty data frame
 means <- data.frame(Site = c("S1", "S2", "S3"),
@@ -449,6 +575,14 @@ means$U_gNm2day.After <-
                                     uptake$Date < "2018-05-01"], na.rm = TRUE),
     mean(uptake$UaNO3_gNm2day.desoto[uptake$Date >= "2018-04-01" & 
                                      uptake$Date < "2018-05-01"], na.rm = TRUE))
+# Vf
+means$vf_mmmin.Overall <- c(mean(vf$vf_mmmin[vf$site == "S1"], na.rm = TRUE),
+                            mean(vf$vf_mmmin[vf$site == "S2"], na.rm = TRUE),
+                            mean(vf$vf_mmmin[vf$site == "S3"], na.rm = TRUE))
+means$vf_mmmin.Overall.sd <- c(sd(vf$vf_mmmin[vf$site == "S1"], na.rm = TRUE),
+                               sd(vf$vf_mmmin[vf$site == "S2"], na.rm = TRUE),
+                               sd(vf$vf_mmmin[vf$site == "S3"], na.rm = TRUE))
+
 # GPP
 means$GPP_gO2m2day.Overall <- 
   c(mean(metab$GPP.eric[metab$date >= "2018-02-01" & 
@@ -479,7 +613,12 @@ means$ER_gO2m2day.Overall.sd <-
                            metab$date < "2018-05-01"], na.rm = TRUE),
     sd(metab$ER.desoto[metab$date >= "2018-02-01" & 
                            metab$date < "2018-05-01"], na.rm = TRUE))
-
+# P/R
+PR %>%
+  filter(date >= "2018-02-01" & date <= "2018-05-01") %>%
+  arrange(date) %>%
+  group_by(site) %>%
+  summarise(PR.mean = mean(PR, na.rm = TRUE), PR.sd = sd(PR, na.rm = TRUE))
 
 # Mean and standard deviation of DOC data
 DOC %>%
@@ -491,10 +630,32 @@ DOC %>%
             n = length(Result_NPOC_mg.L))
 
 # Mean water temperature
+mean(sensor_desoto$WaterTemp_C[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
+# Feb
+mean(sensor_desoto$WaterTemp_C[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-03-01"], na.rm = TRUE)
+# March
+mean(sensor_desoto$WaterTemp_C[sensor_desoto$date >= "2018-03-01" & 
+                            sensor_desoto$date <= "2018-04-01"], na.rm = TRUE)
+# Apr
+mean(sensor_desoto$WaterTemp_C[sensor_desoto$date >= "2018-04-01" & 
+                            sensor_desoto$date <= "2018-04-30"], na.rm = TRUE)
 
+# Q
+mean(sensor_desoto$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-04-01"], na.rm = TRUE)
+sd(sensor_desoto$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-04-01"], na.rm = TRUE)
+
+
+mean(sensor_desoto$Discharge_m3s[sensor_desoto$date >= "2018-04-01" & 
+                            sensor_desoto$date <= "2018-04-30"], na.rm = TRUE)
+sd(sensor_desoto$Discharge_m3s[sensor_desoto$date >= "2018-04-01" & 
+                            sensor_desoto$date <= "2018-04-30"], na.rm = TRUE)
 ```
 
-```{r Fig 1: Mapping}
+```{r Fig 1. Map}
 # Pull country, state, county map data
 state.map <- map_data("state")
 kansas.map <- subset(state.map, region == "kansas")
@@ -509,21 +670,27 @@ lines.rivers <- subset(lines.rivers, STATE %in% c("KS"))
 ks_rivers <- fortify(lines.rivers)
 
 # Plot state map
-ggplot() +
+a <- 
+  ggplot() +
   theme_nothing() +
   # Rivers
   #geom_path(data = ks_rivers, aes(x = long, y = lat, group = group), col = "#23baaf") +
   # Counties
-  geom_polygon(data = counties.map, aes(x = long, y = lat, group = group), 
-               fill = NA, color = "grey") +
+  #geom_polygon(data = counties.map, aes(x = long, y = lat, group = group), 
+   #            fill = NA, color = "grey") +
   # State border
   geom_polygon(data = kansas.map, aes(x = long, y = lat, group = group), 
                fill = NA, color = "black") +
   # Location marker
   geom_point(data = coords, mapping = aes(x = long[5], y = lat[5]), 
-             col = "black", shape = 0, size = 12, stroke = 2) +
+             col = "black", shape = 0, size = 12, stroke = 1) +
+  labs(tag = "A") +
   coord_fixed(1.3) +
   guides(fill = FALSE)
+
+grid.arrange(a, ncol = 2)
+
+
 # Save plot
 ggsave("./Plots/Map_state.png", height = 2, width = 3.5, units = "in")
 
@@ -533,10 +700,10 @@ ggplot() +
   theme_nothing() +
   # Counties
   geom_polygon(data = counties.map, aes(x = long, y = lat, group = group), 
-               fill = NA, color = "grey") +
+               fill = NA, color = "black") +
   # Rivers
-  geom_path(data = ks_rivers, aes(x = long, y = lat, group = group), size = 2,
-            col = "#23baaf") +
+  #geom_path(data = ks_rivers, aes(x = long, y = lat, group = group), size = 2,
+   #         col = "#23baaf") +
   # Site location bubbles
   geom_point(data = coords, mapping = aes(x = long, y = lat), 
              col = "black", shape = 1, size = 5, stroke = 2) +
@@ -556,7 +723,7 @@ googmap <- get_stamenmap(bbox = coord.box, zoom = 10, maptype = "watercolor")
 ggmap(googmap)
 ```
 
-```{r Fig 2: N load plot, N concentration plot, water temp plot}
+```{r Fig 2. N concentration}
 # N load plot
 ggplot(data = massbal, aes(x = date)) +
   # Upstream (Bowersock)
@@ -706,7 +873,7 @@ ggplot(data = massbal, aes(x = date)) +
         legend.position = "bottom", legend.title = element_blank())
 ```
 
-```{r Fig 3: Metabolism}
+```{r Fig 3. Metabolism}
 # GPP, Eric
 a <- 
   ggplot(data = metab, aes(x = date)) +
@@ -840,60 +1007,8 @@ mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER.desoto,
             na.rm = TRUE)
 ```
 
-```{r Fig 3: Uptake vs time significance testing}
-## Significance testing ########################################################
-# Get summary statistics for each group
-uptake.long %>%
-  subset(Date < "2018-05-01") %>%
-  group_by(site, ReleaseStatus) %>%
-  filter(!is.na(UaNO3_gNm2day)) %>%
-  summarise(n = n(),
-            mean = mean(UaNO3_gNm2day, na.rm = TRUE),
-            sd = sd(UaNO3_gNm2day, na.rm = TRUE))
-# Perform two-way anova to assess the affect of two grouping variables 
-# (site & release status) on response (uptake)
-anova.uptake <- aov(UaNO3_gNm2day ~ ReleaseStatus * site, data = subset(uptake.long, Date<"2018-05-01"))
-summary(anova.uptake) 
-# Get multiple pairwise comparisons between the means of groups (to see specifically which groups differ) using Tukey honest significant differences 
-TukeyHSD(anova.uptake) # differences between sites 
-
-# Set up positions for significance letters
-positions <- data.frame(site = c("S1", "S1", "S2", "S2", "S3", "S3"),
-                              UaNO3_gNm2day = c(1E7,2E6,9E5,1E5,9E5,3E5),
-                              ReleaseStatus = factor(c("During", "After",
-                                                       "During", 
-                                                       "After", "During",  
-                                                       "After"), 
-                                                     levels = c("During", 
-                                                                "After")))
-```
-
-```{r Fig 4: Uptake}
-## Calculate uptake velocity ###################################################
-
-# vf = U [g-N / m2 day] / NO3 [mg-N / L] * 1000 [mg-N / g-N] / 1000 [m3 / L] 
-#    = vf [m / day] / 1440 [day / min] * 1000 [mm/m] = vf [mm/min]
-uptake$vf_mmmin.eric <- 
-  uptake$UaNO3_gNm2day.eric / uptake$Mean.Nitrate_mgL.eric / 1440 * 1000
-uptake$vf_mmmin.steve <- 
-  uptake$UaNO3_gNm2day.steve / uptake$Mean.Nitrate_mgL.steve / 1440 * 1000
-uptake$vf_mmmin.desoto <- 
-  uptake$UaNO3_gNm2day.desoto / uptake$Mean.Nitrate_mgL.desoto / 1440 * 1000
-# Adjust data frame structure
-vf <- tidyr::gather(uptake, key = site, value = vf_mmmin, 
-                    vf_mmmin.eric:vf_mmmin.desoto)
-vf$site <- factor(vf$site, levels = c("vf_mmmin.eric", "vf_mmmin.steve", 
-                                      "vf_mmmin.desoto"))
-levels(vf$site)[levels(vf$site)=="vf_mmmin.eric"] <- "S1"
-levels(vf$site)[levels(vf$site)=="vf_mmmin.steve"] <- "S2"
-levels(vf$site)[levels(vf$site)=="vf_mmmin.desoto"] <- "S3"
-vf <- vf[-c(2:16)]
-vf <- subset(vf, Date < "2018-05-01")
-vf$Month <- lubridate::month(vf$Date, label = TRUE, abbr = TRUE)
-
+```{r Fig 4: Uptake and Vf}
 ### Assemble data into a boxplot ##############################################
-ggpubr::compare_means(data = uptake.metab.mass.long, UaNO3_gNm2day~ReleaseStatus, 
-                      group.by = c("site"))
 uptake.metab.mass.long <- 
   uptake.metab.mass.long %>% 
   mutate(Month = factor(month(Date, label = TRUE, abbr = TRUE)),
@@ -964,17 +1079,9 @@ b <-
         axis.text = element_text(color = "black"))
 grob <- grid.arrange(a,b)
 ggsave("./Plots/U.Vf_boxplot.png", grob, height = 6, width = 7, units = "in")
-
-vf.metab <- dplyr::full_join(metab.long, vf, by = c("Date", "site", "ReleaseStatus"))
-vf.metab$date <- NULL
-ggplot(vf.metab, aes(x = value, y = vf_mmmin, color = site)) +
-  facet_grid(site~model, switch = "y") +
-  geom_point() +
-  geom_smooth(method = "lm") +
-  ggpubr::stat_cor(color = "black") 
 ```
 
-```{r Fig 5: Uptake vs metabolism}
+```{r Fig 5. Uptake vs metabolism}
 # Scatterplot GPP vs Ua
 a <- 
   ggplot(subset(uptake.metab.mass.long, model == "GPP"), 
@@ -1052,53 +1159,265 @@ b <-
 
 grob <- grid.arrange(a,b, ncol = 2)
 ggsave("./Plots/Uptake_GPP.png", grob, height = 6.5, width = 6.5, units = "in")
+```
 
-# Scatterplot ER vs Ua
-ggplot(subset(uptake.metab.mass.long, model == "ER"), aes(x = value, 
-                                                     y = UaNO3_gNm2day, 
-                                                     color = site)) +
-  facet_grid(site~ReleaseStatus, scales = "free", switch = "y") +
-  geom_point(alpha = 0.4, shape = 16) +
-  geom_smooth(method = "lm", se = FALSE, fullrange = TRUE) +
-  # Add correlation coeff
-  ggpubr::stat_cor(method = "spearman", color = "black") +
+```{r Fig 6. Vf vs metabolism}
+# Vf vs GPP
+a <- 
+  ggplot(subset(vf.metab, model == "GPP"), 
+       aes(x = value, y = vf_mmmin, fill = site, shape = ReleaseStatus)) +
+  facet_grid(site~., scales = "free", switch = "y") +
+  # Linear model for During release
+  geom_smooth(data = subset(vf.metab, model == "GPP" & ReleaseStatus == "During"),
+              method = "lm", fullrange = TRUE, aes(color = ReleaseStatus), 
+              fill = "lightgrey", alpha = 0.2) +
+  # Linear model for after release
+  geom_smooth(data = subset(vf.metab, model == "GPP" & ReleaseStatus == "After"),
+              method = "lm", fullrange = TRUE, aes(color = site), 
+              fill = "lightgrey", alpha = 0.6) +
+  # Plot points on top
+  geom_point(size = 2) +
+    # Add correlation coeff
+  ggpubr::stat_cor(data = subset(vf.metab, model == "GPP"),
+                   method = "spearman", label.x = c(10), 
+                   label.y = c(1000, 870, 1000, 870, 1000, 870), size = 3,
+                   aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
-  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+  scale_shape_manual(values = c("During" = 1, "After" = 21)) +
+  scale_color_manual(values = c("During" = "black", "After" = "green", 
+                                "S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00")) +
+  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
                                 "S3" = "#F2AD00"),
                      limits = c("S1", "S2", "S3")) +
   # Axis labels
-  xlab(bquote("ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  scale_y_continuous(limits = c(-500, 1200)) +
+  xlab(bquote("GPP (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression(V[f] ~ "(mm" ~~ min^{-1}* ")")) +
+  labs(tag = "A") +
   # Plot theme
   theme_classic() +
   theme(legend.position = "none", legend.title = element_blank(),
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"))
 
-# All together graph
-ggplot(uptake.metab.mass.long, aes(x = value, y = UaNO3_gNm2day, 
-                              color = ReleaseStatus)) +
-  facet_grid(site ~ model, scales = "free", switch = "y") +
-  geom_point(alpha = 0.4, shape = 16) +
-  geom_smooth(method = "lm", se = FALSE) +
-  # Add correlation coeff
-  #ggpubr::stat_cor(color = "black") +
+# Vf vs ER
+b <- 
+  ggplot(subset(vf.metab, model == "ER"), 
+       aes(x = -value, y = vf_mmmin, fill = site, shape = ReleaseStatus)) +
+  facet_grid(site~., scales = "free", switch = "y") +
+  # Linear model for During release
+  geom_smooth(data = subset(vf.metab, model == "ER" & ReleaseStatus == "During"),
+              method = "lm", fullrange = TRUE, aes( color = ReleaseStatus), 
+              fill = "lightgrey", alpha = 0.2) +
+  # Linear model for after release
+  geom_smooth(data = subset(vf.metab, model == "ER" & ReleaseStatus == "After"),
+              method = "lm", fullrange = TRUE, aes( color = site), 
+              fill = "lightgrey", alpha = 0.6) +
+  # Plot points on top
+  geom_point(size = 2) +
+    # Add correlation coeff
+  ggpubr::stat_cor(data = subset(vf.metab, model == "ER"),
+                   method = "spearman", label.x = c(5), 
+                   label.y = c(1000, 870, 1000, 870, 1000, 870), size = 3,
+                   aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
-  #scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-   #                             "S3" = "#F2AD00"),
-    #                 limits = c("S1", "S2", "S3")) +
+  scale_y_continuous(limits = c(-500, 1200)) +
+  scale_shape_manual(values = c("During" = 1, "After" = 21)) +
+  scale_color_manual(values = c("During" = "black", "After" = "green", 
+                                "S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00")) +
+  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
   # Axis labels
-  xlab(bquote("GPP or ER (g-" *O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ d^{-1} * ")")) +
+  xlab(bquote("|ER| (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression(V[f] ~ "(mm" ~~ min^{-1}* ")")) +
+  labs(tag = "B") +
   # Plot theme
   theme_classic() +
-  theme(#legend.position = "none", 
-        legend.title = element_blank(),
+  theme(legend.position = "none", legend.title = element_blank(),
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"))
+
+grob <- grid.arrange(a,b, ncol = 2)
+ggsave("./Plots/Vf_GPP.png", grob, height = 6.5, width = 6.5, units = "in")
 ```
 
-```{r Fig 6: Nitrate load vs uptake}
+```{r Fig 7: Meta-analysis}
+### Meta-analysis Discharge vs GPP, Hall et al 2016 Data #######################
+a <- 
+ggplot() +
+  # Meta-analysis data
+  geom_point(data = hall, aes(x = q_m3s, y = gpp_gm2d), shape = 21, 
+             color = "darkgrey") +
+  # Our data
+  geom_point(data = means, aes(x = Discharge_m3s.Overall, 
+                               y = GPP_gO2m2day.Overall, fill = Site), 
+             size = 3, shape = 21) +
+  # Add correlation coeff
+  #ggpubr::stat_cor(color = "black", method = "spearman") +
+  # Axis scales
+  scale_x_log10() +
+  scale_y_log10() +
+  # Axis labels
+  xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
+  ylab(expression("GPP (g" ~ O[2] ~ m^{-2} ~ d^{-1}*")")) +
+  # Color scales
+  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  labs(tag = "A") +
+  # Plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+# Save plot
+ggsave("./Plots/Meta_Q.GPP.png", height = 3, width = 3.25, units = "in")
+
+### Meta-analysis Discharge vs ER, Hall et al 2016 Data #######################
+b <- 
+ggplot() +
+  # Meta-analysis data
+  geom_point(data = hall, aes(x = q_m3s, y = er_gm2d), shape = 21, 
+             color = "darkgrey") +
+  # Our data
+  geom_point(data = means, aes(x = Discharge_m3s.Overall, 
+                               y = ER_gO2m2day.Overall, fill = Site), 
+             size = 3, shape = 21) +
+  # Add correlation coeff
+  #ggpubr::stat_cor(color = "black", method = "spearman") +
+  # Axis scales
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(tag = "B") +
+  # Axis labels
+  xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
+  ylab(expression("|ER| (g" ~ O[2] ~ m^{-2} ~ d^{-1}*")")) +
+  # Color scales
+  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # Plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+# Save plot
+ggsave("./Plots/Meta_Q.ER.png", height = 3.5, width = 4.25, units = "in")
+
+# Converting between uptake and uptake velocity
+# vf mm/min * NO3 mg/L *[1000L/m3] *[1m/1000mm]*[1g/1000mg] *[1440 min/d] = gN/day*m2
+
+### Discharge v. total uptake, tank et al 2008 ################################
+c <- 
+ggplot() +
+  # Meta-analysis data
+  geom_point(data = tank, aes(x = Discharge_Ls/1000, 
+                              y = NO3_Vf_mmmin*NO3_Cb_mgNL/1000*1440), 
+             shape = 21, color = "darkgrey") +
+  # Rode et al 2016 and Hensley et al 2014 data
+  geom_point(data = rode.hensley, aes(x = Discharge_m3s,
+                                      y = U_mgNm2day/1000),
+             shape = 21, color = "darkgrey") +
+  # Our data
+  geom_point(data = means, aes(x = Discharge_m3s.Overall, 
+                               y = U_gNm2day.Overall, 
+                               fill = Site), 
+             size = 3, shape = 21) +
+  # Axis scales
+  scale_x_log10() +
+  scale_y_log10() +
+  # Axis labels
+  labs(tag = "C") +
+  xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
+  ylab(expression(U ~~ "(g-N" ~~ m^{-2} ~ d^{-1} * ")")) +
+  # Color scales
+  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # Plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
+### Discharge v. Uptake velocity (Tank et al. 2008) ###########################
+d <- 
+ggplot() +
+  # Meta-analysis data
+  geom_point(data = tank, aes(x = Discharge_Ls/1000, y = NO3_Vf_mmmin), 
+             shape = 21, color = "darkgrey") +
+  # Rode et al 2016 and Hensley et al 2014 data
+  geom_point(data = rode.hensley, aes(x = Discharge_m3s,
+                                      y = Vf_mmmin),
+             shape = 21, color = "darkgrey") +
+  # Our data
+  geom_point(data = means, aes(x = Discharge_m3s.Overall, 
+                               y = U_gNm2day.Overall/Nitrate_mgL.Overall*1000/1440, 
+                               fill = Site), 
+             size = 3, shape = 21) +
+  # Axis scales
+  scale_x_log10() +
+  scale_y_log10() +
+  # Axis labels
+  labs(tag = "D") +
+  xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
+  ylab(expression(V[f] ~~ "(mm" ~ min^{-1} * ")")) +
+  # Color scales
+  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # Plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
+arrange <- grid.arrange(a,c,b,d, nrow = 2, ncol = 2)
+ggsave("./Plots/Meta_Q.png", arrange, height = 5, width = 5.5, units = "in")
+
+# vf mm/min * NO3 mg/L *[1000L/m3] *[1m/1000mm] *[1g/1000mg] * [1440 min/d] = gN/day*m2
+# I don't think the snake r is included in this dataset
+# discharge vs uptake velocity dotplot
+ggplot() +
+  # Data from tank metanalysis
+  geom_point(data = tank, aes(x = Discharge_Ls, y = NO3_Vf_mmmin*NO3_Cb_mgNL*1000/1000/1000*1440), 
+             shape = 21) +
+  #geom_point(data=desoto_uptakemeans, aes(x = Discharge_m3s.Overall*1000, y = UaNO3_gNm2day.Overall), 
+  #           color = "blue") +
+  geom_point(data=desoto_uptakemeans, aes(x = Discharge_m3s.During*1000, y = UaNO3_gNm2day.During), 
+             color = "red") +
+  geom_point(data=desoto_uptakemeans, aes(x = Discharge_m3s.After*1000, y = UaNO3_gNm2day.After), 
+             color = "green") +
+  geom_smooth(data = tank, aes(x = Discharge_Ls, y = NO3_Vf_mmmin*NO3_Cb_mgNL*1000/1000/1000*1440), method = "lm") +
+  #geom_point(data = desoto_uptakemeans, aes(x = Discharge_m3s.Overall, y = )
+  # Add correlation coeff
+  ggpubr::stat_cor(data = tank, aes(x = Discharge_Ls, y = NO3_Vf_mmmin*NO3_Cb_mgNL*1000/1000/1000*1440),
+                   color = "black", method = "spearman") +
+  # Axis scales
+  scale_x_log10(limits = c(0.1, 100000)) +
+  scale_y_log10(limits = c(0.0001, 10000)) +
+  # Axis labels
+  xlab(expression("Q ( L" ~ sec^{-1} * ")")) + 
+  ylab(expression(U-NO[3]^{"-"} ~~ "(gN m2 day)")) +
+  # Plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
+
+# Discharge vs metabolism dotplot
+# Extract mean GPP
+
+
+
+
+```
+
+```{r Nitrate load vs uptake}
 # Fig 5 nitrate load vs nitrate uptake scatterplot
 ggplot(subset(uptake.metab.mass.long, site == "S2" | site ==  "S3"), 
        aes(x = NitrateSupply_gNm2day, y = UaNO3_gNm2day)) +
@@ -1201,170 +1520,6 @@ ggplot(uptake.metab.mass.long, aes(x = factor(round_date(Date, unit = period(day
   scale_y_log10()
 
 round_date(uptake.metab.mass.long$Date, unit = period(week = 2))
-```
-
-```{r Fig 7: Meta-analysis}
-### Meta-analysis Discharge vs GPP, Hall et al 2016 Data #######################
-a <- 
-ggplot() +
-  # Meta-analysis data
-  geom_point(data = hall, aes(x = q_m3s, y = gpp_gm2d), shape = 21, 
-             color = "darkgrey") +
-  # Our data
-  geom_point(data = means, aes(x = Discharge_m3s.Overall, 
-                               y = GPP_gO2m2day.Overall, fill = Site), 
-             size = 3, shape = 21) +
-  # Add correlation coeff
-  #ggpubr::stat_cor(color = "black", method = "spearman") +
-  # Axis scales
-  scale_x_log10() +
-  scale_y_log10() +
-  # Axis labels
-  xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
-  ylab(expression("GPP (g" ~ O[2] ~ m^{-2} ~ d^{-1}*")")) +
-  # Color scales
-  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-                                "S3" = "#F2AD00"),
-                     limits = c("S1", "S2", "S3")) +
-  labs(tag = "A") +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-# Save plot
-ggsave("./Plots/Meta_Q.GPP.png", height = 3, width = 3.25, units = "in")
-
-### Meta-analysis Discharge vs ER, Hall et al 2016 Data #######################
-b <- 
-ggplot() +
-  # Meta-analysis data
-  geom_point(data = hall, aes(x = q_m3s, y = er_gm2d), shape = 21, 
-             color = "darkgrey") +
-  # Our data
-  geom_point(data = means, aes(x = Discharge_m3s.Overall, 
-                               y = ER_gO2m2day.Overall, fill = Site), 
-             size = 3, shape = 21) +
-  # Add correlation coeff
-  #ggpubr::stat_cor(color = "black", method = "spearman") +
-  # Axis scales
-  scale_x_log10() +
-  scale_y_log10() +
-  labs(tag = "B") +
-  # Axis labels
-  xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
-  ylab(expression("|ER| (g" ~ O[2] ~ m^{-2} ~ d^{-1}*")")) +
-  # Color scales
-  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-                                "S3" = "#F2AD00"),
-                     limits = c("S1", "S2", "S3")) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-# Save plot
-ggsave("./Plots/Meta_Q.ER.png", height = 3.5, width = 4.25, units = "in")
-
-# Converting between uptake and uptake velocity
-# vf mm/min * NO3 mg/L *[1000L/m3] *[1m/1000mm]*[1g/1000mg] *[1440 min/d] = gN/day*m2
-
-### Discharge v. total uptake, tank et al 2008 ################################
-c <- 
-ggplot() +
-  # Meta-analysis data
-  geom_point(data = tank, aes(x = Discharge_Ls/1000, y = NO3_Vf_mmmin*NO3_Cb_mgNL/1000*1440), 
-             shape = 21, color = "darkgrey") +
-  # Our data
-  geom_point(data = means, aes(x = Discharge_m3s.Overall, 
-                               y = U_gNm2day.Overall, 
-                               fill = Site), 
-             size = 3, shape = 21) +
-  # Axis scales
-  scale_x_log10() +
-  scale_y_log10() +
-  # Axis labels
-  labs(tag = "C") +
-  xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
-  ylab(expression(U ~~ "(g-N" ~~ m^{-2} ~ d^{-1} * ")")) +
-  # Color scales
-  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-                                "S3" = "#F2AD00"),
-                     limits = c("S1", "S2", "S3")) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-
-### Discharge v. Uptake velocity (Tank et al. 2008) ###########################
-d <- 
-ggplot() +
-  # Meta-analysis data
-  geom_point(data = tank, aes(x = Discharge_Ls/1000, y = NO3_Vf_mmmin), 
-             shape = 21, color = "darkgrey") +
-  # Our data
-  geom_point(data = means, aes(x = Discharge_m3s.Overall, 
-                               y = U_gNm2day.Overall/Nitrate_mgL.Overall*1000/1440, 
-                               fill = Site), 
-             size = 3, shape = 21) +
-  # Axis scales
-  scale_x_log10() +
-  scale_y_log10() +
-  # Axis labels
-  labs(tag = "D") +
-  xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
-  ylab(expression(V[f] ~~ "(mm" ~ min^{-1} * ")")) +
-  # Color scales
-  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-                                "S3" = "#F2AD00"),
-                     limits = c("S1", "S2", "S3")) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-
-arrange <- grid.arrange(a,c,b,d, nrow = 2, ncol = 2)
-ggsave("./Plots/Meta_Q.png", arrange, height = 5, width = 5.5, units = "in")
-
-# vf mm/min * NO3 mg/L *[1000L/m3] *[1m/1000mm] *[1g/1000mg] * [1440 min/d] = gN/day*m2
-# I don't think the snake r is included in this dataset
-# discharge vs uptake velocity dotplot
-ggplot() +
-  # Data from tank metanalysis
-  geom_point(data = tank, aes(x = Discharge_Ls, y = NO3_Vf_mmmin*NO3_Cb_mgNL*1000/1000/1000*1440), 
-             shape = 21) +
-  #geom_point(data=desoto_uptakemeans, aes(x = Discharge_m3s.Overall*1000, y = UaNO3_gNm2day.Overall), 
-  #           color = "blue") +
-  geom_point(data=desoto_uptakemeans, aes(x = Discharge_m3s.During*1000, y = UaNO3_gNm2day.During), 
-             color = "red") +
-  geom_point(data=desoto_uptakemeans, aes(x = Discharge_m3s.After*1000, y = UaNO3_gNm2day.After), 
-             color = "green") +
-  geom_smooth(data = tank, aes(x = Discharge_Ls, y = NO3_Vf_mmmin*NO3_Cb_mgNL*1000/1000/1000*1440), method = "lm") +
-  #geom_point(data = desoto_uptakemeans, aes(x = Discharge_m3s.Overall, y = )
-  # Add correlation coeff
-  ggpubr::stat_cor(data = tank, aes(x = Discharge_Ls, y = NO3_Vf_mmmin*NO3_Cb_mgNL*1000/1000/1000*1440),
-                   color = "black", method = "spearman") +
-  # Axis scales
-  scale_x_log10(limits = c(0.1, 100000)) +
-  scale_y_log10(limits = c(0.0001, 10000)) +
-  # Axis labels
-  xlab(expression("Q ( L" ~ sec^{-1} * ")")) + 
-  ylab(expression(U-NO[3]^{"-"} ~~ "(gN m2 day)")) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-
-
-# Discharge vs metabolism dotplot
-# Extract mean GPP
-
-
-
-
 ```
 
 ```{r supplemental}

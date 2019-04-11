@@ -1,0 +1,13 @@
+Author_date_code,Stream,State_(USA)_or_country,SensorStudy,Date,Discharge_m3s,Discharge_Ls,NO3_mgNL,U_mgNm2day,Vf_mday,Vf_mmmin
+Rode_et_al_2016,Selke_River_Forest,GERMANY,yes,2011,1.52,,1.32,12.6,0.016,0.011111111
+Rode_et_al_2016,Selke_River_Forest,GERMANY,yes,2012,1.52,,1.32,8.98,0.009,0.00625
+Rode_et_al_2016,Selke_River_Agricultural,GERMANY,yes,2011,1.75,,4.22,77.3,0.018,0.0125
+Rode_et_al_2016,Selke_River_Agricultural,GERMANY,yes,2012,1.75,,2.9,85.4,0.034,0.023611111
+Hensley_et_al_2014,Alexander_Creek,FL,yes,2013_Mar_13_day,3.7,,0.03,60,,1.39
+Hensley_et_al_2014,Alexander_Creek,FL,yes,2013_Mar_20_day,3.7,,0.02,136,,4.72
+Hensley_et_al_2014,Ichetucknee_River,FL,yes,2010_Mar_18_day,8.5,,0.44,326,,0.51
+Hensley_et_al_2014,Ichetucknee_River,FL,yes,2011_Mar_21_day,8.1,,0.34,352,,0.72
+Hensley_et_al_2014,Ichetucknee_River,FL,yes,14_Feb_13_day,9.1,,0.5,209,,0.29
+Hensley_et_al_2014,Juniper_Creek,FL,yes,2010_Nov_10_day,0.6,,0.07,51,,0.51
+Hensley_et_al_2014,Rainbow_River,FL,yes,2013_Mar_01_day,14.8,,1.6,628,,0.27
+Hensley_et_al_2014,Rainbow_River,FL,yes,2010_Oct_28_day,18.1,,1.4,417,,0.18
