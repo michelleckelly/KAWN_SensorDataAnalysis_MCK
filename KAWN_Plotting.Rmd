@@ -666,53 +666,101 @@ counties.map <- subset(map_data("county"), region == "kansas")
 # States Geological Survey, accessed 26-Jan-19, ArcGIS "USA Rivers and Streams" 
 # dataset www.arcgis.com
 load(url("https://vrzkj25a871bpq7t1ugcgmn9-wpengine.netdna-ssl.com/wp-content/datasets/usa_rivers.RData"))
-lines.rivers <- subset(lines.rivers, STATE %in% c("KS"))
-ks_rivers <- fortify(lines.rivers)
+lines.rivers2 <- subset(lines.rivers, STATE %in% c("KS") & 
+                          NAME %in% c("Kansas River", "Republican River", "Little Blue River",
+                                      "Big Blue River", "West Fork Big Blue River",
+                                      "North Branch West Fork Big Blue River",
+                                      "Big Blue Creek", "North Fork Smoky Hill River",
+                                      "Smoky Hill River", "Saline River",
+                                      "Saline Branch", "North Fork Saline River",
+                                      "South Fork Saline River", "Solomon River",
+                                      "North Fork Solomon River", "South Fork Solomon River"))
+ks_rivers <- fortify(lines.rivers2)
+ks_rivers.all <- fortify(subset(lines.rivers, STATE %in% c("KS")))
 
-# Plot state map
+unique(lines.rivers$NAME[grep("Kansas", lines.rivers$NAME)])
+unique(lines.rivers$NAME[grep("Blue", lines.rivers$NAME)])
+unique(lines.rivers$NAME[grep("Smoky", lines.rivers$NAME)])
+unique(lines.rivers$NAME[grep("Saline", lines.rivers$NAME)])
+unique(lines.rivers$NAME[grep("Solomon", lines.rivers$NAME)])
+
+# USA map
 a <- 
+ggplot() +
+  theme_nothing() +
+  geom_polygon(data = state.map, 
+               aes(x = long, y = lat, group = group, color = "S0"), 
+               fill = NA) +
+  # Location marker
+  geom_point(data = coords, mapping = aes(x = long[5], y = lat[5], col = "S0"), 
+              shape = 0, size = 7, stroke = 1.5) +
+  scale_color_manual(values = c("S0" = "#000000", "S1" = "#FF0000", 
+                                 "S2" = "#23baaf", "S3" = "#F2AD00"),
+                     breaks = c("S0", "S1", "S2", "S3")) +
+  
+  coord_fixed(1.3) +
+  guides(fill = FALSE)
+# State map
+b <- 
   ggplot() +
   theme_nothing() +
   # Rivers
-  #geom_path(data = ks_rivers, aes(x = long, y = lat, group = group), col = "#23baaf") +
-  # Counties
-  #geom_polygon(data = counties.map, aes(x = long, y = lat, group = group), 
-   #            fill = NA, color = "grey") +
+  geom_path(data = ks_rivers, aes(x = long, y = lat, group = group, col = "S2")) +
   # State border
-  geom_polygon(data = kansas.map, aes(x = long, y = lat, group = group), 
-               fill = NA, color = "black") +
+  geom_polygon(data = kansas.map, aes(x = long, y = lat, group = group, color = "S0"), 
+               fill = NA) +
   # Location marker
-  geom_point(data = coords, mapping = aes(x = long[5], y = lat[5]), 
-             col = "black", shape = 0, size = 12, stroke = 1) +
-  labs(tag = "A") +
+  geom_point(data = coords, mapping = aes(x = long[5], y = lat[5], col = "S0"), 
+              shape = 0, size = 8, stroke = 1.5) +
+  scale_color_manual(values = c("S0" = "#000000", "S1" = "#FF0000", 
+                                 "S2" = "#23baaf", "S3" = "#F2AD00"),
+                     breaks = c("S0", "S1", "S2", "S3")) +
   coord_fixed(1.3) +
-  guides(fill = FALSE)
-
-grid.arrange(a, ncol = 2)
-
-
-# Save plot
-ggsave("./Plots/Map_state.png", height = 2, width = 3.5, units = "in")
-
-
-# Plot local map
+  guides(fill = FALSE) +
+    labs(tag = "A") 
+c <-  
 ggplot() +
   theme_nothing() +
-  # Counties
-  geom_polygon(data = counties.map, aes(x = long, y = lat, group = group), 
-               fill = NA, color = "black") +
   # Rivers
-  #geom_path(data = ks_rivers, aes(x = long, y = lat, group = group), size = 2,
-   #         col = "#23baaf") +
+  geom_path(data = ks_rivers.all, aes(x = long, y = lat, group = group, col = "S2")) +
+  geom_path(data = ks_rivers, aes(x = long, y = lat, group = group, col = "S2"), 
+            size = 1.5) +
   # Site location bubbles
-  geom_point(data = coords, mapping = aes(x = long, y = lat), 
-             col = "black", shape = 1, size = 5, stroke = 2) +
+  geom_point(data = coords, mapping = aes(x = long[1], y = lat[1], col = "S0"), 
+             shape = 1, size = 5, stroke = 2) +
+  geom_point(data = coords, mapping = aes(x = long[5], y = lat[5], col = "S1"), 
+             shape = 1, size = 5, stroke = 2) +
+  geom_point(data = coords, mapping = aes(x = long[8], y = lat[8], col = "S2"), 
+             shape = 1, size = 5, stroke = 2) +
+  geom_point(data = coords, mapping = aes(x = long[15], y = lat[15], col = "S3"), 
+             shape = 1, size = 5, stroke = 2) +
+  # Lawrence
+  geom_point(data = NULL, mapping = aes(y = 38.94, x = -95.28, col = "S0"), 
+             shape = 2, size = 5) +
+  # Release point
+  geom_point(data = NULL, mapping = aes(y = 38.969, x = -95.21, col = "S0"), 
+             shape = 4, size = 5) +
   # Site names
   geom_text(data = coords, aes(x = long, y = lat, label = SiteNickname), 
-            nudge_y = 0.017, size = 7) +
+            nudge_y = -0.017, size = 5) +
+  scale_color_manual(values = c("S0" = "#000000", "S1" = "#FF0000", 
+                                 "S2" = "#23baaf", "S3" = "#F2AD00"),
+                     breaks = c("S0", "S1", "S2", "S3")) +
   coord_fixed(1.3)  +
   coord_quickmap(xlim = c(-95.3, -94.9), ylim = c(38.83, 39.1)) +
   theme(panel.border = element_rect(color = "black", fill = NA))
+
+grob <- grid.arrange(a, b, nrow = 2)
+grob <- grid.arrange(grob, c, ncol = 2)
+
+
+# Save plot
+ggsave("./Plots/Map.png", grob, height = 3.3, width = 7, units = "in")
+
+
+# Plot local map
+c <- 
+
 # Save plot
 ggsave("./Plots/Map_local.png", height = 5, width = 6, units = "in")
 
@@ -1309,13 +1357,14 @@ ggsave("./Plots/Meta_Q.ER.png", height = 3.5, width = 4.25, units = "in")
 
 # Converting between uptake and uptake velocity
 # vf mm/min * NO3 mg/L *[1000L/m3] *[1m/1000mm]*[1g/1000mg] *[1440 min/d] = gN/day*m2
+tank$U_gNm2day <- tank$NO3_Vf_mmmin*(tank$NO3_Cb_mgNL/1000)*1440
 
 ### Discharge v. total uptake, tank et al 2008 ################################
 c <- 
 ggplot() +
   # Meta-analysis data
   geom_point(data = tank, aes(x = Discharge_Ls/1000, 
-                              y = NO3_Vf_mmmin*NO3_Cb_mgNL/1000*1440), 
+                              y = NO3_Vf_mmmin*(NO3_Cb_mgNL/1000)*1440), 
              shape = 21, color = "darkgrey") +
   # Rode et al 2016 and Hensley et al 2014 data
   geom_point(data = rode.hensley, aes(x = Discharge_m3s,
