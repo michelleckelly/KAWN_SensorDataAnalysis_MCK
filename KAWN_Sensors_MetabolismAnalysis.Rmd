@@ -14,7 +14,7 @@ editor_options:
 
 # grab latest version of streamMetabolizer
 #install.packages("streamMetabolizer", dependencies = TRUE, 
-#                 repos = c("https://owi.usgs.gov/R", "https://cran.rstudio.com"))
+ #               repos = c("https://owi.usgs.gov/R", "https://cran.rstudio.com"))
 
 # load packages
 library(StreamPULSE)
@@ -49,7 +49,9 @@ if (!loadfromfile){
   eric_data <- request_data(site_code.eric, token = user_token) 
   # format data for modeling
   fitdata.eric <- prep_metabolism(eric_data, type = model_type, model = model_name,
-                                  rm_flagged = "Bad Data", fillgaps = "interpolation")
+                                  rm_flagged = "Bad Data", 
+                                  fillgaps = "interpolation",
+                                  estimate_areal_depth = TRUE)
   # fit metabolism model (about 1hr of run time)
   modelfit.eric <- fit_metabolism(fitdata.eric)
   # save model results to folder
@@ -63,8 +65,9 @@ if (!loadfromfile){
   # format data for modeling
   fitdata.steve <- prep_metabolism(steve_data, type = model_type, 
                                    model = model_name,
-                                    rm_flagged = "Bad Data", 
-                                   fillgaps = "interpolation")
+                                   rm_flagged = "Bad Data", 
+                                   fillgaps = "interpolation",
+                                   estimate_areal_depth = TRUE)
   # fit metabolism model (about 1hr of run time)
   modelfit.steve <- fit_metabolism(fitdata.steve)
   # save model results to folder
@@ -78,13 +81,58 @@ if (!loadfromfile){
   fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, 
                                     model = model_name,
                                     rm_flagged = "Bad Data", 
-                                    fillgaps = "interpolation")
+                                    fillgaps = "interpolation",
+                                    estimate_areal_depth = TRUE)
   # use streamMetabolizer to fit model
   modelfit.desoto <- fit_metabolism(fitdata.desoto)
   # save model results to folder, as .RData and as .csv
   saveRDS(modelfit.desoto, file = "./Outputs/MetabResults_Desoto.RData") 
-  write.csv(modelfit.desoto$predictions, file = "./Outputs/MetabResults_Desoto.csv")
+  write.csv(modelfit.desoto$predictions, 
+            file = "./Outputs/MetabResults_Desoto.csv")
 }
+```
+
+```{r DepthCheck}
+# Check StreamMetabolizer calculated depth against USGS stream gauging data
+# at DeSoto gauge
+
+# Pull calculated depth data from stream metabolism model
+eric_calcZ <- modelfit.eric[["fit"]]@data
+steve_calcZ <- modelfit.steve[["fit"]]@data
+desoto_calcZ <- modelfit.desoto[["fit"]]@data
+
+# Load in gage height data from USGS sensor at Desoto (06892350)
+desoto_gage <- read.csv("./Data/USGSDesoto_GageHeight.csv")
+# Convert ft to m
+desoto_gage$GageHeight_m <- desoto_gage$GageHeight_ft * 0.3048
+# Format DateTime
+desoto_gage$DateTime <- lubridate::mdy_hm(desoto_gage$DateTime, 
+                                          tz = "America/Chicago")
+# Take daily mean of Gage heights
+desoto_gage <- 
+  desoto_gage %>%
+  group_by(date = as.Date(DateTime)) %>%
+  summarise(GageHeight_m = mean(GageHeight_m))
+
+# Take daily mean of calculated depth
+desoto_calcZ <- 
+  desoto_calcZ %>%
+  group_by(date) %>%
+  summarise(calcdepth_m = mean(depth))
+
+# Merge
+desoto_calcZ <- dplyr::full_join(desoto_calcZ, desoto_gage, by = "date")
+# Plot
+ggpubr::ggscatter(desoto_calcZ, x = "GageHeight_m", y = "calcdepth_m", 
+                  add = "reg.line", 
+                  add.params = list(color = "red", fill = "lightgray"), 
+                  conf.int = TRUE) +
+  xlab("Gage height, USGS at DeSoto (m)") +
+  ylab("Modeled mean depth at S3, StreamMetabolizer (m)") +
+  ggpubr::stat_cor(aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~")))
+# Linear regression
+model <- lm(calcdepth_m ~ GageHeight_m, data = desoto_calcZ)
+summary(model)
 ```
 
 ```{r NEP.calculate}

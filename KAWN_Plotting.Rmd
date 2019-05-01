@@ -273,6 +273,7 @@ uptake.metab.mass.long <- subset(uptake.metab.mass.long,
 tank <- read.csv("./Data/Meta-analysis/Tank_2008_uptakedata.csv",
                  header = TRUE)
 tank$NO3_Cb_mgNL <- tank$NO3_Cb_ugNL/1000
+# Load in data from rode et al 2016, 
 rode.hensley <- read.csv("./Data/Meta-analysis/Rode_Hensley_SensorUptake.csv")
 
 # Load in Hall et al 2016 metabolism meta-analysis

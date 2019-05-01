@@ -1,6 +1,6 @@
 # Ignore history and RData files
 *.Rhistory
-.RData
+*.RData
 
 # Ignore Rmd default cache directory
 /cache/
@@ -29,14 +29,3 @@
 # Ignore folder of sensor data files that are uploaded to the streamPULSE server 
 # (script is still reproducable without this folder)
 /Data/StreamPULSE_UploadedTo/
-
-# Ignore large .RData script output files 
-# (script is still reproducable without this folder)
-/Outputs/*.RData
-
-# Ignore any output zip files, created for sharing purposes 
-# (script is still reproducable without them)
-/Outputs/*.zip
-
-# Ignore metabolism workspace file, created for sharing purposes
-MetabolismWorkspaceFile_31Oct18.RData
