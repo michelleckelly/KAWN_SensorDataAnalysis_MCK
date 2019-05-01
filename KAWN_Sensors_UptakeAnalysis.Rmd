@@ -16,29 +16,16 @@ library(dplyr)
 library(ggplot2)
 library(ggpmisc)
 library(imputeTS)
-
-# Toggle this variable based on if you would like to compute new results
-# or load old results
-# recompile <- FALSE: load old results from output file, good if you're just
-#                     interested in plotting and want to save time
-# recompile <- TRUE: (re)compute results from raw data
-
-recompile <- TRUE
 ```
 
 ```{r Load uptake data}
-# UPDATE: Change this to load an RData file (so everyhtings preserved)
-# update file name if needed
-# make sure uptake variable name is same as following chunk
-NitrateUptake <- read.csv(file = "./Outputs/NitrateUptakeResults_Eqn2.csv")
-NitrateUptake$Date <- lubridate::ymd(NitrateUptake$Date)
+NitrateUptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1.rds")
 ```
 
-```{r Compile uptake data, eval = recompile}
-# Calculate autotrophic nitrate uptake (Ua-NO3) based on Heffernan and Cohen 
-# 2010
+```{r Prep uptake data}
+# Autotrophic nitrate uptake calculation (Heffernan and Cohen 2010) ############
 
-## Load in raw data ##
+# Load in raw data #############################################################
 # These CSV files can be downloaded from the StreamPULSE database
 eric <- 
   read.csv("./Data/StreamPULSE_Downloaded/KS_KANSASREASTLAWRENCE_sensorData.csv",
@@ -50,11 +37,10 @@ desoto <-
   read.csv("./Data/StreamPULSE_Downloaded/KS_KANSASR_sensorData.csv", 
            header = TRUE)
 
-## Prep data for calculations ##
+# Prep data for calculations ###################################################
 # Input: Sensor data frame
 # Output: Sensor data frame with added columns for local time, data flagged 
-# "Bad Data" removed
-
+# "Bad Data" (as identified in StreamPulse website tool) removed
 prepper <- function(sensor_data){
   # Format datetime column correctly
   sensor_data$DateTime_UTC <- 
@@ -80,126 +66,16 @@ prepper <- function(sensor_data){
   # Return new dataframe
   return(sensor_uptake)
 }
-
-# Run function
 eric_uptake <- prepper(eric)
 steve_uptake <- prepper(steve)
 desoto_uptake <- prepper(desoto)
+```
 
+```{r Eqn 1 Uptake}
+# Uptake calculated using the extrapolated diel method (Heffernan and Cohen 
+# 2010, Eqn 1) #################################################################
 
-##### Take out some of the variability due to changing Q #######################
-
-variability.smoother <- function(uptake_data){
-  # Section dates before 1 May 2018
-  uptake_data <- uptake_data[uptake_data$DateTime_CST < 
-                               ymd_hms("2018-05-01 00:00:00"),]
-  # Visualize discharge through time
-  plot(y = uptake_data$Discharge_m3s, 
-     x = uptake_data$DateTime_CST, 
-     main = "Discharge at Desoto",
-     ylab = "Discharge, m3 / s", xlab = "DateTime")
-  # Take the difference between each discharge measurement using diff()
-  varib <- data.frame(DateTime_CST = uptake_data$DateTime_CST
-                           [2:length(uptake_data$DateTime_CST)],
-                           month = months(uptake_data$DateTime_CST)
-                           [2:length(uptake_data$DateTime_CST)], 
-                           diff.Discharge = diff(uptake_data$Discharge_m3s))
-  # Extract outliers of all observations using base boxplot
-  stats <- boxplot(varib$diff.Discharge)
-  # Boxplot statistics output:
-  # [1,1] extreme of lower whisker, [2,1] Q1, [3,1] median, 
-  # [4,1] Q3, [5,1] extreme of upper whisker
-  Q1 <- stats$stats[2,1]
-  Q3 <- stats$stats[4,1]
-  IQR <- Q3 - Q1
-  
-  # Boxplot to visualize variability
-  #ggplot(varib) + 
-    #stat_boxplot(aes(x = "All", y = diff.Discharge), geom = "errorbar", 
-                 #width = 0.5) +
-    #geom_boxplot(aes(x = "All", y = diff.Discharge), outlier.shape = 1) +
-    #stat_boxplot(aes(x = month, y = diff.Discharge), geom = "errorbar",
-                 #width = 0.5) +
-    #geom_boxplot(aes(x = month, y = diff.Discharge), outlier.shape = 1) +
-    #geom_hline(yintercept = Q3 + 5*IQR, linetype = 2) +
-    #geom_hline(yintercept = Q1 - 5*IQR, linetype = 2) +
-    #scale_x_discrete(limits = c("All", "January", "February", "March", 
-                                #"April")) +
-    #labs(x = NULL, y = "delta Discharge, m3 / s", 
-         #title = "Change in discharge between \nmeasurements at Desoto") +
-    #theme_classic()
-  
-  # Select extreme outliers
-  # > Q3 + 3*IQR or < Q1 - 3*IQR
-  varib$flag[varib$diff.Discharge > Q3 + 5*IQR] <- "outlier"
-  varib$flag[varib$diff.Discharge < Q1 - 5*IQR] <- "outlier"
-  # Transfer over outlier flags to original data
-  uptake_data <- dplyr::full_join(uptake_data, varib[c(-2)], by = "DateTime_CST")
-  
-  # Visualize the points that have been selected as extreme outliers
-  # Selected outliers in red
-  #ggplot(uptake_data, aes(x = DateTime_CST)) +
-    #geom_line(aes(y = diff.Discharge), shape = 1) +
-    #geom_point(aes(y = diff.Discharge[flag == "outlier"]), color = "red", 
-               #shape = 1) +
-    #labs(x = NULL, y = "delta Discharge, m3 / s", 
-         #title = "Change in discharge between \nmeasurements at Desoto") +
-    #theme_classic()
-  
-  #ggplot(uptake_data) +
-    #geom_point(data = subset(uptake_data, is.na(uptake_data$flag)),
-                             #aes(x = DateTime_CST[is.na(flag)], 
-                                 #y = Discharge_m3s[is.na(flag)]), shape = 1) +
-    #geom_point(data = uptake_data, 
-               #aes(x = DateTime_CST[flag == "outlier"],
-                   #y = Discharge_m3s[flag == "outlier"]), color = "red", 
-               #shape = 1) +
-    #labs(x = NULL, y = "Discharge, m3 / s", 
-         #title = "Discharge at Desoto") +
-    #theme_classic()
-  
-  # Add column for corrected nitrate concentrations (where outlier data is now NA)
-  uptake_data$Nitrate_mgL.corr <- uptake_data$Nitrate_mgL
-  uptake_data$Nitrate_mgL.corr[uptake_data$flag == "outlier"] <- NA
-  # Remove hours of data where there are 3 or more outliers present
-  uptake_data <- uptake_data %>%
-    group_by(date = lubridate::date(DateTime_CST), 
-             hour = lubridate::hour(DateTime_CST)) %>%
-    mutate(na.count = sum(is.na(Nitrate_mgL.corr))) %>%
-    mutate(Nitrate_mgL.corr = ifelse(na.count >= 3, NA, Nitrate_mgL.corr))
-  
-  # visualize removed outliers (in red)
-  #ggplot(uptake_data) +
-    #geom_point(aes(x = DateTime_CST, y = Nitrate_mgL), shape = 1, col = "red") +
-      #geom_point(aes(x = DateTime_CST, y = Nitrate_mgL.corr), shape = 1)
-  
-  # Amend Nitrate_mgL data with corrected data
-  uptake_data$Nitrate_mgL <- uptake_data$Nitrate_mgL.corr
-  # Interpolate gaps in data
-  uptake_data$Nitrate_mgL <- imputeTS::na.interpolation(uptake_data$Nitrate_mgL)
-  # Return datatframe
-  return(uptake_data)
-}
-
-eric_smooth <- variability.smoother(eric_uptake)
-steve_smooth <- variability.smoother(steve_uptake)
-desoto_smooth <- variability.smoother(desoto_uptake)
-
-
-
-#### Specify equation used to calculate uptake #################################
-
-# If UptakeEqn == 1, calculate uptake using the 
-# extrapolated diel method (Heffernan and Cohen 
-# 2010, Eqn. 1)
-# If UptakeEqn == 2, calculate uptake using the 
-# integrated diel method (Heffernan and Cohen 
-# 2010, Eqn. 2)
-UptakeEqn <- 2
-
-#### Calculate uptake using Equation 1 ########################################
-if (UptakeEqn == 1) {
-  # Steps:
+# Steps:
   # 1. Take an average of NO3 measurements
   # 2. Find the maximum nitrate during pre-dawn hours
   # Within one pre-dawn to pre-dawn block
@@ -208,148 +84,226 @@ if (UptakeEqn == 1) {
   # 5. Multiply nitrate differences by Q/wL
   # 6. Convert from seconds to days
   # Move on to next time block
-  
-  # Function to calculate uptake
-  # Input: the dataframe spit out by prepper()
-  # Output: Calculated NO3 Uptake
-  
-  HC_Eqn1 <- function(prepped_df){
-    # Take an average Nitrate concentration for each 2 hr window
-    prepped_df <- 
-      prepped_df %>%
-      dplyr::group_by(DateTime_CST = lubridate::round_date(DateTime_CST, 
-                                                           unit = "3 hours")) %>%
-      dplyr::summarise(t = lubridate::hour(unique(DateTime_CST)),
-                       Mean.Discharge_m3s = mean(Discharge_m3s, na.rm = TRUE),
-                       Mean.Nitrate_mgL = mean(Nitrate_mgL, na.rm = TRUE))
-    # Take maximum nitrate during pre-dawn hours
-    maxN <- 
-      prepped_df %>%
-      dplyr::group_by(date = date(DateTime_CST)) %>%
-      dplyr::filter(t %in% c(2,3,4,5,6,7,8)) %>%
-      dplyr::summarise(DateTime_CST = DateTime_CST[which.max(Mean.Nitrate_mgL)],
-                       Max.PreDawnN = max(Mean.Nitrate_mgL))
-    # Merge back into original dataframe
-    uptake_df <- full_join(prepped_df, maxN, by = "DateTime_CST")
-    # Fill in non-NA values front to back with most recent non-NA value
-    uptake_df$date <- zoo::na.locf(uptake_df$date, na.rm = FALSE)
-    uptake_df$Max.PreDawnN <- zoo::na.locf(uptake_df$Max.PreDawnN, 
-                                           na.rm = FALSE)
-    # Calculate difference between pre-dawn max nitrate and current nitrate
-    uptake_df$DiffNitrate <- uptake_df$Max.PreDawnN - uptake_df$Mean.Nitrate_mgL
-    # Sum the difference for pre-dawn to pre-dawn day chunk
-    uptake_df <- 
-      uptake_df %>%
-      dplyr::group_by(Date = date) %>%
-      summarise(Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE),
-                Mean.Discharge_m3s = mean(Mean.Discharge_m3s),
-                SumDiff_mgNL = sum(DiffNitrate))
-    return(uptake_df)
-  }
-  
-  # Execute function
-  eric_uptake_Eqn1 <- HC_Eqn1(eric_uptake)
-  steve_uptake_Eqn1 <- HC_Eqn1(steve_uptake)
-  desoto_uptake_Eqn1 <- HC_Eqn1(desoto_uptake)
-  
-  # Calculate Uptake (Ua) and Supply with specific scaling for each site
-  
-  # Ua = SumNitrateDiff [mg/L] * Q [m3/s] / (w [m] * L[m] ) 
-  #       * 1000 [L/m3] / 1000 [g/mg] * 86400 [sec/day]
-  
-  # Supply [g-N m-2 d-1] = 
-  #             ( Q [L s-1] * C [g-N L-1] * 86400 [s d-1] ) / (w [m] * L [m])
-  #                      = mass N load [g-N d-1] / (w [m] * L [m])
-  
-  # where 
-  #   w     aerial stream width
-  #   L     stream reach length, choosing arbitrary 100m (King et al 2014)
-  # Site      w (as measured using google maps, in RiverModel_AerialWidths.xlsx)
-  # Eric      210.9 m
-  # Steve     113.4 m
-  # Desoto    138.07 m
-  
-  # Eric
-  # Set days where no uptake occured (negative values) to NA
-  # These days will be termed "non-detectable", are likely due to changes in Q
-  eric_uptake_Eqn1$UaNO3_gNm2day <- eric_uptake_Eqn1$SumDiff_mgNL *
-    eric_uptake_Eqn1$Mean.Discharge_m3s / (210.9 * 100) * 86400
-  eric_uptake_Eqn1$UaNO3_gNm2day[eric_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
-  eric_uptake_Eqn1$NitrateSupply_gNm2day <- eric_uptake_Eqn1$Mean.Nitrate_mgL*
-    eric_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (210.9 * 100)
-  
-  # Steve
-  steve_uptake_Eqn1$UaNO3_gNm2day <- steve_uptake_Eqn1$SumDiff_mgNL *
-    steve_uptake_Eqn1$Mean.Discharge_m3s / (113.4 * 100) * 86400
-  steve_uptake_Eqn1$UaNO3_gNm2day[steve_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
-  steve_uptake_Eqn1$NitrateSupply_gNm2day <- steve_uptake_Eqn1$Mean.Nitrate_mgL*
-    steve_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (113.4 * 100)
-  
-  # Desoto
-  # Set days where no uptake occured (negative values) to NA
-  # These days will be termed "non-detectable", are likely due to changes in Q
-  desoto_uptake_Eqn1$UaNO3_gNm2day <- desoto_uptake_Eqn1$SumDiff_mgNL *
-    desoto_uptake_Eqn1$Mean.Discharge_m3s / (138.07 * 100) * 86400
-  desoto_uptake_Eqn1$UaNO3_gNm2day[desoto_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
-  desoto_uptake_Eqn1$NitrateSupply_gNm2day <- desoto_uptake_Eqn1$Mean.Nitrate_mgL *
-    desoto_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (138.07 * 100)
-  
-  # Merge calculations into a single dataframe and save to CSV file
-  Uptake_Eqn1 <- dplyr::full_join(eric_uptake_Eqn1, steve_uptake_Eqn1, 
-                                  by = "Date", suffix = c(".eric", ".steve"))
-  Uptake_Eqn1 <- dplyr::full_join(Uptake_Eqn1, desoto_uptake_Eqn1, 
-                                  by = "Date")
-  
-  # Add column to denote during waste release or after
-  # During: dates prior to 1 April 2018
-  # After: dates post 1 April 2018
-  Uptake_Eqn1$ReleaseStatus <- "During"
-  Uptake_Eqn1$ReleaseStatus[Uptake_Eqn1$Date >= ymd("2018-04-01")] <- "After"
-  
-  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Mean.Nitrate_mgL"] <- 
-    "Mean.Nitrate_mgL.desoto"
-  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Mean.Discharge_m3s"] <- 
-    "Mean.Discharge_m3s.desoto"
-  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "SumDiff_mgNL"] <- 
-    "SumDiff_mgNL.desoto"
-  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "UaNO3_gNm2day"] <- 
-    "UaNO3_gNm2day.desoto"
-  names(Uptake_Eqn1)[names(Uptake_Eqn1) == "NitrateSupply_gNm2day"] <- 
-    "NitrateSupply_gNm2day.desoto"
-  
-  # Date cleanup: remove calculations for dates with bad raw data
-  # Eric:
-  # 2018-02-20 thru 2018-02-23 sensor burial
-  Uptake_Eqn1$UaNO3_gNm2day.eric[Uptake_Eqn1$Date >= ymd("2018-02-20") &
-                                   Uptake_Eqn1$Date <= ymd("2018-02-23")] <- NA
-  # 2018-03-06 thru 2018-03-12 sensor burial
-  Uptake_Eqn1$UaNO3_gNm2day.eric[Uptake_Eqn1$Date >= ymd("2018-03-06") &
-                                   Uptake_Eqn1$Date <= ymd("2018-03-12")] <- NA
-  # 2018-04-01 thru 2018-04-04 sensor burial
-  Uptake_Eqn1$UaNO3_gNm2day.eric[Uptake_Eqn1$Date >= ymd("2018-04-01") &
-                                   Uptake_Eqn1$Date <= ymd("2018-04-04")] <- NA
-  # 2018-04-14 thru 2018-04-17 sensor burial
-  Uptake_Eqn1$UaNO3_gNm2day.eric[Uptake_Eqn1$Date >= ymd("2018-04-14") &
-                                   Uptake_Eqn1$Date <= ymd("2018-04-17")] <- NA
-  # 2018-04-25 thru 2018-04-27 sensor burial
-  Uptake_Eqn1$UaNO3_gNm2day.eric[Uptake_Eqn1$Date >= ymd("2018-04-25") &
-                                   Uptake_Eqn1$Date <= ymd("2018-04-27")] <- NA
-  # Steve:
-  # Sensor not deployed until Feb 10 at 15:00
-  Uptake_Eqn1$UaNO3_gNm2day.steve[Uptake_Eqn1$Date >= ymd("2018-02-01") &
-                                    Uptake_Eqn1$Date <= ymd("2018-02-10")] <- NA
-  # Sensor burial 2018-03-09 thru 2018-03-22
-  Uptake_Eqn1$UaNO3_gNm2day.steve[Uptake_Eqn1$Date >= ymd("2018-03-09") &
-                                    Uptake_Eqn1$Date <= ymd("2018-03-22")] <- NA
-  
-  # Save dataframe
-  write.csv(Uptake_Eqn1, file = "./Outputs/NitrateUptakeResults_Eqn1.csv", 
-            row.names = FALSE)
-  saveRDS(Uptake_Eqn1, file = "./Outputs/NitrateUptakeResults_Eqn1.rds")
+
+HC_Eqn1 <- function(prepped_df){
+  # Take an average Nitrate concentration for each 2 hr window
+  prepped_df <- 
+    prepped_df %>%
+    dplyr::group_by(DateTime_CST = lubridate::round_date(DateTime_CST, 
+                                                         unit = "3 hours")) %>%
+    dplyr::summarise(t = lubridate::hour(unique(DateTime_CST)),
+                     Mean.Discharge_m3s = mean(Discharge_m3s, na.rm = TRUE),
+                     Mean.Nitrate_mgL = mean(Nitrate_mgL, na.rm = TRUE))
+  # Take maximum nitrate during pre-dawn hours
+  maxN <- 
+    prepped_df %>%
+    dplyr::group_by(date = date(DateTime_CST)) %>%
+    dplyr::filter(t %in% c(2,3,4,5,6,7,8)) %>%
+    dplyr::summarise(DateTime_CST = DateTime_CST[which.max(Mean.Nitrate_mgL)],
+                     Max.PreDawnN = max(Mean.Nitrate_mgL))
+  # Merge back into original dataframe
+  uptake_df <- full_join(prepped_df, maxN, by = "DateTime_CST")
+  # Fill in non-NA values front to back with most recent non-NA value
+  uptake_df$date <- zoo::na.locf(uptake_df$date, na.rm = FALSE)
+  uptake_df$Max.PreDawnN <- zoo::na.locf(uptake_df$Max.PreDawnN, 
+                                         na.rm = FALSE)
+  # Calculate difference between pre-dawn max nitrate and current nitrate
+  uptake_df$DiffNitrate <- uptake_df$Max.PreDawnN - uptake_df$Mean.Nitrate_mgL
+  # Sum the difference for pre-dawn to pre-dawn day chunk
+  uptake_df <- 
+    uptake_df %>%
+    dplyr::group_by(Date = date) %>%
+    summarise(Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE),
+              Mean.Discharge_m3s = mean(Mean.Discharge_m3s),
+              SumDiff_mgNL = sum(DiffNitrate))
+  return(uptake_df)
 }
+eric_uptake_Eqn1 <- HC_Eqn1(eric_uptake)
+steve_uptake_Eqn1 <- HC_Eqn1(steve_uptake)
+desoto_uptake_Eqn1 <- HC_Eqn1(desoto_uptake)
+
+# Unite uptake_Eqn1 data with StreamMetabolism modeled depth ###################
+# Load in modeled depth data
+eric_calcZ <- modelfit.eric[["fit"]]@data
+steve_calcZ <- modelfit.steve[["fit"]]@data
+desoto_calcZ <- modelfit.desoto[["fit"]]@data
+# Take daily mean of calculated depth
+eric_calcZ <- 
+  eric_calcZ %>%
+  group_by(Date = date) %>%
+  summarise(calcdepth_m = mean(depth))
+steve_calcZ <- 
+  steve_calcZ %>%
+  group_by(Date = date) %>%
+  summarise(calcdepth_m = mean(depth))
+desoto_calcZ <- 
+  desoto_calcZ %>%
+  group_by(Date = date) %>%
+  summarise(calcdepth_m = mean(depth))
+# Merge with uptake_Eqn1 data
+eric_uptake_Eqn1 <- dplyr::full_join(eric_calcZ, eric_uptake_Eqn1, 
+                                     by = "Date")
+steve_uptake_Eqn1 <- dplyr::full_join(steve_calcZ, steve_uptake_Eqn1, 
+                                     by = "Date")
+desoto_uptake_Eqn1 <- dplyr::full_join(desoto_calcZ, desoto_uptake_Eqn1, 
+                                       by = "Date")
+
+# Scale Uptake #################################################################
+
+# A = wd
+#   where
+#   A     riverbed area     [m^2]
+#   w     riverbed width    [m]
+#   d     mean river depth    [m]
+
+# Uptake Equation (Heffernan and Cohen 2010, Eqn 1)
+# U = (Q/A) * SumNitrateDiff * 86400 [sec/day] * 1000 [L/m^3]
+#   where
+#   U     autotrophic uptake  [mg-N/m^2 day]
+#   Q     discharge           [m3/s]
+#   A     riverbed area       [m3]
+#   SumNitrateDiff            [mg-N/L]
+
+# w has been measured using Google Maps satellite imagery
+# See file RiverModel_AerialWidths.xlsx
+# w   Eric      210.9 m
+# w   Steve     113.4 m
+# w   Desoto    138.07 m
+
+# Calculate riverbed area
+eric_uptake_Eqn1$A_m2 <- eric_uptake_Eqn1$calcdepth_m * 210.9
+steve_uptake_Eqn1$A_m2 <- steve_uptake_Eqn1$calcdepth_m * 113.4
+desoto_uptake_Eqn1$A_m2 <- desoto_uptake_Eqn1$calcdepth_m * 138.07
+# Calculate uptake
+eric_uptake_Eqn1$UaNO3_mgNm2day <- 
+  (eric_uptake_Eqn1$Mean.Discharge_m3s / eric_uptake_Eqn1$A_m2) * 
+  eric_uptake_Eqn1$SumDiff_mgNL * 86400 * 1000
+steve_uptake_Eqn1$UaNO3_mgNm2day <- 
+  (steve_uptake_Eqn1$Mean.Discharge_m3s / steve_uptake_Eqn1$A_m2) * 
+  steve_uptake_Eqn1$SumDiff_mgNL * 86400 * 1000
+desoto_uptake_Eqn1$UaNO3_mgNm2day <- 
+  (desoto_uptake_Eqn1$Mean.Discharge_m3s / desoto_uptake_Eqn1$A_m2) * 
+  desoto_uptake_Eqn1$SumDiff_mgNL * 86400 * 1000
+
+# Set days where no uptake occured (negative values) to NA
+eric_uptake_Eqn1$UaNO3_mgNm2day[eric_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+steve_uptake_Eqn1$UaNO3_mgNm2day[steve_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+desoto_uptake_Eqn1$UaNO3_mgNm2day[desoto_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+# Convert
+eric_uptake_Eqn1$UaNO3_gNm2day <- eric_uptake_Eqn1$UaNO3_mgNm2day / 1000
+steve_uptake_Eqn1$UaNO3_gNm2day <- steve_uptake_Eqn1$UaNO3_mgNm2day / 1000
+desoto_uptake_Eqn1$UaNO3_gNm2day <- desoto_uptake_Eqn1$UaNO3_mgNm2day / 1000
+
+# Merge calculations into a single dataframe
+Uptake_Eqn1 <- dplyr::full_join(eric_uptake_Eqn1, steve_uptake_Eqn1, 
+                                by = "Date", suffix = c(".eric", ".steve"))
+Uptake_Eqn1 <- dplyr::full_join(Uptake_Eqn1, desoto_uptake_Eqn1, 
+                                by = "Date")
+# Rename columns
+names(Uptake_Eqn1)[names(Uptake_Eqn1) == "calcdepth_m"] <- 
+  "calcdepth_m.desoto"
+names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Mean.Nitrate_mgL"] <- 
+  "Mean.Nitrate_mgL.desoto"
+names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Mean.Discharge_m3s"] <- 
+  "Mean.Discharge_m3s.desoto"
+names(Uptake_Eqn1)[names(Uptake_Eqn1) == "SumDiff_mgNL"] <- 
+  "SumDiff_mgNL.desoto"
+names(Uptake_Eqn1)[names(Uptake_Eqn1) == "A_m2"] <- 
+  "A_m2.desoto"
+names(Uptake_Eqn1)[names(Uptake_Eqn1) == "UaNO3_mgNm2day"] <- 
+  "UaNO3_mgNm2day.desoto"
+names(Uptake_Eqn1)[names(Uptake_Eqn1) == "UaNO3_gNm2day"] <- 
+  "UaNO3_gNm2day.desoto"
+
+# Add column to denote during waste release or after
+# During: dates prior to 1 April 2018
+# After: dates post 1 April 2018
+Uptake_Eqn1$ReleaseStatus <- "During"
+Uptake_Eqn1$ReleaseStatus[Uptake_Eqn1$Date >= ymd("2018-04-01")] <- "After"
+
+# Date cleanup: remove calculations for dates with bad raw data
+# Eric:
+# 2018-02-20 thru 2018-02-23 sensor burial
+Uptake_Eqn1$UaNO3_gNm2day.eric[Uptake_Eqn1$Date >= ymd("2018-02-20") &
+                                 Uptake_Eqn1$Date <= ymd("2018-02-23")] <- NA
+# 2018-03-06 thru 2018-03-12 sensor burial
+Uptake_Eqn1$UaNO3_gNm2day.eric[Uptake_Eqn1$Date >= ymd("2018-03-06") &
+                                 Uptake_Eqn1$Date <= ymd("2018-03-12")] <- NA
+# 2018-04-01 thru 2018-04-04 sensor burial
+Uptake_Eqn1$UaNO3_gNm2day.eric[Uptake_Eqn1$Date >= ymd("2018-04-01") &
+                                 Uptake_Eqn1$Date <= ymd("2018-04-04")] <- NA
+# 2018-04-14 thru 2018-04-17 sensor burial
+Uptake_Eqn1$UaNO3_gNm2day.eric[Uptake_Eqn1$Date >= ymd("2018-04-14") &
+                                 Uptake_Eqn1$Date <= ymd("2018-04-17")] <- NA
+# 2018-04-25 thru 2018-04-27 sensor burial
+Uptake_Eqn1$UaNO3_gNm2day.eric[Uptake_Eqn1$Date >= ymd("2018-04-25") &
+                                 Uptake_Eqn1$Date <= ymd("2018-04-27")] <- NA
+# Steve:
+# Sensor not deployed until Feb 10 at 15:00
+Uptake_Eqn1$UaNO3_gNm2day.steve[Uptake_Eqn1$Date >= ymd("2018-02-01") &
+                                  Uptake_Eqn1$Date <= ymd("2018-02-10")] <- NA
+# Sensor burial 2018-03-09 thru 2018-03-22
+Uptake_Eqn1$UaNO3_gNm2day.steve[Uptake_Eqn1$Date >= ymd("2018-03-09") &
+                                  Uptake_Eqn1$Date <= ymd("2018-03-22")] <- NA
+
+# Save dataframe
+write.csv(Uptake_Eqn1, 
+          file = "./Outputs/NitrateUptakeResults_Eqn1_DepthEdited.csv", 
+          row.names = FALSE)
+saveRDS(Uptake_Eqn1, file = "./Outputs/NitrateUptakeResults_Eqn1_DepthEdited.rds")
+
+
+
+
+
+# Calculate Uptake (Ua) and Supply with specific scaling for each site
+
+# Ua = SumNitrateDiff [mg/L] * Q [m3/s] / (w [m] * L[m] ) 
+#       * 1000 [L/m3] / 1000 [g/mg] * 86400 [sec/day]
+
+# Supply [g-N m-2 d-1] = 
+#             ( Q [L s-1] * C [g-N L-1] * 86400 [s d-1] ) / (w [m] * L [m])
+#                      = mass N load [g-N d-1] / (w [m] * L [m])
+
+
+
+# Eric
+# Set days where no uptake occured (negative values) to NA
+# These days will be termed "non-detectable", are likely due to changes in Q
+eric_uptake_Eqn1$UaNO3_gNm2day <- eric_uptake_Eqn1$SumDiff_mgNL *
+  eric_uptake_Eqn1$Mean.Discharge_m3s / (210.9 * 100) * 86400
+eric_uptake_Eqn1$UaNO3_gNm2day[eric_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+eric_uptake_Eqn1$NitrateSupply_gNm2day <- eric_uptake_Eqn1$Mean.Nitrate_mgL*
+  eric_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (210.9 * 100)
+
+# Steve
+steve_uptake_Eqn1$UaNO3_gNm2day <- steve_uptake_Eqn1$SumDiff_mgNL *
+  steve_uptake_Eqn1$Mean.Discharge_m3s / (113.4 * 100) * 86400
+steve_uptake_Eqn1$UaNO3_gNm2day[steve_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+steve_uptake_Eqn1$NitrateSupply_gNm2day <- steve_uptake_Eqn1$Mean.Nitrate_mgL*
+  steve_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (113.4 * 100)
+
+# Desoto
+# Set days where no uptake occured (negative values) to NA
+# These days will be termed "non-detectable", are likely due to changes in Q
+desoto_uptake_Eqn1$UaNO3_gNm2day <- desoto_uptake_Eqn1$SumDiff_mgNL *
+  desoto_uptake_Eqn1$Mean.Discharge_m3s / (138.07 * 100) * 86400
+desoto_uptake_Eqn1$UaNO3_gNm2day[desoto_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+desoto_uptake_Eqn1$NitrateSupply_gNm2day <- desoto_uptake_Eqn1$Mean.Nitrate_mgL *
+  desoto_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (138.07 * 100)
+
+
+```
+
+```{r Eqn 2 Uptake}
+# This section has not been updated, is not calculating correctly
 
 #### Calculate uptake using Equation 2 #########################################
-
+#using the 
+# integrated diel method (Heffernan and Cohen 
+# 2010, Eqn. 2)
+  
+  
 if (UptakeEqn == 2){
   # Calculate NO3 uptake using the integrated diel method 
   # (Heffernan and Cohen 2010, Eqn. 2)
@@ -540,149 +494,6 @@ if (UptakeEqn == 2){
 }
 ```
 
-```{r Calculation: Merge Uptake data with Metabolism data}
-# New dataframe: metabolism results and uptake calculations
-
-# Load in metabolism model results
-modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
-modelfit.steve <- readRDS("./Outputs/MetabResults_Steve.RData")
-modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
-
-# Compile metabolism results into a single dataframe
-Metabolism <- dplyr::full_join(modelfit.eric$predictions, modelfit.steve$predictions,
-                               by = "date", suffix = c(".eric", ".steve"))
-Metabolism <- dplyr::full_join(Metabolism, modelfit.desoto$predictions, by = "date")
-
-# Cleanup and rename columns
-Metabolism$msgs.fit.eric <- NULL
-Metabolism$warnings.eric <- NULL
-Metabolism$errors.eric <- NULL
-Metabolism$msgs.fit.steve <- NULL
-Metabolism$warnings.steve <- NULL
-Metabolism$errors.steve <- NULL
-Metabolism$msgs.fit <- NULL
-Metabolism$warnings <- NULL
-Metabolism$errors <- NULL
-names(Metabolism)[names(Metabolism) == "GPP"] <- "GPP.desoto"
-names(Metabolism)[names(Metabolism) == "GPP.lower"] <- "GPP.lower.desoto"
-names(Metabolism)[names(Metabolism) == "GPP.upper"] <- "GPP.upper.desoto"
-names(Metabolism)[names(Metabolism) == "ER"] <- "ER.desoto"
-names(Metabolism)[names(Metabolism) == "ER.lower"] <- "ER.lower.desoto"
-names(Metabolism)[names(Metabolism) == "ER.upper"] <- "ER.upper.desoto"
-names(Metabolism)[names(Metabolism) == "date"] <- "Date"
-
-# # Join uptake dataframe with metabolism dataframes
-UptakeMetab <- dplyr::full_join(NitrateUptake, Metabolism, by = "Date")
-```
-
-```{r Calculation and Plot: UAGPP}
-# Calculate expected autotrophic assimilation of nitrate
-# based on GPP, as in Rode et al 2016
-# Assumptions:
-#   net autotrophic production is half of gross primary productivity
-#       (ra -> 0.5)
-#   net photosynthetic quotient is 1 (that is, 1 mol O2 produced = 
-#       1 mol C converted from CO2 to organic biomass)
-#   conversion rate of C to N is the same as the molar C:N ratio of 
-#       the periphyton in the system
-#       (using Whiles and Dodds 2002 for this value, site KR3 on the 
-#       Kansas River, which has C:N of about 9 during winter to spring)
-
-ra <- 0.5 # autotrophic production efficiency factor
-N.C <- 1/9 # C:N ratio in Kansas River = 9C:1N
-
-# Equation:
-# GPP [g O2 / (m^2 day)] * [1 mol O2 / 32 g O2] * [1 mol C / 1 mol O2] * 
-#   [1 mol N / 9 mol C ] C:N ratio * [14 g N / 1 mol N] * 
-#   0.5 efficiency factor = Ua-GPP [g N / (m^2 day)]
-
-UptakeMetab$UaGPP_gNm2day.eric <- UptakeMetab$GPP.eric * (1/32) * N.C * 14 * ra
-UptakeMetab$UaGPP_gNm2day.steve <- UptakeMetab$GPP.steve * (1/32) * N.C * 14 * ra
-UptakeMetab$UaGPP_gNm2day.desoto <- UptakeMetab$GPP.desoto * (1/32) * N.C * 14 * ra
-
-# Eric
-ggplot(data = UptakeMetab, aes(x = UaNO3_gNm2day.eric, y = UaGPP_gNm2day.eric)) +
-  geom_point(shape = 21, fill = "white") +
-  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
-              color = "#FF0000") +
-  facet_grid(.~ReleaseStatus) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none", strip.background = element_blank(),
-        strip.text.x = element_blank())
-  
-# Steve
-ggplot(data = UptakeMetab, aes(x = UaNO3_gNm2day.steve, y = UaGPP_gNm2day.steve)) +
-  geom_point(shape = 21, fill = "white") +
-  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
-              color = "#23baaf") +
-  facet_grid(.~ReleaseStatus) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none", strip.background = element_blank(),
-        strip.text.x = element_blank())
-  
-# Desoto
-ggplot(data = UptakeMetab, aes(x = UaNO3_gNm2day.desoto, y = UaGPP_gNm2day.desoto)) +
-  geom_point(shape = 21, fill = "white") +
-  geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
-              color = "#F2AD00") +
-  facet_grid(.~ReleaseStatus) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none", strip.background = element_blank(),
-        strip.text.x = element_blank())
-```
-
-```{r Calculation: Vf}
-# Calculate assimilatory uptake velocity (Vf)
-# where Vf is the average downward velocity at which 
-# NO3- ions are removed from the water and is a measure
-# of efficiency relative to availability (Rode et al 2016)
-#
-# Using Ua-NO3:
-#     Ua-NO3 [kg-N / (m^2 day)] / [NO3] [mg-N / L] * [1 m3 / 1000L] * 
-#         [1000 mg / 1 g] = Vfa [m2 / day]
-UptakeMetab$Vf.NO3_mday.eric <- 
-  UptakeMetab$UaNO3_gNm2day.eric / UptakeMetab$Mean.Nitrate_mgL.eric
-UptakeMetab$Vf.NO3_mday.steve <- 
-  UptakeMetab$UaNO3_gNm2day.steve / UptakeMetab$Mean.Nitrate_mgL.steve
-UptakeMetab$Vf.NO3_mday.desoto <- 
-  UptakeMetab$UaNO3_gNm2day.desoto / UptakeMetab$Mean.Nitrate_mgL.desoto
-
-# Using Ua-GPP:
-#     Ua-GPP [g-N / (m^2 day)] / [NO3] [mg-N / L] * [1 m3 / 1000L] * [1000 mg / g] 
-#     = Vfa [m2 / day]
-UptakeMetab$Vf.GPP_mday.eric <- 
-  UptakeMetab$UaGPP_gNm2day.eric / UptakeMetab$Mean.Nitrate_mgL.eric
-UptakeMetab$Vf.GPP_mday.steve <- 
-  UptakeMetab$UaGPP_gNm2day.steve / UptakeMetab$Mean.Nitrate_mgL.steve
-UptakeMetab$Vf.GPP_mday.desoto <- 
-  UptakeMetab$UaGPP_gNm2day.desoto / UptakeMetab$Mean.Nitrate_mgL.desoto
-```
-
-```{r Calculation: Cleanup and NA suspicious dates}
-# Cleanup for anomalies
-
-# Change all exactly equal to 0 values to NA so they don't plot
-UptakeMetab[UptakeMetab == 0] <- NA
-# One row in steve has Inf value because Ua is divided by 0 value for nitrate
-UptakeMetab$Vf.NO3_mday.steve[is.infinite(UptakeMetab$Vf.NO3_mday.steve)] <- NA
-# Steve doesn't have nitrate data until the 10th
-UptakeMetab$Mean.Nitrate_mgL.steve[UptakeMetab$Date >= ymd("2018-01-31") 
-                                   & UptakeMetab$Date <= ymd("2018-02-10")] <- 
-  NA
-UptakeMetab$UaNO3_gNm2day.steve[UptakeMetab$Date >= ymd("2018-01-31") 
-                                & UptakeMetab$Date <= ymd("2018-02-10")] <- 
-  NA
-UptakeMetab$Vf.NO3_mday.steve[UptakeMetab$Date >= ymd("2018-01-31") 
-                              & UptakeMetab$Date <= ymd("2018-02-10")] <- 
-  NA
-```
-
 ```{r Calculation: Uhet}
 # Calculate expected heterotrophic assimilation of nitrate (Uhet)
 # based on GPP, as in Convino et al 2018
@@ -698,378 +509,4 @@ rh <- 0.2 # Heterotrophic growth efficiency factor
 #         * 0.2 heterotrophic growth efficiency factor
 #         = Uhet [g N / (m^2 day)]
 -(UptakeMetab$ER.desoto - ra * UptakeMetab$GPP.desoto) * (1/32) * N.C * 14 * rh + UptakeMetab$UaGPP_gNm2day.desoto
-```
-
-```{r Calculation: NO3Supply}
-# Calculate the supply of nitrate to the reach
-# Supply [g-N / m2 day] = Q [m3 / s] * NO3 [mg / L] * 1/A [m2] * 86400 [2/day] 
-#                         * 1000 [L/m3] * 1/1000 [g/mg]
-
-# Until we have better data: use 130 as static riverbed area for whole reach
-
-A <- 130
-
-UptakeMetab$NSupply_gNm2day.eric <- 
-  (UptakeMetab$Mean.Discharge_m3s.eric * UptakeMetab$Mean.Nitrate_mgL.eric * 
-     86400) / A
-UptakeMetab$NSupply_gNm2day.steve <- 
-  (UptakeMetab$Mean.Discharge_m3s.steve * UptakeMetab$Mean.Nitrate_mgL.steve * 
-     86400) / A
-UptakeMetab$NSupply_gNm2day.desoto <- 
-  (UptakeMetab$Mean.Discharge_m3s.desoto * UptakeMetab$Mean.Nitrate_mgL.desoto * 
-     86400) / A
-
-```
-
-```{r Plot: nitrate uptake and nitrate supply}
-# Eric
-ggplot(data = UptakeMetab, aes(x = Date)) +
-  geom_col(aes(y = -UaNO3_gNm2day.eric, fill = "NO3 Uptake")) +
-  geom_col(aes(y = NSupply_gNm2day.eric, fill = "NO3 Supply")) +
-  geom_line(aes(y = (NSupply_gNm2day.eric/-UaNO3_gNm2day.eric)*10^5)) +
-  scale_y_continuous(limits = c(-3.5E6, 2E5),
-                     sec.axis = sec_axis(~./10^5, name = "Supply:Uptake")) +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
-               date_breaks = "2 weeks", date_labels = "%b %e") +
-  # Vertical line at 1-Apr-18
-  geom_vline(aes(xintercept = as_date("2018-04-01")), linetype = 2) +
-  # axis labels
-  xlab(NULL) + 
-  ylab(expression("(g-N" ~~ m^{2} ~ day^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA), 
-        legend.title = element_blank())
-ggsave("./Plots/UptakevSupply_Eric.png", width = 6.75, height = 2.5, 
-       units = "in")
-
-# Steve
-ggplot(data = UptakeMetab, aes(x = Date)) +
-  geom_col(aes(y = -UaNO3_gNm2day.steve, fill = "NO3 Uptake")) +
-  geom_col(aes(y = NSupply_gNm2day.steve, fill = "NO3 Supply")) +
-  geom_line(aes(y = (NSupply_gNm2day.steve/-UaNO3_gNm2day.steve)*10^5)) +
-  scale_y_continuous(limits = c(-5E5, 3E5),
-                     sec.axis = sec_axis(~./10^5, name = "Supply:Uptake")) +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
-               date_breaks = "2 weeks", date_labels = "%b %e") +
-  # Vertical line at 1-Apr-18
-  geom_vline(aes(xintercept = as_date("2018-04-01")), linetype = 2) +
-  # axis labels
-  xlab(NULL) + 
-  ylab(expression("(g-N" ~~ m^{2} ~ day^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA), 
-        legend.title = element_blank())
-ggsave("./Plots/UptakevSupply_Steve.png", width = 6.75, height = 2.5, 
-       units = "in")
-
-# Desoto
-ggplot(data = UptakeMetab, aes(x = Date)) +
-  geom_col(aes(y = -UaNO3_gNm2day.desoto, fill = "NO3 Uptake")) +
-  geom_col(aes(y = NSupply_gNm2day.desoto, fill = "NO3 Supply")) +
-  geom_line(aes(y = (NSupply_gNm2day.desoto/-UaNO3_gNm2day.desoto)*10^5)) +
-  scale_y_continuous(limits = c(-6E5, 2E5), 
-                     sec.axis = sec_axis(~./10^5, name = "Supply:Uptake")) +
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
-               date_breaks = "2 weeks", date_labels = "%b %e") +
-  # Vertical line at 1-Apr-18
-  geom_vline(aes(xintercept = as_date("2018-04-01")), linetype = 2) +
-  # axis labels
-  xlab(NULL) + 
-  ylab(expression("(g-N" ~~ m^{2} ~ day^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA), 
-        legend.title = element_blank())
-ggsave("./Plots/UptakevSupply_Desoto.png", width = 6.75, height = 2.5, 
-       units = "in")
-```
-
-
-```{r Plot: Vf vs time}
-# Plot uptake velocity vs time
-
-ggplot(data = UptakeMetab, aes(x = Date)) +
-  # Discharge (Eric)
-  geom_point(aes(y = Vf.NO3_mday.eric, color = "Discharge"), shape = 21, 
-             fill = "white") +
-  # Downstream (Steve)
-  geom_point(aes(y = Vf.NO3_mday.steve, color = "Downstream"), shape = 21, 
-             fill = "white") +
-  # Desoto
-  geom_point(aes(y = Vf.NO3_mday.desoto, color = "Desoto"), shape = 21, 
-             fill = "white") +
-  # Vertical line at 1-Apr-18
-  geom_vline(aes(xintercept = as_date("2018-04-01")), linetype = 2) +
-  # Axis and color scales
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
-               date_breaks = "2 weeks", date_labels = "%b %e" ) + 
-  scale_y_continuous(limits = c(0, 1.5E6)) +
-  scale_color_manual(values = c("Upstream" = "#000000", 
-                                "Discharge" = "#FF0000", 
-                                 "Downstream" = "#23baaf", 
-                                "Desoto" = "#F2AD00"),
-                     breaks = c("Upstream", "Discharge", 
-                                "Downstream", "Desoto")) +
-  # axis labels
-  xlab(NULL) + 
-  ylab(expression(V[f]-NO[3]^{"-"} ~~ "(m" ~ day^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA), 
-        legend.title = element_blank())
-
-ggsave(file = "./Plots/Vf_time.png", width = 6.75, height = 2.5, units = "in")
-```
-
-```{r Plot: Uptake vs GPP in 6 tiles}
-# Reshape data so you can use a facet operator
-# Add a designator for site name
-# Add a designator for ReleaseStatus (done)
-# Order ReleaseStatus as a factor 
-
-# Select data prior to May 1
-UptakeMetab <- subset(UptakeMetab, Date <= ymd("2018-05-01"))
-
-# Change factor levels of ReleaseStatus designation 
-# so they plot in the correct order
-UptakeMetab$ReleaseStatus <- factor(UptakeMetab$ReleaseStatus, 
-                                    levels = c("During", "After"), ordered = T)
-
-# GPP vs Uptake
-Plot.uptake_GPP <- grid.arrange(
-  # Eric
-  ggplot(data = UptakeMetab, aes(x = GPP.eric, y = UaNO3_gNm2day.eric)) +
-    geom_point(shape = 21, fill = "white") +
-    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
-                color = "#FF0000") +
-    facet_grid(.~ReleaseStatus) +
-    # axis labels
-    xlab(NULL) + 
-    ylab(NULL) +
-    # plot theme
-    theme_classic() +
-    theme(panel.border = element_rect(color = "black", fill = NA),
-          legend.position = "none", strip.background = element_blank(),
-          strip.text.x = element_blank()),
-  
-  # Steve
-  ggplot(data = UptakeMetab, aes(x = GPP.steve, y = UaNO3_gNm2day.steve)) +
-    geom_point(shape = 21, fill = "white") +
-    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
-                color = "#23baaf") +
-    facet_grid(.~ReleaseStatus) +
-    # axis labels
-    xlab(NULL) + 
-    ylab(NULL) +
-    # plot theme
-    theme_classic() +
-    theme(panel.border = element_rect(color = "black", fill = NA),
-          legend.position = "none", strip.background = element_blank(),
-          strip.text.x = element_blank()),
-  
-  # Desoto
-  ggplot(data = UptakeMetab, aes(x = GPP.desoto, y = UaNO3_gNm2day.desoto)) +
-    geom_point(shape = 21, fill = "white") +
-    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
-                color = "#F2AD00") +
-    facet_grid(.~ReleaseStatus) +
-    # axis labels
-    xlab(NULL) + 
-    ylab(NULL) +
-    # plot theme
-    theme_classic() +
-    theme(panel.border = element_rect(color = "black", fill = NA),
-          legend.position = "none", strip.background = element_blank(),
-          strip.text.x = element_blank()),
-  
-  left = yaxis,
-  bottom = textGrob(label = expression("GPP (g "*O[2] ~ m^{-2} ~ d^{-1} * ")"))
-)
-# Save plot
-ggsave("./Plots/Uptake_GPP.png", Plot.uptake_GPP,
-       height = 5.5, width = 4.25, units = "in")
-```
-
-```{r Plot: Uptake vs ER in 6 tiles}
-# ER vs Uptake
-Plot.uptake_ER <- grid.arrange(
-  # Eric
-  ggplot(data = UptakeMetab, aes(x = ER.eric, y = UaNO3_gNm2day.eric)) +
-    geom_point(shape = 21, fill = "white") +
-    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
-                color = "#FF0000") +
-    facet_grid(.~ReleaseStatus) +
-    # axis labels
-    xlab(NULL) + 
-    ylab(NULL) +
-    # plot theme
-    theme_classic() +
-    theme(panel.border = element_rect(color = "black", fill = NA),
-          legend.position = "none", strip.background = element_blank(),
-          strip.text.x = element_blank()),
-  
-  # Steve
-  ggplot(data = UptakeMetab, aes(x = ER.steve, y = UaNO3_gNm2day.steve)) +
-    geom_point(shape = 21, fill = "white") +
-    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
-                color = "#23baaf") +
-    facet_grid(.~ReleaseStatus) +
-    # axis labels
-    xlab(NULL) + 
-    ylab(NULL) +
-    # plot theme
-    theme_classic() +
-    theme(panel.border = element_rect(color = "black", fill = NA),
-          legend.position = "none", strip.background = element_blank(),
-          strip.text.x = element_blank()),
-  
-  # Desoto
-  ggplot(data = UptakeMetab, aes(x = ER.desoto, y = UaNO3_gNm2day.desoto)) +
-    geom_point(shape = 21, fill = "white") +
-    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
-                color = "#F2AD00") +
-    facet_grid(.~ReleaseStatus) +
-    # axis labels
-    xlab(NULL) + 
-    ylab(NULL) +
-    # plot theme
-    theme_classic() +
-    theme(panel.border = element_rect(color = "black", fill = NA),
-          legend.position = "none", strip.background = element_blank(),
-          strip.text.x = element_blank()),
-  
-  left = yaxis,
-  bottom = textGrob(label = expression("ER (g "*O[2] ~ m^{-2} ~ d^{-1} * ")"))
-)
-# Save plot
-ggsave("./Plots/Uptake_ER.png", Plot.uptake_ER,
-       height = 5.5, width = 4.25, units = "in")
-```
-
-```{r Plot: UaNO3 vs NO3 and During or Post}
-# Nitrate vs Uptake
-Plot.uptake_Nitrate <- grid.arrange(
-  # Eric
-  ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.eric, y = UaNO3_gNm2day.eric)) +
-    geom_point(shape = 21, fill = "white") +
-    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
-                color = "#FF0000") +
-    facet_grid(.~ReleaseStatus) +
-    # axis labels
-    xlab(NULL) + 
-    ylab(NULL) +
-    # plot theme
-    theme_classic() +
-    theme(panel.border = element_rect(color = "black", fill = NA),
-          legend.position = "none", strip.background = element_blank(),
-          strip.text.x = element_blank()),
-  
-  # Steve
-  ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.steve, y = UaNO3_gNm2day.steve)) +
-    geom_point(shape = 21, fill = "white") +
-    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
-                color = "#23baaf") +
-    facet_grid(.~ReleaseStatus) +
-    # axis labels
-    xlab(NULL) + 
-    ylab(NULL) +
-    # plot theme
-    theme_classic() +
-    theme(panel.border = element_rect(color = "black", fill = NA),
-          legend.position = "none", strip.background = element_blank(),
-          strip.text.x = element_blank()),
-  
-  # Desoto
-  ggplot(data = UptakeMetab, aes(x = Mean.Nitrate_mgL.desoto, y = UaNO3_gNm2day.desoto)) +
-    geom_point(shape = 21, fill = "white") +
-    geom_smooth(formula = y~x, method = "lm", se = FALSE, fullrange = TRUE,
-                color = "#F2AD00") +
-    facet_grid(.~ReleaseStatus) +
-    # axis labels
-    xlab(NULL) + 
-    ylab(NULL) +
-    # plot theme
-    theme_classic() +
-    theme(panel.border = element_rect(color = "black", fill = NA),
-          legend.position = "none", strip.background = element_blank(),
-          strip.text.x = element_blank()),
-  
-  left = yaxis,
-  bottom = textGrob(label = expression(NO[3]^{"-"} ~~ "(mg-N" ~ L^{-1} *")"))
-)
-# Save plot
-ggsave("./Plots/Uptake_Nitrate.png", Plot.uptake_Nitrate,
-       height = 5.5, width = 4.25, units = "in")
-```
-
-```{r Calculation: Pearson Correlations}
-# Compute linear correlations between uptake and predictors
-
-# Uptake and GPP
-# During pumping
-cor(x = subset(UptakeMetab, ReleaseStatus == "During")$GPP.eric, 
-    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_gNm2day.eric, 
-    use = "pairwise.complete.obs", method = "pearson")
-cor(x = subset(UptakeMetab, ReleaseStatus == "During")$GPP.steve, 
-    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_gNm2day.steve, 
-    use = "pairwise.complete.obs", method = "pearson")
-cor(x = subset(UptakeMetab, ReleaseStatus == "During")$GPP.desoto, 
-    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_gNm2day.desoto, 
-    use = "pairwise.complete.obs", method = "pearson")
-# After pumping
-cor(x = subset(UptakeMetab, ReleaseStatus == "After")$GPP.eric, 
-    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_gNm2day.eric, 
-    use = "pairwise.complete.obs", method = "pearson")
-cor(x = subset(UptakeMetab, ReleaseStatus == "After")$GPP.steve, 
-    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_gNm2day.steve, 
-    use = "pairwise.complete.obs", method = "pearson")
-cor(x = subset(UptakeMetab, ReleaseStatus == "After")$GPP.desoto, 
-    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_gNm2day.desoto, 
-    use = "pairwise.complete.obs", method = "pearson")
-
-# Uptake and ER
-# During pumping
-cor(x = subset(UptakeMetab, ReleaseStatus == "During")$ER.eric, 
-    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_gNm2day.eric, 
-    use = "pairwise.complete.obs", method = "pearson")
-cor(x = subset(UptakeMetab, ReleaseStatus == "During")$ER.steve, 
-    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_gNm2day.steve, 
-    use = "pairwise.complete.obs", method = "pearson")
-cor(x = subset(UptakeMetab, ReleaseStatus == "During")$ER.desoto, 
-    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_gNm2day.desoto, 
-    use = "pairwise.complete.obs", method = "pearson")
-# After pumping
-cor(x = subset(UptakeMetab, ReleaseStatus == "After")$ER.eric, 
-    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_gNm2day.eric, 
-    use = "pairwise.complete.obs", method = "pearson")
-cor(x = subset(UptakeMetab, ReleaseStatus == "After")$ER.steve, 
-    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_gNm2day.steve, 
-    use = "pairwise.complete.obs", method = "pearson")
-cor(x = subset(UptakeMetab, ReleaseStatus == "After")$ER.desoto, 
-    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_gNm2day.desoto, 
-    use = "pairwise.complete.obs", method = "pearson")
-
-# Uptake and NO3
-# During pumping
-cor(x = subset(UptakeMetab, ReleaseStatus == "During")$Mean.Nitrate_mgL.eric, 
-    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_gNm2day.eric, 
-    use = "pairwise.complete.obs", method = "pearson")
-cor(x = subset(UptakeMetab, ReleaseStatus == "During")$Mean.Nitrate_mgL.steve, 
-    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_gNm2day.steve, 
-    use = "pairwise.complete.obs", method = "pearson")
-cor(x = subset(UptakeMetab, ReleaseStatus == "During")$Mean.Nitrate_mgL.desoto, 
-    y = subset(UptakeMetab, ReleaseStatus == "During")$UaNO3_gNm2day.desoto, 
-    use = "pairwise.complete.obs", method = "pearson")
-# After pumping
-cor(x = subset(UptakeMetab, ReleaseStatus == "After")$Mean.Nitrate_mgL.eric, 
-    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_gNm2day.eric, 
-    use = "pairwise.complete.obs", method = "pearson")
-cor(x = subset(UptakeMetab, ReleaseStatus == "After")$Mean.Nitrate_mgL.steve, 
-    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_gNm2day.steve, 
-    use = "pairwise.complete.obs", method = "pearson")
-cor(x = subset(UptakeMetab, ReleaseStatus == "After")$Mean.Nitrate_mgL.desoto, 
-    y = subset(UptakeMetab, ReleaseStatus == "After")$UaNO3_gNm2day.desoto, 
-    use = "pairwise.complete.obs", method = "pearson")
 ```

@@ -183,7 +183,7 @@ sensor_desoto <- dplyr::full_join(sensor_desoto, metab_desoto, by = "date")
 
 ### Nitrate uptake results ###
 # HAVE bad dates removed
-uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1.rds")
+uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1_DepthEdited.rds")
 uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-01"] <- NA # affected by rapid 
 #discharge change, U calculation overestimate
 uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-09"] <- NA # affected by sensor 
@@ -225,12 +225,13 @@ metab.long$site <- factor(metab.long$site, levels = c("S1", "S2", "S3"))
 uptake$ReleaseStatus <- factor(uptake$ReleaseStatus, 
                                levels = c("During", "After"))
 # Adjust from wide to long format
-uptake.long <- tidyr::gather(uptake[c(-2:-4, -6:-9, -11:-14, -16)], key = site, 
+uptake.long <- tidyr::gather(uptake[c(-2:-7, -9:-14, -16:-21, -23:-26)], 
+                             key = site, 
                              value = UaNO3_gNm2day,
                              UaNO3_gNm2day.eric:UaNO3_gNm2day.desoto)
-supply.long <- tidyr::gather(uptake[c(-2:-5, -7:-10, -12:-15, -17)], key = site, 
-                             value = NitrateSupply_gNm2day,
-                             NitrateSupply_gNm2day.eric:NitrateSupply_gNm2day.desoto)
+vf.long <- tidyr::gather(uptake[c(-2:-22)], key = site, 
+                             value = vf_mmmin,
+                             vf_mmmin.eric:vf_mmmin.desoto)
 # Factorize site name
 uptake.long$site <- factor(uptake.long$site, levels = c("UaNO3_gNm2day.eric", 
                                                         "UaNO3_gNm2day.steve", 
@@ -256,7 +257,7 @@ levels(supply.long$site)[levels(supply.long$site)==
 # Merge uptake data and metabolism data
 metab.long$Date <- metab.long$date
 uptake.metab.long <- dplyr::full_join(metab.long, uptake.long, 
-                                      by = c("Date", "site", "ReleaseStatus"))
+                                      by = c("Date", "site"))
 uptake.metab.long$date <- NULL
 uptake.metab.long <- subset(uptake.metab.long, Date < ymd("2018-05-01"))
 
@@ -422,43 +423,6 @@ cor.test(~vf_mmmin+value,
 cor.test(~vf_mmmin+value, 
          data = subset(vf.metab, model == "ER" & site == "S3"), 
          method = c("spearman"))
-
-
-
-
-
-
-
-# The below portion has not been editied
-## Significance testing ########################################################
-# Get summary statistics for each group
-uptake.long %>%
-  subset(Date < "2018-05-01") %>%
-  group_by(site, ReleaseStatus) %>%
-  filter(!is.na(UaNO3_gNm2day)) %>%
-  summarise(n = n(),
-            mean = mean(UaNO3_gNm2day, na.rm = TRUE),
-            sd = sd(UaNO3_gNm2day, na.rm = TRUE))
-# Perform two-way anova to assess the affect of two grouping variables 
-# (site & release status) on response (uptake)
-anova.uptake <- aov(UaNO3_gNm2day ~ ReleaseStatus * site, data = subset(uptake.long, Date<"2018-05-01"))
-summary(anova.uptake) 
-# Get multiple pairwise comparisons between the means of groups (to see specifically which groups differ) using Tukey honest significant differences 
-TukeyHSD(anova.uptake) # differences between sites 
-
-# Set up positions for significance letters
-positions <- data.frame(site = c("S1", "S1", "S2", "S2", "S3", "S3"),
-                              UaNO3_gNm2day = c(1E7,2E6,9E5,1E5,9E5,3E5),
-                              ReleaseStatus = factor(c("During", "After",
-                                                       "During", 
-                                                       "After", "During",  
-                                                       "After"), 
-                                                     levels = c("During", 
-                                                                "After")))
-
-ggpubr::compare_means(data = uptake.metab.mass.long, UaNO3_gNm2day~ReleaseStatus, 
-                      group.by = c("site"))
-
 ```
 
 ```{r Calculation: Mean data}
@@ -476,77 +440,106 @@ means <- data.frame(Site = c("S1", "S2", "S3"),
                     ER_gO2m2day.Overall = numeric(length = 3))
 # Ammonium
 mean(massbal$Ammonium.bowersock_mgNL[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], na.rm = TRUE)
+                                      massbal$date <= "2018-05-01"], 
+     na.rm = TRUE)
 sd(massbal$Ammonium.bowersock_mgNL[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], na.rm = TRUE)
+                                      massbal$date <= "2018-05-01"], 
+   na.rm = TRUE)
 mean(massbal$Ammonium.eric_mgNL[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], na.rm = TRUE)
+                                      massbal$date <= "2018-05-01"], 
+     na.rm = TRUE)
 sd(massbal$Ammonium.eric_mgNL[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], na.rm = TRUE)
+                                      massbal$date <= "2018-05-01"], 
+   na.rm = TRUE)
 mean(massbal$Ammonium.steve_mgNL[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], na.rm = TRUE)
+                                      massbal$date <= "2018-05-01"], 
+     na.rm = TRUE)
 sd(massbal$Ammonium.steve_mgNL[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], na.rm = TRUE)
+                                      massbal$date <= "2018-05-01"], 
+   na.rm = TRUE)
 mean(massbal$Ammonium.desoto_mgNL[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], na.rm = TRUE)
+                                      massbal$date <= "2018-05-01"], 
+     na.rm = TRUE)
 sd(massbal$Ammonium.desoto_mgNL[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], na.rm = TRUE)
+                                      massbal$date <= "2018-05-01"], 
+   na.rm = TRUE)
 
 
 # Nitrate
 mean(massbal$Nitrate.bowersock_mgNL[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], na.rm = TRUE)
+                                      massbal$date <= "2018-05-01"], 
+     na.rm = TRUE)
 sd(massbal$Nitrate.bowersock_mgNL[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], na.rm = TRUE)
+                                      massbal$date <= "2018-05-01"], 
+   na.rm = TRUE)
 
 means$Nitrate_mgL.Overall <- 
   c(mean(uptake$Mean.Nitrate_mgL.eric[uptake$Date >= "2018-02-01" & 
-                                        uptake$Date < "2018-05-01"], na.rm = TRUE),
+                                        uptake$Date < "2018-05-01"], 
+         na.rm = TRUE),
     mean(uptake$Mean.Nitrate_mgL.steve[uptake$Date >= "2018-02-01" & 
-                                         uptake$Date < "2018-05-01"], na.rm = TRUE),
+                                         uptake$Date < "2018-05-01"], 
+         na.rm = TRUE),
     mean(uptake$Mean.Nitrate_mgL.desoto[uptake$Date >= "2018-02-01" & 
-                                          uptake$Date < "2018-05-01"], na.rm = TRUE))
+                                          uptake$Date < "2018-05-01"], 
+         na.rm = TRUE))
 means$Nitrate_mgL.SD <- 
   c(sd(uptake$Mean.Nitrate_mgL.eric[uptake$Date >= "2018-02-01" & 
-                                        uptake$Date < "2018-05-01"], na.rm = TRUE),
+                                        uptake$Date < "2018-05-01"], 
+       na.rm = TRUE),
     sd(uptake$Mean.Nitrate_mgL.steve[uptake$Date >= "2018-02-01" & 
-                                         uptake$Date < "2018-05-01"], na.rm = TRUE),
+                                         uptake$Date < "2018-05-01"], 
+       na.rm = TRUE),
     sd(uptake$Mean.Nitrate_mgL.desoto[uptake$Date >= "2018-02-01" & 
-                                          uptake$Date < "2018-05-01"], na.rm = TRUE))
+                                          uptake$Date < "2018-05-01"], 
+       na.rm = TRUE))
 means$Nitrate_mgL.During <- 
   c(mean(uptake$Mean.Nitrate_mgL.eric[uptake$Date >= "2018-02-01" & 
-                                        uptake$Date < "2018-04-01"], na.rm = TRUE),
+                                        uptake$Date < "2018-04-01"], 
+         na.rm = TRUE),
     mean(uptake$Mean.Nitrate_mgL.steve[uptake$Date >= "2018-02-01" & 
-                                         uptake$Date < "2018-04-01"], na.rm = TRUE),
+                                         uptake$Date < "2018-04-01"], 
+         na.rm = TRUE),
     mean(uptake$Mean.Nitrate_mgL.desoto[uptake$Date >= "2018-02-01" & 
-                                          uptake$Date < "2018-04-01"], na.rm = TRUE))
+                                          uptake$Date < "2018-04-01"], 
+         na.rm = TRUE))
 means$Nitrate_mgL.After <- 
   c(mean(uptake$Mean.Nitrate_mgL.eric[uptake$Date >= "2018-04-01" & 
-                                        uptake$Date < "2018-05-01"], na.rm = TRUE),
+                                        uptake$Date < "2018-05-01"], 
+         na.rm = TRUE),
     mean(uptake$Mean.Nitrate_mgL.steve[uptake$Date >= "2018-04-01" & 
-                                         uptake$Date < "2018-05-01"], na.rm = TRUE),
+                                         uptake$Date < "2018-05-01"], 
+         na.rm = TRUE),
     mean(uptake$Mean.Nitrate_mgL.desoto[uptake$Date >= "2018-04-01" & 
-                                          uptake$Date < "2018-05-01"], na.rm = TRUE))
+                                          uptake$Date < "2018-05-01"], 
+         na.rm = TRUE))
 # Discharge
 mean(massbal$Q.lawrence_Ls[massbal$date >= "2018-02-01" &
                              massbal$date <= "2018-05-01"], na.rm = TRUE)/1000
 sd(massbal$Q.lawrence_Ls[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], na.rm = TRUE)/1000
+                                      massbal$date <= "2018-05-01"], 
+   na.rm = TRUE)/1000
 
 means$Discharge_m3s.Overall <- 
   c(mean(uptake$Mean.Discharge_m3s.eric[uptake$Date >= "2018-02-01" & 
-                                        uptake$Date < "2018-05-01"], na.rm = TRUE),
+                                        uptake$Date < "2018-05-01"], 
+         na.rm = TRUE),
     mean(uptake$Mean.Discharge_m3s.steve[uptake$Date >= "2018-02-01" & 
-                                         uptake$Date < "2018-05-01"], na.rm = TRUE),
+                                         uptake$Date < "2018-05-01"], 
+         na.rm = TRUE),
     mean(uptake$Mean.Discharge_m3s.desoto[uptake$Date >= "2018-02-01" & 
-                                          uptake$Date < "2018-05-01"], na.rm = TRUE))
+                                          uptake$Date < "2018-05-01"], 
+         na.rm = TRUE))
 means$Discharge_m3s.Overall.sd <- 
   c(sd(uptake$Mean.Discharge_m3s.eric[uptake$Date >= "2018-02-01" & 
-                                        uptake$Date < "2018-05-01"], na.rm = TRUE),
+                                        uptake$Date < "2018-05-01"], 
+       na.rm = TRUE),
     sd(uptake$Mean.Discharge_m3s.steve[uptake$Date >= "2018-02-01" & 
-                                         uptake$Date < "2018-05-01"], na.rm = TRUE),
+                                         uptake$Date < "2018-05-01"], 
+       na.rm = TRUE),
     sd(uptake$Mean.Discharge_m3s.desoto[uptake$Date >= "2018-02-01" & 
-                                          uptake$Date < "2018-05-01"], na.rm = TRUE))
+                                          uptake$Date < "2018-05-01"], 
+       na.rm = TRUE))
 # Uptake
 means$U_gNm2day.Overall <- 
   c(mean(uptake$UaNO3_gNm2day.eric[uptake$Date >= "2018-02-01" & 
@@ -1082,7 +1075,7 @@ a <-
   geom_point(position = position_jitterdodge(dodge.width = 1, 
                                              jitter.width = 1), 
              shape = 1, size = 2) +
-  scale_y_log10(breaks = c(1,10,100,1E3,1E4)) +
+  scale_y_log10() +
   # Color scales
   scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
                               "S3" = "#F2AD00"),
@@ -1137,19 +1130,21 @@ a <-
        aes(x = value, y = UaNO3_gNm2day, fill = site, shape = ReleaseStatus)) +
   facet_grid(site~., scales = "free", switch = "y") +
   # Linear model for During release
-  geom_smooth(data = subset(uptake.metab.mass.long, model == "GPP" & ReleaseStatus == "During"),
-              method = "lm", fullrange = TRUE, aes(color = ReleaseStatus), 
-              fill = "lightgrey", alpha = 0.2) +
+  #geom_smooth(data = subset(uptake.metab.mass.long, model == "GPP" & 
+   #                           ReleaseStatus == "During"),
+    #          method = "lm", fullrange = TRUE, aes(color = ReleaseStatus), 
+     #         fill = "lightgrey", alpha = 0.2) +
   # Linear model for after release
-  geom_smooth(data = subset(uptake.metab.mass.long, model == "GPP" & ReleaseStatus == "After"),
-              method = "lm", fullrange = TRUE, aes(color = site), 
-              fill = "lightgrey", alpha = 0.6) +
+  #geom_smooth(data = subset(uptake.metab.mass.long, model == "GPP" & 
+   #                           ReleaseStatus == "After"),
+    #          method = "lm", fullrange = TRUE, aes(color = site), 
+     #         fill = "lightgrey", alpha = 0.6) +
   # Plot points on top
   geom_point(size = 2) +
     # Add correlation coeff
   ggpubr::stat_cor(data = subset(uptake.metab.mass.long, model == "GPP"),
-                   method = "spearman", label.x = c(7), 
-                   label.y = c(3700, 3200, 500, 420, 950, 800), size = 3,
+                   method = "spearman", label.x = c(0), 
+                   #label.y = c(37000, 32000, 5000, 4200, 9500, 8000), size = 3,
                    aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
@@ -1174,19 +1169,21 @@ b <-
        aes(x = -value, y = UaNO3_gNm2day, fill = site, shape = ReleaseStatus)) +
   facet_grid(site~., scales = "free", switch = "y") +
   # Linear model for During release
-  geom_smooth(data = subset(uptake.metab.mass.long, model == "ER" & ReleaseStatus == "During"),
-              method = "lm", fullrange = TRUE, aes( color = ReleaseStatus), 
-              fill = "lightgrey", alpha = 0.2) +
+  #geom_smooth(data = subset(uptake.metab.mass.long, model == "ER" & 
+  #                            ReleaseStatus == "During"),
+  #            method = "lm", fullrange = TRUE, aes( color = ReleaseStatus), 
+  #            fill = "lightgrey", alpha = 0.2) +
   # Linear model for after release
-  geom_smooth(data = subset(uptake.metab.mass.long, model == "ER" & ReleaseStatus == "After"),
-              method = "lm", fullrange = TRUE, aes( color = site), 
-              fill = "lightgrey", alpha = 0.6) +
+  #geom_smooth(data = subset(uptake.metab.mass.long, model == "ER" & 
+  #                            ReleaseStatus == "After"),
+  #            method = "lm", fullrange = TRUE, aes( color = site), 
+  #            fill = "lightgrey", alpha = 0.6) +
   # Plot points on top
   geom_point(size = 2) +
     # Add correlation coeff
   ggpubr::stat_cor(data = subset(uptake.metab.mass.long, model == "ER"),
                    method = "spearman", label.x = c(5), 
-                   label.y = c(-300, -600, -100, -250, 850, 750), size = 3,
+                   #label.y = c(-300, -600, -100, -250, 850, 750), size = 3,
                    aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
@@ -1367,13 +1364,17 @@ ggplot() +
   geom_point(data = tank, aes(x = Discharge_Ls/1000, 
                               y = NO3_Vf_mmmin*(NO3_Cb_mgNL/1000)*1440), 
              shape = 21, color = "darkgrey") +
+  geom_smooth(data = tank, aes(x = Discharge_Ls/1000, 
+                              y = NO3_Vf_mmmin*(NO3_Cb_mgNL/1000)*1440), 
+              method = "lm", fullrange = TRUE, 
+              fill = "lightgrey", alpha = 0.2) +
   # Rode et al 2016 and Hensley et al 2014 data
   geom_point(data = rode.hensley, aes(x = Discharge_m3s,
                                       y = U_mgNm2day/1000),
              shape = 21, color = "darkgrey") +
   # Our data
   geom_point(data = means, aes(x = Discharge_m3s.Overall, 
-                               y = U_gNm2day.Overall, 
+                               y = U_gNm2day.After, 
                                fill = Site), 
              size = 3, shape = 21) +
   # Axis scales
@@ -1399,13 +1400,17 @@ ggplot() +
   # Meta-analysis data
   geom_point(data = tank, aes(x = Discharge_Ls/1000, y = NO3_Vf_mmmin), 
              shape = 21, color = "darkgrey") +
+  geom_smooth(data = tank, aes(x = Discharge_Ls/1000, 
+                              y = NO3_Vf_mmmin), 
+              method = "lm", fullrange = TRUE, 
+              fill = "lightgrey", alpha = 0.2) +
   # Rode et al 2016 and Hensley et al 2014 data
   geom_point(data = rode.hensley, aes(x = Discharge_m3s,
                                       y = Vf_mmmin),
              shape = 21, color = "darkgrey") +
   # Our data
   geom_point(data = means, aes(x = Discharge_m3s.Overall, 
-                               y = U_gNm2day.Overall/Nitrate_mgL.Overall*1000/1440, 
+                               y = U_gNm2day.After/Nitrate_mgL.After*1000/1440, 
                                fill = Site), 
              size = 3, shape = 21) +
   # Axis scales
