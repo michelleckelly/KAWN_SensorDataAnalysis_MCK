@@ -181,13 +181,7 @@ sensor_desoto <- dplyr::full_join(sensor_desoto, metab_desoto, by = "date")
 # 2018-02-01 thru 2018-02-10 N sensor not yet deployed
 # 2018-03-10 thru 2018-03-22 N sensor burial
 
-### Nitrate uptake results ###
-# HAVE bad dates removed
-uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1_DepthEdited.rds")
-uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-01"] <- NA # affected by rapid 
-#discharge change, U calculation overestimate
-uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-09"] <- NA # affected by sensor 
-#burial that started around 03-10
+
 
 ### Reshape metab data ########################################################
 # Factorize release status
@@ -220,38 +214,63 @@ levels(metab.long$site)[levels(metab.long$site)=="ER.desoto"] <- "S3"
 metab.long$model <- factor(metab.long$model, levels = c("GPP", "ER")) # Reorder
 metab.long$site <- factor(metab.long$site, levels = c("S1", "S2", "S3"))
 
-### Reshape uptake data ########################################################
-# Factorize release status
-uptake$ReleaseStatus <- factor(uptake$ReleaseStatus, 
-                               levels = c("During", "After"))
+### Nitrate uptake results #####################################################
+# HAVE bad dates removed
+uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1_DepthEdited.rds")
+uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-01"] <- NA # affected by rapid 
+#discharge change, U calculation overestimate
+uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-09"] <- NA # affected by sensor
+#burial that started around 03-10
+# Section date
+uptake <- uptake[uptake$Date >= ymd("2018-02-01") & 
+                   uptake$Date < ymd("2018-05-01"),]
+
+### Reshape uptake data #######
 # Adjust from wide to long format
-uptake.long <- tidyr::gather(uptake[c(-2:-7, -9:-14, -16:-21, -23:-26)], 
+uptake.long <- tidyr::gather(uptake[c("Date","UaNO3_gNm2day.eric",
+                                      "UaNO3_gNm2day.eric_scaled",
+                                      "UaNO3_gNm2day.steve",
+                                      "UaNO3_gNm2day.desoto", 
+                                      "ReleaseStatus")], 
                              key = site, 
                              value = UaNO3_gNm2day,
                              UaNO3_gNm2day.eric:UaNO3_gNm2day.desoto)
-vf.long <- tidyr::gather(uptake[c(-2:-22)], key = site, 
+vf.long <- tidyr::gather(uptake[c("Date","vf_mmmin.eric", 
+                                  "vf_mmmin.steve", 
+                                  "vf_mmmin.desoto")], key = site, 
                              value = vf_mmmin,
                              vf_mmmin.eric:vf_mmmin.desoto)
 # Factorize site name
-uptake.long$site <- factor(uptake.long$site, levels = c("UaNO3_gNm2day.eric", 
-                                                        "UaNO3_gNm2day.steve", 
-                                                        "UaNO3_gNm2day.desoto"))
-levels(uptake.long$site)[levels(uptake.long$site)=="UaNO3_gNm2day.eric"] <- 
-  "S1"
-levels(uptake.long$site)[levels(uptake.long$site)=="UaNO3_gNm2day.steve"] <- 
-  "S2"
-levels(uptake.long$site)[levels(uptake.long$site)=="UaNO3_gNm2day.desoto"] <- 
-  "S3"
-supply.long$site <- factor(supply.long$site, 
-                           levels = c("NitrateSupply_gNm2day.eric", 
-                                      "NitrateSupply_gNm2day.steve", 
-                                      "NitrateSupply_gNm2day.desoto"))
-levels(supply.long$site)[levels(supply.long$site)==
-                           "NitrateSupply_gNm2day.eric"] <- "S1"
-levels(supply.long$site)[levels(supply.long$site)==
-                           "NitrateSupply_gNm2day.steve"] <- "S2"
-levels(supply.long$site)[levels(supply.long$site)==
-                           "NitrateSupply_gNm2day.desoto"] <- "S3"
+uptake.long$site <- factor(uptake.long$site, 
+                           levels = c("UaNO3_gNm2day.eric",
+                                      "UaNO3_gNm2day.eric_scaled", 
+                                      "UaNO3_gNm2day.steve", 
+                                      "UaNO3_gNm2day.desoto"))
+levels(uptake.long$site)[levels(uptake.long$site) == 
+                           "UaNO3_gNm2day.eric"] <- "S1"
+levels(uptake.long$site)[levels(uptake.long$site) == 
+                           "UaNO3_gNm2day.eric_scaled"] <- "S1_scaled"
+levels(uptake.long$site)[levels(uptake.long$site) == 
+                           "UaNO3_gNm2day.steve"] <- "S2"
+levels(uptake.long$site)[levels(uptake.long$site) == 
+                           "UaNO3_gNm2day.desoto"] <- "S3"
+# Add Month column
+uptake.long <- 
+  uptake.long %>% 
+  mutate(Month = factor(month(Date, label = TRUE, abbr = TRUE)),
+         WeekGroup = factor(round_date(Date, period(week = 3))))
+uptake.long <- na.omit(uptake.long)
+
+#supply.long$site <- factor(supply.long$site, 
+#                           levels = c("NitrateSupply_gNm2day.eric", 
+#                                      "NitrateSupply_gNm2day.steve", 
+#                                      "NitrateSupply_gNm2day.desoto"))
+#levels(supply.long$site)[levels(supply.long$site)==
+#                           "NitrateSupply_gNm2day.eric"] <- "S1"
+#levels(supply.long$site)[levels(supply.long$site)==
+#                           "NitrateSupply_gNm2day.steve"] <- "S2"
+#levels(supply.long$site)[levels(supply.long$site)==
+#                           "NitrateSupply_gNm2day.desoto"] <- "S3"
 
 ### Join data for comparison plotting ##########################################
 # Merge uptake data and metabolism data
@@ -262,13 +281,13 @@ uptake.metab.long$date <- NULL
 uptake.metab.long <- subset(uptake.metab.long, Date < ymd("2018-05-01"))
 
 # Merge uptake with N load
-uptake.metab.mass.long <- dplyr::full_join(uptake.metab.long, supply.long, 
-                                           by = c("Date", "site"))
+#uptake.metab.mass.long <- dplyr::full_join(uptake.metab.long, supply.long, 
+#                                           by = c("Date", "site"))
 # Subset dates
-uptake.metab.mass.long <- subset(uptake.metab.mass.long, 
-                                 uptake.metab.mass.long$Date < ymd("2018-05-01"))
-uptake.metab.mass.long <- subset(uptake.metab.mass.long, 
-                                 uptake.metab.mass.long$Date >= ymd("2018-02-01"))
+#uptake.metab.mass.long <- subset(uptake.metab.mass.long, 
+#                                 uptake.metab.mass.long$Date < ymd("2018-05-01"))
+#uptake.metab.mass.long <- subset(uptake.metab.mass.long, 
+#                                 uptake.metab.mass.long$Date >= ymd("2018-02-01"))
 
 # Load in Tank et al 2008 uptake meta-analysis
 tank <- read.csv("./Data/Meta-analysis/Tank_2008_uptakedata.csv",
@@ -355,11 +374,10 @@ ggpubr::compare_means(PR~site, data = PR, method = "kruskal.test")
 
 ## Uptake ######################################################################
 # Test whether mean U was different between sites
-uptake.metab.mass.long$Month <- lubridate::month(uptake.metab.mass.long$Date)
-ggpubr::compare_means(UaNO3_gNm2day~site, data = uptake.metab.mass.long, 
+ggpubr::compare_means(UaNO3_gNm2day~site, data = uptake.long, 
                       method = "kruskal.test")
 # Test uptake during vs after
-ggpubr::compare_means(UaNO3_gNm2day~ReleaseStatus, data = uptake.metab.mass.long, 
+ggpubr::compare_means(UaNO3_gNm2day~ReleaseStatus, data = uptake.long, 
                       method = "kruskal.test", group.by = c("site"))
 ## Uptake velocity #############################################################
 # Test whether mean Vf was different between sites
@@ -542,28 +560,28 @@ means$Discharge_m3s.Overall.sd <-
        na.rm = TRUE))
 # Uptake
 means$U_gNm2day.Overall <- 
-  c(mean(uptake$UaNO3_gNm2day.eric[uptake$Date >= "2018-02-01" & 
+  c(mean(uptake$UaNO3_gNm2day.eric_scaled[uptake$Date >= "2018-02-01" & 
                                    uptake$Date < "2018-05-01"], na.rm = TRUE),
     mean(uptake$UaNO3_gNm2day.steve[uptake$Date >= "2018-02-01" & 
                                     uptake$Date < "2018-05-01"], na.rm = TRUE),
     mean(uptake$UaNO3_gNm2day.desoto[uptake$Date >= "2018-02-01" & 
                                      uptake$Date < "2018-05-01"], na.rm = TRUE))
 means$U_gNm2day.Overall.sd <- 
-  c(sd(uptake$UaNO3_gNm2day.eric[uptake$Date >= "2018-02-01" & 
+  c(sd(uptake$UaNO3_gNm2day.eric_scaled[uptake$Date >= "2018-02-01" & 
                                    uptake$Date < "2018-05-01"], na.rm = TRUE),
     sd(uptake$UaNO3_gNm2day.steve[uptake$Date >= "2018-02-01" & 
                                     uptake$Date < "2018-05-01"], na.rm = TRUE),
     sd(uptake$UaNO3_gNm2day.desoto[uptake$Date >= "2018-02-01" & 
                                      uptake$Date < "2018-05-01"], na.rm = TRUE))
 means$U_gNm2day.During <- 
-  c(mean(uptake$UaNO3_gNm2day.eric[uptake$Date >= "2018-02-01" & 
+  c(mean(uptake$UaNO3_gNm2day.eric_scaled[uptake$Date >= "2018-02-01" & 
                                    uptake$Date < "2018-04-01"], na.rm = TRUE),
     mean(uptake$UaNO3_gNm2day.steve[uptake$Date >= "2018-02-01" & 
                                     uptake$Date < "2018-04-01"], na.rm = TRUE),
     mean(uptake$UaNO3_gNm2day.desoto[uptake$Date >= "2018-02-01" & 
                                      uptake$Date < "2018-04-01"], na.rm = TRUE))
 means$U_gNm2day.After <- 
-  c(mean(uptake$UaNO3_gNm2day.eric[uptake$Date >= "2018-04-01" & 
+  c(mean(uptake$UaNO3_gNm2day.eric_scaled[uptake$Date >= "2018-04-01" & 
                                    uptake$Date < "2018-05-01"], na.rm = TRUE),
     mean(uptake$UaNO3_gNm2day.steve[uptake$Date >= "2018-04-01" & 
                                     uptake$Date < "2018-05-01"], na.rm = TRUE),
@@ -1051,18 +1069,18 @@ mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER.desoto,
 
 ```{r Fig 4: Uptake and Vf}
 ### Assemble data into a boxplot ##############################################
-uptake.metab.mass.long <- 
-  uptake.metab.mass.long %>% 
+uptake.metab.long <- 
+  uptake.metab.long %>% 
   mutate(Month = factor(month(Date, label = TRUE, abbr = TRUE)),
          WeekGroup = factor(round_date(Date, period(week = 3))))
-str(uptake.metab.mass.long)
+str(uptake.metab.long)
 
 # U ############################################################################
 # Broken up by ReleaseStatus
-a <- 
-  ggplot(data = subset(uptake.metab.mass.long, model == "GPP"), aes(x = Month, 
+#a <- 
+  ggplot(data = uptake.long, aes(x = Month, 
                                           y = UaNO3_gNm2day, fill = site)) +
-  facet_wrap(~site) +
+  facet_wrap(~site, nrow = 1) +
   # Error bars
   stat_boxplot(geom = "errorbar", width = 0.5, 
                position = position_dodge(width = 0.75)) +
@@ -1077,9 +1095,10 @@ a <-
              shape = 1, size = 2) +
   scale_y_log10() +
   # Color scales
-  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-                              "S3" = "#F2AD00"),
-                     limits = c("S1", "S2", "S3")) +
+  scale_fill_manual(values = c("S1" = "#FF0000", "S1_scaled" = "#FF0000",
+                               "S2" = "#23baaf", 
+                               "S3" = "#F2AD00"),
+                     limits = c("S1", "S1_scaled", "S2", "S3")) +
   # axis labels
   labs(tag = "A") +
   xlab(NULL) + 
@@ -1358,7 +1377,7 @@ ggsave("./Plots/Meta_Q.ER.png", height = 3.5, width = 4.25, units = "in")
 tank$U_gNm2day <- tank$NO3_Vf_mmmin*(tank$NO3_Cb_mgNL/1000)*1440
 
 ### Discharge v. total uptake, tank et al 2008 ################################
-c <- 
+#c <- 
 ggplot() +
   # Meta-analysis data
   geom_point(data = tank, aes(x = Discharge_Ls/1000, 
@@ -1671,4 +1690,43 @@ ggplot(data = sensor_desoto, aes(x = ER.desoto, y = WaterTemp_C)) +
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"))
 
+```
+
+```{r supply}
+Uptake_Eqn1 <- 
+  Uptake_Eqn1 %>% 
+  mutate(Month = factor(month(Date, label = TRUE, abbr = TRUE)),
+         WeekGroup = factor(round_date(Date, period(week = 3))))
+
+
+ggplot(data = Uptake_Eqn1, aes(x = Month, 
+                                          y = PercRemoval.Desoto)) +
+  #facet_wrap(~site, nrow = 1) +
+  # Error bars
+  stat_boxplot(geom = "errorbar", width = 0.5, 
+               position = position_dodge(width = 0.75)) +
+  # Add text for significance
+  ggpubr::stat_compare_means(aes(group = Month), label = "p.format", 
+                             label.y.npc = "bottom") +
+  # Boxplots
+  geom_boxplot(outlier.shape = NA) +
+  # Jitter points
+  geom_point(position = position_jitter(), 
+             shape = 1, size = 2) +
+  #scale_y_log10() +
+  # Color scales
+  #scale_fill_manual(values = c("S1" = "#FF0000", "S1_scaled" = "#FF0000",
+   #                            "S2" = "#23baaf", 
+    #                           "S3" = "#F2AD00"),
+     #                limits = c("S1", "S1_scaled", "S2", "S3")) +
+  # axis labels
+  labs(tag = "A") +
+  #scale_y_continuous(limits = c(0,100)) +
+  xlab(NULL) + 
+  ylab("Percent removal, uptake/supply") +
+  # plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
 ```
