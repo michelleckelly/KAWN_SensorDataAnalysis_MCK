@@ -68,20 +68,106 @@ discharge$Q.farmland_m3s <- NULL
 # load in data provided by city
 farmland <- 
   read.csv(file = "./Data/SensorData_CompiledFiles/FarmlandDailyReport_CityofLawrence_MCK.csv")
-farmland <- 
-  data.frame(date = lubridate::mdy(farmland$Date),
-             Nitrate.farmland_mgNL = farmland$OutflowWier_Farmland001A1_NitrateNitrite_mgN.L,
-             Ammonia.farmland_mgNL = farmland$OutflowWier_Farmland001A1_Ammonia_mgN.L)
 
-# take data from only 1-Jan onwards
-farmland <- farmland[farmland$date >= lubridate::mdy("1-1-2018"),]
-# linearlly interpolate missing concentration values
-# the point of this is to get an estimation of concentrations on weekends
-# that pumping was done but samples were not taken. On dates that no pumping
-# was done, a Q = 0 will be multiplied by these concentrations and they won't
-# go into the N balance
-farmland$Nitrate.farmland_mgNL <- imputeTS::na.interpolation(farmland$Nitrate.farmland_mgNL)
-farmland$Ammonia.farmland_mgNL <- imputeTS::na.interpolation(farmland$Ammonia.farmland_mgNL)
+# Select data of interest
+farmland.clean <- 
+  farmland %>%
+  mutate(date = lubridate::mdy(Date)) %>%
+  filter(date >= lubridate::ymd("2018-02-01")) %>%
+  select(date, 
+         Nitrate.Weir_mgNL = OutflowWier_Farmland001A1_NitrateNitrite_mgN.L,
+         Ammonium.Weir_mgNL = OutflowWier_Farmland001A1_Ammonia_mgN.L,
+         Nitrate.Ditch_mgNL = Downstream_1625RdDitch_NitrateNitrite_mgN.L,
+         Ammonium.Ditch_mgNL = Downstream_1625RdDitch_Ammonia_mgN.L,
+         Q.Pump_gpm = flowRate_AveragePump_gpm) %>%
+  mutate(Month = factor(month(date, abbr = TRUE, label = TRUE)),
+         Q.Pump_m3s = Q.Pump_gpm*6.309E-5)
+
+# Calculate supply
+
+farmland.clean$Supply_gNm2day.FarmlandWeir.Nitrate <- 
+  farmland.clean$Q.Pump_m3s*farmland.clean$Nitrate.Weir_mgNL * 86400 / 1
+farmland.clean$Supply_gNm2day.FarmlandWeir.Ammonium <- 
+ farmland.clean$Q.Pump_m3s*farmland.clean$Ammonium.Weir_mgNL * 86400 / 1
+
+farmland.clean$Supply_gNm2day.FarmlandDitch.Nitrate <-
+  farmland.clean$Q.Pump_m3s*farmland.clean$Nitrate.Ditch_mgNL * 86400 / 1
+farmland.clean$Supply_gNm2day.FarmlandDitch.Ammonium <-
+  farmland.clean$Q.Pump_m3s*farmland.clean$Ammonium.Ditch_mgNL * 86400 / 1
+
+# Collapse
+a <- 
+  farmland.clean %>%
+  select(date, Month, Supply_gNm2day.FarmlandWeir.Nitrate,
+         Supply_gNm2day.FarmlandDitch.Nitrate,
+         Supply_gNm2day.FarmlandWeir.Ammonium,
+         Supply_gNm2day.FarmlandDitch.Ammonium) %>%
+  gather(variable, value, 
+         "Supply_gNm2day.FarmlandWeir.Nitrate", 
+         "Supply_gNm2day.FarmlandDitch.Nitrate",
+         "Supply_gNm2day.FarmlandWeir.Ammonium",
+         "Supply_gNm2day.FarmlandDitch.Ammonium")
+a$variable <- 
+  factor(a$variable, 
+         levels = c("Supply_gNm2day.FarmlandWeir.Nitrate",
+                    "Supply_gNm2day.FarmlandDitch.Nitrate",
+                    "Supply_gNm2day.FarmlandWeir.Ammonium",
+                    "Supply_gNm2day.FarmlandDitch.Ammonium"),
+         labels = c("Nitrate_Weir",
+                    "Nitrate_Ditch",
+                    "Ammonium_Weir",
+                    "Ammonium_Ditch"))
+# Plot
+ggplot(data = a, aes(x = Month, y = value)) +
+  geom_boxplot(aes(color = variable), position = position_dodge(1)) +
+  ylab("N supply (g-N / m2 day)") +
+  ggtitle("City data from Farmland Weir and 1550Rd Ditch") +
+  # plot theme
+  theme_classic() +
+  theme(legend.title = element_blank(), legend.position = "bottom",
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
+
+# Percent removal along ditch
+farmland.clean %>%
+  filter(Month == "Feb") %>%
+  summarise(Supply_gNm2day.Weir.Nitrate = 
+              mean(Supply_gNm2day.FarmlandWeir.Nitrate, na.rm = TRUE), 
+            Supply_gNm2day.Ditch.Nitrate = 
+              mean(Supply_gNm2day.FarmlandDitch.Nitrate, na.rm = TRUE),
+            Supply_gNm2day.Weir.Ammonium = 
+              mean(Supply_gNm2day.FarmlandWeir.Ammonium, na.rm = TRUE),
+            Supply_gNm2day.Ditch.Ammonium = 
+              mean(Supply_gNm2day.FarmlandDitch.Ammonium, na.rm = TRUE)) %>%
+  summarise(PercChange_NitrateSupply_Feb = 
+              (Supply_gNm2day.Ditch.Nitrate - Supply_gNm2day.Weir.Nitrate)/
+              Supply_gNm2day.Weir.Nitrate * 100,
+            PercChange_AmmoniumSupply_Feb =
+              (Supply_gNm2day.Ditch.Ammonium - Supply_gNm2day.Weir.Ammonium)/
+               Supply_gNm2day.Weir.Ammonium * 100)
+
+farmland.clean %>%
+  filter(Month == "Mar") %>%
+  summarise(Supply_gNm2day.Weir.Nitrate = 
+              mean(Supply_gNm2day.FarmlandWeir.Nitrate, na.rm = TRUE), 
+            Supply_gNm2day.Ditch.Nitrate = 
+              mean(Supply_gNm2day.FarmlandDitch.Nitrate, na.rm = TRUE),
+            Supply_gNm2day.Weir.Ammonium = 
+              mean(Supply_gNm2day.FarmlandWeir.Ammonium, na.rm = TRUE),
+            Supply_gNm2day.Ditch.Ammonium = 
+              mean(Supply_gNm2day.FarmlandDitch.Ammonium, na.rm = TRUE)) %>%
+  summarise(PercChange_NitrateSupply_Mar = 
+              (Supply_gNm2day.Ditch.Nitrate - Supply_gNm2day.Weir.Nitrate)/
+              Supply_gNm2day.Weir.Nitrate * 100,
+            PercChange_AmmoniumSupply_Mar =
+              (Supply_gNm2day.Ditch.Ammonium - Supply_gNm2day.Weir.Ammonium)/
+               Supply_gNm2day.Weir.Ammonium * 100)
+
+2.08/673 * 1000
+
+
+
 
 # Bowersock NO3+NO2 -------------------------------------------------------
 bowersock <- read.csv(file = "./Data/SensorData_CompiledFiles/KAWN_SensorData_Bowersock.csv")

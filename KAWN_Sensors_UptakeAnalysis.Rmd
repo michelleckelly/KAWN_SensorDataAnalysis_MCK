@@ -52,6 +52,11 @@ prepper <- function(sensor_data){
   #
   # Remove data that's been flagged as "Bad Data"
   sensor_data$value[sensor_data$flagtype %in% c("Bad Data")] <- NA
+  # Remove nitrate "0" values and interpolate - Steve nitratax looks like it's 
+  # reading 0 on afternoon of 2-13 (sudden drop from 0.37 to 0.00 within 15 min, 
+  # potential sensor issue)
+  sensor_data$value[sensor_data$variable == "Nitrate_mgL" & 
+                      sensor_data$value == 0] <- NA
   # Remove flagtype and flagcomment columns
   sensor_data$flagtype <- NULL
   sensor_data$flagcomment <- NULL
@@ -84,7 +89,7 @@ desoto_uptake <- prepper(desoto)
   # 5. Multiply nitrate differences by Q/wL
   # 6. Convert from seconds to days
   # Move on to next time block
-
+#prepped_df <- eric_uptake
 HC_Eqn1 <- function(prepped_df){
   # Take an average Nitrate concentration for each 2 hr window
   prepped_df <- 
@@ -113,7 +118,13 @@ HC_Eqn1 <- function(prepped_df){
   uptake_df <- 
     uptake_df %>%
     dplyr::group_by(Date = date) %>%
-    summarise(Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE),
+    summarise(Max.PreDawnN_mgL = unique(Max.PreDawnN),
+              # Minimum of 3 hr nitrate avgs, for assessing diel swing
+              Min.Nitrate_mgL = min(Mean.Nitrate_mgL, na.rm = TRUE), 
+              # Calculate percent change in solute
+              NitrateChange_Perc= (Min.Nitrate_mgL - Max.PreDawnN_mgL) / 
+                Max.PreDawnN_mgL*100,
+              Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE),
               Mean.Discharge_m3s = mean(Mean.Discharge_m3s),
               SumDiff_mgNL = sum(DiffNitrate))
   return(uptake_df)
@@ -122,6 +133,57 @@ eric_uptake_Eqn1 <- HC_Eqn1(eric_uptake)
 steve_uptake_Eqn1 <- HC_Eqn1(steve_uptake)
 desoto_uptake_Eqn1 <- HC_Eqn1(desoto_uptake)
 
+```
+
+```{r thesis scaling by set length}
+# Calculate Uptake (Ua) and Supply with specific scaling for each site
+  
+  # Ua = SumNitrateDiff [mg/L] * Q [m3/s] / (w [m] * L[m] ) 
+  #       * 1000 [L/m3] / 1000 [g/mg] * 86400 [sec/day]
+  
+  # Supply [g-N m-2 d-1] = 
+  #             ( Q [L s-1] * C [g-N L-1] * 86400 [s d-1] ) / (w [m] * L [m])
+  #                      = mass N load [g-N d-1] / (w [m] * L [m])
+  
+  # where 
+  #   w     aerial stream width
+  #   L     stream reach length, choosing arbitrary 100m (King et al 2014)
+  # Site      w (as measured using google maps, in RiverModel_AerialWidths.xlsx)
+  # Eric      210.9 m
+  # Steve     113.4 m
+  # Desoto    138.07 m
+
+w.Eric <- 210.9
+w.Steve <- 113.4
+w.Desoto <- 138.07
+  
+  # Eric
+  # Set days where no uptake occured (negative values) to NA
+  # These days will be termed "non-detectable", are likely due to changes in Q
+  eric_uptake_Eqn1$UaNO3_gNm2day <- eric_uptake_Eqn1$SumDiff_mgNL *
+    eric_uptake_Eqn1$Mean.Discharge_m3s / (w.Eric * 100) * 86400
+  eric_uptake_Eqn1$UaNO3_gNm2day[eric_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+  eric_uptake_Eqn1$NitrateSupply_gNm2day <- eric_uptake_Eqn1$Mean.Nitrate_mgL*
+    eric_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (w.Eric * 100)
+  
+  # Steve
+  steve_uptake_Eqn1$UaNO3_gNm2day <- steve_uptake_Eqn1$SumDiff_mgNL *
+    steve_uptake_Eqn1$Mean.Discharge_m3s / (w.Steve * 100) * 86400
+  steve_uptake_Eqn1$UaNO3_gNm2day[steve_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+  steve_uptake_Eqn1$NitrateSupply_gNm2day <- steve_uptake_Eqn1$Mean.Nitrate_mgL*
+    steve_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (w.Steve * 100)
+  
+  # Desoto
+  # Set days where no uptake occured (negative values) to NA
+  # These days will be termed "non-detectable", are likely due to changes in Q
+  desoto_uptake_Eqn1$UaNO3_gNm2day <- desoto_uptake_Eqn1$SumDiff_mgNL *
+    desoto_uptake_Eqn1$Mean.Discharge_m3s / (w.Desoto * 100) * 86400
+  desoto_uptake_Eqn1$UaNO3_gNm2day[desoto_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+  desoto_uptake_Eqn1$NitrateSupply_gNm2day <- desoto_uptake_Eqn1$Mean.Nitrate_mgL *
+    desoto_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (w.Desoto * 100)
+```
+
+```{r depth scaling}
 # Unite uptake_Eqn1 data with StreamMetabolism modeled depth ###################
 # Load in modeled depth data
 modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
@@ -172,11 +234,14 @@ desoto_uptake_Eqn1 <- dplyr::full_join(desoto_calcZ, desoto_uptake_Eqn1,
 # w   Eric      210.9 m
 # w   Steve     113.4 m
 # w   Desoto    138.07 m
+w.Eric <- 210.9
+w.Steve <- 113.4
+w.Desoto <- 138.07
 
 # Calculate riverbed area
-eric_uptake_Eqn1$A_m2 <- eric_uptake_Eqn1$calcdepth_m * 210.9
-steve_uptake_Eqn1$A_m2 <- steve_uptake_Eqn1$calcdepth_m * 113.4
-desoto_uptake_Eqn1$A_m2 <- desoto_uptake_Eqn1$calcdepth_m * 138.07
+eric_uptake_Eqn1$A_m2 <- eric_uptake_Eqn1$calcdepth_m * w.Eric
+steve_uptake_Eqn1$A_m2 <- steve_uptake_Eqn1$calcdepth_m * w.Steve
+desoto_uptake_Eqn1$A_m2 <- desoto_uptake_Eqn1$calcdepth_m * w.Desoto
 # Calculate uptake
 eric_uptake_Eqn1$UaNO3_mgNm2day <- 
   (eric_uptake_Eqn1$Mean.Discharge_m3s / eric_uptake_Eqn1$A_m2) * 
@@ -188,14 +253,36 @@ desoto_uptake_Eqn1$UaNO3_mgNm2day <-
   (desoto_uptake_Eqn1$Mean.Discharge_m3s / desoto_uptake_Eqn1$A_m2) * 
   desoto_uptake_Eqn1$SumDiff_mgNL * 86400 * 1000
 
+
+# Supply = (Q * C) / (w * d)
+#        = ([m3 / s] * [mg-N / L]) / ([m] * [m])
+#        = [mg-N / (m2 sec)] * 86,400 [sec / day] * 1000 [L/m3] *1/1000 [g/mg]
+#        = [g-N / m2 day]
+
+# C     concentration of water column nitrate
+#       needs to be pre-dawn maximum water column nitrate, before any uptake 
+#       occurs
+
+Uptake_Eqn1$Supply_gNm2day.eric <- 
+  (Uptake_Eqn1$Mean.Discharge_m3s.eric * Uptake_Eqn1$Max.PreDawnN_mgL.eric) /
+  (Uptake_Eqn1$calcdepth_m.eric*w.Eric) * 86400
+Uptake_Eqn1$Supply_gNm2day.steve <- 
+  (Uptake_Eqn1$Mean.Discharge_m3s.steve * Uptake_Eqn1$Max.PreDawnN_mgL.steve) / 
+  (Uptake_Eqn1$calcdepth_m.steve*w.Steve) *86400
+Uptake_Eqn1$Supply_gNm2day.desoto <- 
+  (Uptake_Eqn1$Mean.Discharge_m3s.desoto * Uptake_Eqn1$Max.PreDawnN_mgL.desoto) / 
+  (Uptake_Eqn1$calcdepth_m.desoto*w.Desoto) *86400
+```
+
+```{r cleanup and save}
 # Set days where no uptake occured (negative values) to NA
-eric_uptake_Eqn1$UaNO3_mgNm2day[eric_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
-steve_uptake_Eqn1$UaNO3_mgNm2day[steve_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
-desoto_uptake_Eqn1$UaNO3_mgNm2day[desoto_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+#eric_uptake_Eqn1$UaNO3_mgNm2day[eric_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+#steve_uptake_Eqn1$UaNO3_mgNm2day[steve_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
+#desoto_uptake_Eqn1$UaNO3_mgNm2day[desoto_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
 # Convert
-eric_uptake_Eqn1$UaNO3_gNm2day <- eric_uptake_Eqn1$UaNO3_mgNm2day / 1000
-steve_uptake_Eqn1$UaNO3_gNm2day <- steve_uptake_Eqn1$UaNO3_mgNm2day / 1000
-desoto_uptake_Eqn1$UaNO3_gNm2day <- desoto_uptake_Eqn1$UaNO3_mgNm2day / 1000
+#eric_uptake_Eqn1$UaNO3_gNm2day <- eric_uptake_Eqn1$UaNO3_mgNm2day / 1000
+#steve_uptake_Eqn1$UaNO3_gNm2day <- steve_uptake_Eqn1$UaNO3_mgNm2day / 1000
+#desoto_uptake_Eqn1$UaNO3_gNm2day <- desoto_uptake_Eqn1$UaNO3_mgNm2day / 1000
 
 # Merge calculations into a single dataframe
 Uptake_Eqn1 <- dplyr::full_join(eric_uptake_Eqn1, steve_uptake_Eqn1, 
@@ -205,6 +292,12 @@ Uptake_Eqn1 <- dplyr::full_join(Uptake_Eqn1, desoto_uptake_Eqn1,
 # Rename columns
 names(Uptake_Eqn1)[names(Uptake_Eqn1) == "calcdepth_m"] <- 
   "calcdepth_m.desoto"
+names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Max.PreDawnN_mgL"] <- 
+  "Max.PreDawnN_mgL.desoto"
+names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Min.Nitrate_mgL"] <- 
+  "Min.Nitrate_mgL.desoto"
+names(Uptake_Eqn1)[names(Uptake_Eqn1) == "NitrateChange_Perc"] <- 
+  "NitrateChange_Perc.desoto"
 names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Mean.Nitrate_mgL"] <- 
   "Mean.Nitrate_mgL.desoto"
 names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Mean.Discharge_m3s"] <- 
@@ -224,7 +317,7 @@ names(Uptake_Eqn1)[names(Uptake_Eqn1) == "UaNO3_gNm2day"] <-
 Uptake_Eqn1$ReleaseStatus <- "During"
 Uptake_Eqn1$ReleaseStatus[Uptake_Eqn1$Date >= ymd("2018-04-01")] <- "After"
 # Factorize release status
-Uptake_Eqn1$ReleaseStatus <- factor(uptake$ReleaseStatus, 
+Uptake_Eqn1$ReleaseStatus <- factor(Uptake_Eqn1$ReleaseStatus, 
                                     levels = c("During", "After"))
 
 # Date cleanup: remove calculations for dates with bad raw data
@@ -251,32 +344,67 @@ Uptake_Eqn1$UaNO3_gNm2day.steve[Uptake_Eqn1$Date >= ymd("2018-02-01") &
 # Sensor burial 2018-03-09 thru 2018-03-22
 Uptake_Eqn1$UaNO3_gNm2day.steve[Uptake_Eqn1$Date >= ymd("2018-03-09") &
                                   Uptake_Eqn1$Date <= ymd("2018-03-22")] <- NA
+# Reservoir release caused sudden dilution on Feb 23
+Uptake_Eqn1$UaNO3_gNm2day.steve[Uptake_Eqn1$Date == ymd("2018-02-23")] <- NA
+# Desoto:
+# Large increase in discharge (rain?) on 3-20 caused peak in nitrate 
+# concentration (not due to biologic activity)
+Uptake_Eqn1$UaNO3_gNm2day.desoto[Uptake_Eqn1$Date == ymd("2018-03-20")] <- NA
+Uptake_Eqn1$UaNO3_gNm2day.desoto[Uptake_Eqn1$Date == ymd("2018-03-21")] <- NA
+# Another rain event on 3-27 causes nitrate peak
+Uptake_Eqn1$UaNO3_gNm2day.desoto[Uptake_Eqn1$Date == ymd("2018-03-27")] <- NA
+Uptake_Eqn1$UaNO3_gNm2day.desoto[Uptake_Eqn1$Date == ymd("2018-03-28")] <- NA
+Uptake_Eqn1$UaNO3_gNm2day.desoto[Uptake_Eqn1$Date == ymd("2018-03-29")] <- NA
+Uptake_Eqn1$UaNO3_gNm2day.desoto[Uptake_Eqn1$Date == ymd("2018-03-30")] <- NA
 
 ## Scale uptake based on mixing ################################################
 # ~75% of river volume at S1 does not see pulse. Currenty, uptake estimates
 # at S1 assume 100% mixing across cross-sectional area, but in reality only 
 # about 25% mixing across cross sectional area. Therefore, scale uptake:
-Uptake_Eqn1$UaNO3_gNm2day.eric_scaled <- Uptake_Eqn1$UaNO3_gNm2day.eric*0.25
+#Uptake_Eqn1$UaNO3_gNm2day.eric_scaled <- Uptake_Eqn1$UaNO3_gNm2day.eric*0.25
 
 ## Calculate Vf ################################################################
 
 ## Calculate supply ############################################################
-Uptake_Eqn1$SupplyNitrate_gNm2d <- 
-  (Uptake_Eqn1$Mean.Discharge_m3s.desoto * 
-     Uptake_Eqn1$Mean.Nitrate_mgL.desoto * 86400) / 
-  (Uptake_Eqn1$calcdepth_m.desoto*138.07)
-Uptake_Eqn1$PercRemoval.Desoto <- Uptake_Eqn1$UaNO3_gNm2day.desoto /
-  Uptake_Eqn1$SupplyNitrate_gNm2d*100
+
+# Supply = (Q * C) / (w * L)
+#        = ([m3 / s] * [mg-N / L]) / ([m] * [m])
+#        = [mg-N / (m2 sec)] * 86,400 [sec / day] * 1000 [L/m3] *1/1000 [g/mg]
+#        = [g-N / m2 day]
+
+# C     concentration of water column nitrate
+#       needs to be pre-dawn maximum water column nitrate, before any uptake 
+#       occurs
+
+Uptake_Eqn1$Supply_gNm2day.eric <- 
+  (Uptake_Eqn1$Mean.Discharge_m3s.eric * Uptake_Eqn1$Max.PreDawnN_mgL.eric) /
+  (100*w.Eric) * 86400
+Uptake_Eqn1$Supply_gNm2day.steve <- 
+  (Uptake_Eqn1$Mean.Discharge_m3s.steve * Uptake_Eqn1$Max.PreDawnN_mgL.steve) / 
+  (100*w.Steve) * 86400
+Uptake_Eqn1$Supply_gNm2day.desoto <- 
+  (Uptake_Eqn1$Mean.Discharge_m3s.desoto * Uptake_Eqn1$Max.PreDawnN_mgL.desoto) / 
+  (100*w.Desoto) * 86400
+
+# Nix supply and percent change values whenever uptake values were bad
+Uptake_Eqn1$Supply_gNm2day.eric[is.na(Uptake_Eqn1$UaNO3_gNm2day.eric)] <- NA
+Uptake_Eqn1$Supply_gNm2day.steve[is.na(Uptake_Eqn1$UaNO3_gNm2day.steve)] <- NA
+Uptake_Eqn1$Supply_gNm2day.desoto[is.na(Uptake_Eqn1$UaNO3_gNm2day.desoto)] <- NA
+
+Uptake_Eqn1$NitrateChange_Perc.eric[is.na(Uptake_Eqn1$UaNO3_gNm2day.eric)] <- NA
+Uptake_Eqn1$NitrateChange_Perc.steve[is.na(Uptake_Eqn1$UaNO3_gNm2day.steve)] <- NA
+Uptake_Eqn1$NitrateChange_Perc.desoto[is.na(Uptake_Eqn1$UaNO3_gNm2day.desoto)] <- NA
+
+
+
 
 # Save dataframe
 write.csv(Uptake_Eqn1, 
-          file = "./Outputs/NitrateUptakeResults_Eqn1_DepthEdited.csv", 
+          file = "./Outputs/NitrateUptakeResults_Eqn1.csv", 
           row.names = FALSE)
-saveRDS(Uptake_Eqn1, file = "./Outputs/NitrateUptakeResults_Eqn1_DepthEdited.rds")
+saveRDS(Uptake_Eqn1, file = "./Outputs/NitrateUptakeResults_Eqn1.rds")
 
 str(Uptake_Eqn1)
-
-
 
 # Calculate Uptake (Ua) and Supply with specific scaling for each site
 

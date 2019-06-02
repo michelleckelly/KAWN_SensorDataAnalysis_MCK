@@ -216,7 +216,7 @@ metab.long$site <- factor(metab.long$site, levels = c("S1", "S2", "S3"))
 
 ### Nitrate uptake results #####################################################
 # HAVE bad dates removed
-uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1_DepthEdited.rds")
+uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1.rds")
 uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-01"] <- NA # affected by rapid 
 #discharge change, U calculation overestimate
 uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-09"] <- NA # affected by sensor
@@ -227,38 +227,46 @@ uptake <- uptake[uptake$Date >= ymd("2018-02-01") &
 
 ### Reshape uptake data #######
 # Adjust from wide to long format
-uptake.long <- tidyr::gather(uptake[c("Date","UaNO3_gNm2day.eric",
-                                      "UaNO3_gNm2day.eric_scaled",
-                                      "UaNO3_gNm2day.steve",
-                                      "UaNO3_gNm2day.desoto", 
-                                      "ReleaseStatus")], 
-                             key = site, 
-                             value = UaNO3_gNm2day,
-                             UaNO3_gNm2day.eric:UaNO3_gNm2day.desoto)
-vf.long <- tidyr::gather(uptake[c("Date","vf_mmmin.eric", 
-                                  "vf_mmmin.steve", 
-                                  "vf_mmmin.desoto")], key = site, 
-                             value = vf_mmmin,
-                             vf_mmmin.eric:vf_mmmin.desoto)
+uptake.long <- 
+  uptake %>%
+  gather(site, UaNO3_gNm2day, UaNO3_gNm2day.eric, UaNO3_gNm2day.steve, 
+         UaNO3_gNm2day.desoto) %>%
+  select(Date, site, UaNO3_gNm2day)
+# Rename site names
+uptake.long$site[uptake.long$site == "UaNO3_gNm2day.eric"] <- "S1"
+uptake.long$site[uptake.long$site == "UaNO3_gNm2day.steve"] <- "S2"
+uptake.long$site[uptake.long$site == "UaNO3_gNm2day.desoto"] <- "S3"
+
+supply.long <- 
+  uptake %>%
+  gather(site, Supply_gNm2day, Supply_gNm2day.eric, Supply_gNm2day.steve,
+         Supply_gNm2day.desoto) %>%
+  select(Date, site, Supply_gNm2day)
+# Rename site names
+supply.long$site[supply.long$site == "Supply_gNm2day.eric"] <- "S1"
+supply.long$site[supply.long$site == "Supply_gNm2day.steve"] <- "S2"
+supply.long$site[supply.long$site == "Supply_gNm2day.desoto"] <- "S3"
+
+#vf.long <- tidyr::gather(uptake[c("Date","vf_mmmin.eric", 
+#                                  "vf_mmmin.steve", 
+#                                  "vf_mmmin.desoto")], key = site, 
+#                             value = vf_mmmin,
+#                             vf_mmmin.eric:vf_mmmin.desoto)
+
 # Factorize site name
-uptake.long$site <- factor(uptake.long$site, 
-                           levels = c("UaNO3_gNm2day.eric",
-                                      "UaNO3_gNm2day.eric_scaled", 
-                                      "UaNO3_gNm2day.steve", 
-                                      "UaNO3_gNm2day.desoto"))
-levels(uptake.long$site)[levels(uptake.long$site) == 
-                           "UaNO3_gNm2day.eric"] <- "S1"
-levels(uptake.long$site)[levels(uptake.long$site) == 
-                           "UaNO3_gNm2day.eric_scaled"] <- "S1_scaled"
-levels(uptake.long$site)[levels(uptake.long$site) == 
-                           "UaNO3_gNm2day.steve"] <- "S2"
-levels(uptake.long$site)[levels(uptake.long$site) == 
-                           "UaNO3_gNm2day.desoto"] <- "S3"
+uptake.long$site <- factor(uptake.long$site)
+supply.long$site <- factor(supply.long$site)
+
 # Add Month column
 uptake.long <- 
   uptake.long %>% 
   mutate(Month = factor(month(Date, label = TRUE, abbr = TRUE)),
          WeekGroup = factor(round_date(Date, period(week = 3))))
+supply.long <- 
+  supply.long %>% 
+  mutate(Month = factor(month(Date, label = TRUE, abbr = TRUE)),
+         WeekGroup = factor(round_date(Date, period(week = 3))))
+
 uptake.long <- na.omit(uptake.long)
 
 #supply.long$site <- factor(supply.long$site, 
@@ -1069,15 +1077,15 @@ mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER.desoto,
 
 ```{r Fig 4: Uptake and Vf}
 ### Assemble data into a boxplot ##############################################
-uptake.metab.long <- 
-  uptake.metab.long %>% 
-  mutate(Month = factor(month(Date, label = TRUE, abbr = TRUE)),
-         WeekGroup = factor(round_date(Date, period(week = 3))))
-str(uptake.metab.long)
+#uptake.metab.long <- 
+#  uptake.metab.long %>% 
+#  mutate(Month = factor(month(Date, label = TRUE, abbr = TRUE)),
+#         WeekGroup = factor(round_date(Date, period(week = 3))))
+#str(uptake.metab.long)
 
 # U ############################################################################
 # Broken up by ReleaseStatus
-#a <- 
+a <- 
   ggplot(data = uptake.long, aes(x = Month, 
                                           y = UaNO3_gNm2day, fill = site)) +
   facet_wrap(~site, nrow = 1) +
@@ -1140,31 +1148,94 @@ b <-
         axis.text = element_text(color = "black"))
 grob <- grid.arrange(a,b)
 ggsave("./Plots/U.Vf_boxplot.png", grob, height = 6, width = 7, units = "in")
+
+
+
+# Merge uptake.long with supply.long
+SU.long <- 
+  left_join(supply.long, uptake.long, by = c("Date", "Month", 
+                                             "site", "WeekGroup"))
+# Gather for plotting
+plotdata <- gather(SU.long, type, value, Supply_gNm2day, UaNO3_gNm2day)
+plotdata$type <- factor(plotdata$type, 
+                        levels = c("Supply_gNm2day", "UaNO3_gNm2day"),
+                        labels = c("Supply", "Uptake"))
+
+ggplot(data = subset(plotdata, Date < "2018-05-01"), 
+       aes(x = Month, y = value)) +
+  facet_wrap(~site, nrow = 1) +
+  # Boxplots
+  geom_boxplot(aes(fill = type), position = position_dodge(1), 
+               outlier.shape = NA) +
+  # Points
+  geom_point(aes(group = type, fill = type), 
+             position = position_jitterdodge(jitter.width = 0.2, 
+                                             dodge.width = 1), shape = 21) +
+  # axis labels
+  xlab(NULL) + 
+  ylab(expression("Supply or Uptake (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(legend.title = element_blank(), legend.position = "bottom",
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
+## Plot supply
+ggplot(data = subset(supply.long, Date < "2018-05-01"), 
+       aes(x = Month, y = Supply_gNm2day, fill = site)) +
+  facet_wrap(~site, nrow = 1) +
+  # Error bars
+  stat_boxplot(geom = "errorbar", width = 0.5, 
+               position = position_dodge(width = 0.75)) +
+  # Add text for significance
+  ggpubr::stat_compare_means(aes(group = Month), label = "p.format", 
+                             label.y.npc = "bottom") +
+  # Boxplots
+  geom_boxplot(outlier.shape = NA) +
+  # Jitter points
+  geom_point(position = position_jitterdodge(dodge.width = 1, 
+                                             jitter.width = 1), 
+             shape = 1, size = 2) +
+  scale_y_log10() +
+  # Color scales
+  scale_fill_manual(values = c("S1" = "#FF0000", "S1_scaled" = "#FF0000",
+                               "S2" = "#23baaf", 
+                               "S3" = "#F2AD00"),
+                     limits = c("S1", "S1_scaled", "S2", "S3")) +
+  # axis labels
+  #labs(tag = "A") +
+  xlab(NULL) + 
+  ylab(expression("Supply (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  # plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+ggsave("./Plots/Supply_boxplot.png", height = 3, width = 7, units = "in")
+
+
+
 ```
 
 ```{r Fig 5. Uptake vs metabolism}
 # Scatterplot GPP vs Ua
-a <- 
-  ggplot(subset(uptake.metab.mass.long, model == "GPP"), 
-       aes(x = value, y = UaNO3_gNm2day, fill = site, shape = ReleaseStatus)) +
+#a <- 
+  ggplot(subset(uptake.metab.long, model == "GPP"), 
+       aes(x = value, y = UaNO3_gNm2day, fill = site)) +
   facet_grid(site~., scales = "free", switch = "y") +
   # Linear model for During release
-  #geom_smooth(data = subset(uptake.metab.mass.long, model == "GPP" & 
-   #                           ReleaseStatus == "During"),
-    #          method = "lm", fullrange = TRUE, aes(color = ReleaseStatus), 
-     #         fill = "lightgrey", alpha = 0.2) +
+  #geom_smooth(method = "lm", fullrange = TRUE, 
+  #            fill = "lightgrey", alpha = 0.2) +
   # Linear model for after release
-  #geom_smooth(data = subset(uptake.metab.mass.long, model == "GPP" & 
-   #                           ReleaseStatus == "After"),
-    #          method = "lm", fullrange = TRUE, aes(color = site), 
-     #         fill = "lightgrey", alpha = 0.6) +
+  geom_smooth(data = subset(uptake.metab.long, model == "GPP" & 
+                              ReleaseStatus == "During" & site == "S3"),
+              method = "lm", fullrange = FALSE, aes(color = site), 
+              fill = "lightgrey", alpha = 0.6) +
   # Plot points on top
-  geom_point(size = 2) +
+  geom_point(size = 2.5, shape = 21) +
     # Add correlation coeff
-  ggpubr::stat_cor(data = subset(uptake.metab.mass.long, model == "GPP"),
-                   method = "spearman", label.x = c(0), 
-                   #label.y = c(37000, 32000, 5000, 4200, 9500, 8000), size = 3,
-                   aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
+  #ggpubr::stat_cor(method = "spearman", label.x = 0,
+   #                aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
   scale_color_manual(values = c("During" = "black", "After" = "green", 
@@ -1184,7 +1255,7 @@ a <-
         axis.text = element_text(color = "black"))
 # ER vs U
 b <- 
-  ggplot(subset(uptake.metab.mass.long, model == "ER"), 
+  ggplot(subset(uptake.metab.long, model == "ER"), 
        aes(x = -value, y = UaNO3_gNm2day, fill = site, shape = ReleaseStatus)) +
   facet_grid(site~., scales = "free", switch = "y") +
   # Linear model for During release
@@ -1198,12 +1269,12 @@ b <-
   #            method = "lm", fullrange = TRUE, aes( color = site), 
   #            fill = "lightgrey", alpha = 0.6) +
   # Plot points on top
-  geom_point(size = 2) +
+  geom_point(size = 2.5) +
     # Add correlation coeff
-  ggpubr::stat_cor(data = subset(uptake.metab.mass.long, model == "ER"),
-                   method = "spearman", label.x = c(5), 
+  #ggpubr::stat_cor(data = subset(uptake.metab.long, model == "ER"),
+   #                method = "spearman", label.x = c(5), 
                    #label.y = c(-300, -600, -100, -250, 850, 750), size = 3,
-                   aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
+    #               aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
   scale_color_manual(values = c("During" = "black", "After" = "green", 
@@ -1213,6 +1284,7 @@ b <-
                                 "S3" = "#F2AD00"),
                      limits = c("S1", "S2", "S3")) +
   # Axis labels
+  scale_x_continuous(limits = c(-2, 25)) +
   xlab(bquote("|ER| (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab(expression("U (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
   labs(tag = "B") +
@@ -1224,6 +1296,106 @@ b <-
 
 grob <- grid.arrange(a,b, ncol = 2)
 ggsave("./Plots/Uptake_GPP.png", grob, height = 6.5, width = 6.5, units = "in")
+
+
+
+##Plotting diel swing
+Uptake_Eqn1$Month <- month(Uptake_Eqn1$Date, label = TRUE, abbr = TRUE)
+Uptake_Eqn1$Month <- factor(Uptake_Eqn1$Month)
+
+a <- gather(Uptake_Eqn1, "site", "NitrateChange_Perc", NitrateChange_Perc.eric,
+       NitrateChange_Perc.steve, NitrateChange_Perc.desoto)
+a$site <- factor(a$site, levels = c("NitrateChange_Perc.eric", 
+                          "NitrateChange_Perc.steve",
+                          "NitrateChange_Perc.desoto"), 
+       labels = c("S1", "S2", "S3"))
+# percent change over time
+ggplot(data = subset(a, Date < "2018-05-01" & Date >= "2018-02-01"), 
+       aes(x = Month, y = -NitrateChange_Perc, color = site)) +
+  geom_boxplot(position = position_dodge2())
+
+# merge diel swing w/ metabolism
+metab.long$Date <- metab.long$date
+a <- dplyr::full_join(a, metab.long, by = c("Date", "site", "ReleaseStatus"))
+
+## Plot diel swing v GPP
+#plot1 <- 
+  ggplot(subset(a, Date < "2018-05-01" & Date >= "2018-02-01" & model == "GPP"),
+       aes(y = -NitrateChange_Perc, x = value, shape = ReleaseStatus)) +
+  facet_grid(site~., scales= "free_x", switch = "both") +
+  # Pearson correlation
+  #ggpubr::stat_cor(aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~")),
+   #                label.x = 25, size = 3)+
+  # Add points
+  geom_point(aes(fill = site), size = 2.5) +
+  # Add trendlines
+  geom_smooth(data = subset(a, Date < "2018-05-01" & Date >= "2018-02-01"
+                            & site == "S3" & model == "GPP" & 
+                              ReleaseStatus == "During"),
+              method = "lm", color = "black") +
+  #geom_smooth(data = subset(a, Date < "2018-05-01" & Date >= "2018-02-01"
+  #                          & site == "S2" & model == "ER"),
+  #            method = "lm", color = "black", se = FALSE) +
+  #geom_smooth(data = subset(a, Date < "2018-05-01" & Date >= "2018-02-01"
+   #                         & site == "S3" & model == "GPP"),
+    #          method = "lm", color = "black", se = FALSE) +
+  ggpubr::stat_cor(method = "spearman", 
+                   aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
+  # Labels
+  ylab(expression(Delta ~ NO[3]^{"-"})) +
+  xlab("GPP (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")") +
+  #color
+  scale_shape_manual(values = c("During" = 1, "After" = 21)) +
+  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  scale_x_continuous(limits = c(0, 17))+
+  # plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+
+## Plot diel swing v ER
+plot2 <- 
+  ggplot(subset(a, Date < "2018-05-01" & Date >= "2018-02-01" & model == "ER"),
+       aes(y = -NitrateChange_Perc, x = -value, shape = ReleaseStatus)) +
+  facet_grid(site~., scales= "free_x", switch = "both") +
+  
+  # Add points
+  geom_point(aes(fill = site), size = 2.5) +
+  # Add trendlines
+  #geom_smooth(data = subset(a, Date < "2018-05-01" & Date >= "2018-02-01"
+   #                         & site == "S3" & model == "GPP" & 
+    #                          ReleaseStatus == "During"),
+     #         method = "lm", color = "black") +
+  geom_smooth(data = subset(a, Date < "2018-05-01" & Date >= "2018-02-01"
+                            & site == "S2" & model == "ER" & 
+                              ReleaseStatus == "After"),
+              method = "lm", color = "#23baaf", se = T) +
+  #geom_smooth(data = subset(a, Date < "2018-05-01" & Date >= "2018-02-01"
+   #                         & site == "S3" & model == "GPP"),
+    #          method = "lm", color = "black", se = FALSE) +
+  #ggpubr::stat_cor(method = "spearman", 
+  #                 aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
+  # Labels
+  ylab(expression(Delta ~ NO[3]^{"-"})) +
+  xlab("|ER| (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")") +
+  scale_x_continuous(limits = c(-2, 25)) + # theres a point here thats weird and you need to double check it but sfs is in 3 days
+  #color
+  scale_shape_manual(values = c("During" = 1, "After" = 21)) +
+  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  #scale_x_continuous(limits = c(0, 17))+
+  # plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
+grob2 <- grid.arrange(plot1, plot2, ncol = 2)
+ggsave("./Plots/Diel_GPP.png", grob2, height = 6.5, width = 6.5, units = "in")
+
 ```
 
 ```{r Fig 6. Vf vs metabolism}
