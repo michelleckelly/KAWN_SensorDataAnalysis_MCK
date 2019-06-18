@@ -161,5 +161,3 @@ NEP.eric <- NEP_calcs(modelfit.eric$predictions)
 NEP.steve <- NEP_calcs(modelfit.steve$predictions)
 NEP.desoto <- NEP_calcs(modelfit.desoto$predictions)
 ```
-
-
