@@ -9,12 +9,13 @@ editor_options:
 
 ```{r setup}
 # grab streamPULSE pipeline tools
+#install.packages("devtools")
 #library(devtools)
 #install_github('streampulse/StreamPULSE', dependencies=TRUE)
 
 # grab latest version of streamMetabolizer
 #install.packages("streamMetabolizer", dependencies = TRUE, 
- #               repos = c("https://owi.usgs.gov/R", "https://cran.rstudio.com"))
+#                repos = c("https://owi.usgs.gov/R", "https://cran.rstudio.com"))
 
 # load packages
 library(StreamPULSE)
@@ -26,70 +27,67 @@ library(tidyr)
 ```
 
 ```{r metabolism.load}
-loadfromfile <- FALSE # if loadfromfile TRUE, load metabolsim model from saved RData file
+# Load in modeled metabolism data from file
+# Skip this block if you haven't run the metabolism model, or if you want 
+# to re-compute the model
 
-if (loadfromfile) {
-  modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
-  modelfit.steve <- readRDS("./Outputs/MetabResults_Steve.RData")
-  modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
-}
+modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
+modelfit.steve <- readRDS("./Outputs/MetabResults_Steve.RData")
+modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
 ```
 
 ```{r metabolism.calculate}
-if (!loadfromfile){
-  # unique user token for user michelleckelly
-  user_token <- "a1a704245e5fda8ac9b4" 
-  model_type <-  "bayes" # model type for stream metabolizer to use
-  model_name <-  "streamMetabolizer" # default modeling framework
+# Model stream metabolism from raw data using StreamPULSE database and 
+# streamMetabolizer package
+
+# Unique user token for user michelleckelly, needed to access embargoed data
+user_token <- "a1a704245e5fda8ac9b4" 
+# Define the desired model type for streamMetabolizer
+model_type <-  "bayes"
+# Define the desired modeling framework 
+model_name <-  "streamMetabolizer"
   
-  # Eric ----------------------------------------------------------
-  # site code for eric's: Region_SiteName https://data.streampulse.org/sitelist
-  site_code.eric <- "KS_KANSASREASTLAWRENCE"
-  # request data from API
-  eric_data <- request_data(site_code.eric, token = user_token) 
-  # format data for modeling
-  fitdata.eric <- prep_metabolism(eric_data, type = model_type, model = model_name,
-                                  rm_flagged = "Bad Data", 
+# Eric ----------------------------------------------------------
+# Define the site code from the StreamPULSE site list
+# Full list of site codes available at: https://data.streampulse.org/sitelist
+site_code.eric <- "KS_KANSASREASTLAWRENCE"
+# Call to API to request data
+eric_data <- request_data(site_code.eric, token = user_token) 
+# Format data for modeling
+fitdata.eric <- prep_metabolism(eric_data, type = model_type, 
+                                model = model_name, rm_flagged = "Bad Data", 
+                                fillgaps = "interpolation",
+                                estimate_areal_depth = TRUE)
+# Fit metabolism model (Run time for this step may be long, depending on your
+# computing power. It took 1-2 hrs for me to run this model on a lab laptop)
+modelfit.eric <- fit_metabolism(fitdata.eric)
+# Save model results
+saveRDS(modelfit.eric, file = "./Outputs/MetabResults_Eric.RData") 
+write.csv(modelfit.eric$predictions, file = "./Outputs/MetabResults_Eric.csv")
+  
+# Steve -------------------------------------------------------
+site_code.steve <- "KS_KANSASRFALLLEAF"
+steve_data <- request_data(site_code.steve, token = user_token) 
+fitdata.steve <- prep_metabolism(steve_data, type = model_type, 
+                                 model = model_name, rm_flagged = "Bad Data", 
+                                 fillgaps = "interpolation",
+                                 estimate_areal_depth = TRUE)
+modelfit.steve <- fit_metabolism(fitdata.steve)
+saveRDS(modelfit.steve, file = "./Outputs/MetabResults_Steve.RData") 
+write.csv(modelfit.steve$predictions, file = "./Outputs/MetabResults_Steve.csv")
+  
+# Desoto ------------------------------------------------------
+site_code.desoto <- "KS_KANSASR"
+desoto_data <- request_data(site_code.desoto, token = user_token)
+fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, 
+                                  model = model_name, rm_flagged = "Bad Data", 
                                   fillgaps = "interpolation",
                                   estimate_areal_depth = TRUE)
-  # fit metabolism model (about 1hr of run time)
-  modelfit.eric <- fit_metabolism(fitdata.eric)
-  # save model results to folder
-  saveRDS(modelfit.eric, file = "./Outputs/MetabResults_Eric.RData") 
-  write.csv(modelfit.eric$predictions, file = "./Outputs/MetabResults_Eric.csv")
-  
-  # Steve -------------------------------------------------------
-  site_code.steve <- "KS_KANSASRFALLLEAF" # site code for steve's
-  # request data from API
-  steve_data <- request_data(site_code.steve, token = user_token) 
-  # format data for modeling
-  fitdata.steve <- prep_metabolism(steve_data, type = model_type, 
-                                   model = model_name,
-                                   rm_flagged = "Bad Data", 
-                                   fillgaps = "interpolation",
-                                   estimate_areal_depth = TRUE)
-  # fit metabolism model (about 1hr of run time)
-  modelfit.steve <- fit_metabolism(fitdata.steve)
-  # save model results to folder
-  saveRDS(modelfit.steve, file = "./Outputs/MetabResults_Steve.RData") 
-  write.csv(modelfit.steve$predictions, file = "./Outputs/MetabResults_Steve.csv")
-  
-  # Desoto ------------------------------------------------------
-  site_code.desoto <- "KS_KANSASR"
-  desoto_data <- request_data(site_code.desoto, token = user_token)
-  # formatting data for metabolism modeling
-  fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, 
-                                    model = model_name,
-                                    rm_flagged = "Bad Data", 
-                                    fillgaps = "interpolation",
-                                    estimate_areal_depth = TRUE)
-  # use streamMetabolizer to fit model
-  modelfit.desoto <- fit_metabolism(fitdata.desoto)
-  # save model results to folder, as .RData and as .csv
-  saveRDS(modelfit.desoto, file = "./Outputs/MetabResults_Desoto.RData") 
-  write.csv(modelfit.desoto$predictions, 
-            file = "./Outputs/MetabResults_Desoto.csv")
-}
+modelfit.desoto <- fit_metabolism(fitdata.desoto)
+saveRDS(modelfit.desoto, file = "./Outputs/MetabResults_Desoto.RData") 
+write.csv(modelfit.desoto$predictions, 
+          file = "./Outputs/MetabResults_Desoto.csv")
+
 ```
 
 ```{r DepthCheck}
@@ -165,136 +163,3 @@ NEP.desoto <- NEP_calcs(modelfit.desoto$predictions)
 ```
 
 
-```{r metabolism.plot}
-# Eric
-ggplot(modelfit.eric$predictions, aes(x = date)) +
-  geom_line(aes(y = GPP, color = "GPP")) +
-  geom_point(aes(y = GPP, color = "GPP")) +
-  #geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
-  geom_line(aes(y = ER, color = "ER")) +
-  geom_point(aes(y = ER, color = "ER")) +
-  #geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
-  geom_rect(aes(xmin = as.Date("2018-02-20"), xmax = as.Date("2018-02-23"), 
-                ymin = -25, ymax = 25), fill = "white") + # sensor burial
-  geom_rect(aes(xmin = as.Date("2018-03-06"), xmax = as.Date("2018-03-12"), 
-                ymin = -25, ymax = 25), fill = "white") + # sensor burial
-  geom_rect(aes(xmin = as.Date("2018-04-01"), xmax = as.Date("2018-04-04"), 
-                ymin = -25, ymax = 25), fill = "white") + # sensor burial
-  geom_rect(aes(xmin = as.Date("2018-04-14"), xmax = as.Date("2018-04-17"), 
-                ymin = -25, ymax = 25), fill = "white") + # sensor burial
-  geom_rect(aes(xmin = as.Date("2018-04-25"), xmax = as.Date("2018-04-27"), 
-                ymin = -25, ymax = 25), fill = "white") + # sensor burial
-  labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
-  scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01")), 
-                 date_breaks = "2 weeks", date_labels = "%e %b") +
-  scale_color_manual(values = c("GPP" = "#FF0000", "ER" = "#000000"), 
-                     name = "Discharge") +
-  geom_line(aes(y = 0), color = "black") +
-  ylim(c(-25,30)) + 
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = c(0.17, 0.88), legend.direction = "horizontal",
-        legend.background = element_rect(color = "black"))
-ggsave("./Plots/MetabPlot_Eric.png", height = 2.5, width = 7, units = "in")
-
-# Steve
-ggplot(modelfit.steve$predictions, aes(x = date)) +
-  geom_line(aes(y = GPP, color = "GPP")) +
-  geom_point(aes(y = GPP, color = "GPP")) +
-  #geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
-  geom_line(aes(y = ER, color = "ER")) +
-  geom_point(aes(y = ER, color = "ER")) +
-  #geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
-  geom_line(aes(y = 0), color = "black") +
-  labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
-  scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01")), 
-                 date_breaks = "2 weeks", date_labels = "%e %b") +
-  scale_color_manual(values = c("GPP" = "#23baaf", "ER" = "#000000"), 
-                     name = "Downstream") +
-  ylim(c(-25,30)) + 
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = c(0.19, 0.88), legend.direction = "horizontal",
-        legend.background = element_rect(color = "black"))
-ggsave("./Plots/MetabPlot_Steve.png",height = 2.5, width = 7, units = "in")
-
-
-#### For Amy's AGU Poster ###########
-ggplot(filter(modelfit.steve$predictions, date < ymd("2018-03-30") | 
-                date > ymd("2018-04-09")), aes(x = date)) +
-  # Add rectangle for 24 hr sampling periods
-  annotate("rect", 
-           xmin = ymd("2018-03-28"),
-           xmax = ymd("2018-03-30"),
-           ymin = -25, ymax = 25, fill = "grey", alpha = 0.5) +
-  annotate("rect", 
-           xmin = ymd("2018-04-09"),
-           xmax = ymd("2018-04-11"),
-           ymin = -25, ymax = 25, fill = "grey", alpha = 0.5) +
-  # ER and error bars
-  geom_errorbar(aes(ymin = ER.lower, ymax = ER.upper), color = "black") +
-  geom_point(aes(y = ER), color = "black", shape = 21, fill = "white") +
-  # GPP and error bars
-  geom_errorbar(aes(ymin = GPP.lower, ymax = GPP.upper), color = "#008B00") +
-  geom_point(aes(y = GPP), color = "#008B00", shape = 21, fill = "white") +
-  # Labels
-  labs(x = NULL, y = expression(O[2] ~ "(g" ~ m^-2 ~ d^-1 ~")")) +
-  scale_x_date(date_breaks = "5 days", date_labels = "%e %b") +
-  coord_cartesian(xlim =  c(as.Date("2018-03-17"), as.Date("2018-04-20")),
-                  ylim = c(-25, 25)) +
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA))
-ggsave("./Plots/KAWN24Hr_DownstreamMetab.png",height = 3.5, width = 8, units = "in")
-
-#####################################
-# Desoto
-ggplot(modelfit.desoto$predictions, aes(x = date)) +
-  geom_line(aes(y = GPP, color = "GPP")) +
-  geom_point(aes(y = GPP, color = "GPP")) +
-  #geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.3) +
-  geom_line(aes(y = ER, color = "ER")) +
-  geom_point(aes(y = ER, color = "ER")) +
-  #geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper, fill = "ER"), alpha = 0.3) +
-  geom_line(aes(y = 0), color = "black") +
-  labs(x = NULL, y = bquote(O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
-  scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01")), 
-                 date_breaks = "2 weeks", date_labels = "%e %b") +
-  scale_color_manual(values = c("GPP" = "#F2AD00", "ER" = "#000000"), 
-                     name = "Desoto") +
-  ylim(c(-25,30)) + 
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = c(0.16, 0.88), legend.direction = "horizontal",
-        legend.background = element_rect(color = "black"))
-  #theme(legend.title=element_blank(), legend.position = "none")
-ggsave("./Plots/MetabPlot_Desoto.png",height = 2.5, width = 7, units = "in")
-```
-
-```{r NEP.plot}
-# plot NEP results
-#
-# Arguments
-# NEP_dataframe   dataframe returned by NEP_calcs
-# legend_pos      character string, see theme() within ggplot. "top", "bottom", "left", "right" or "none"
-# ...             intended so user can specify their own y-limits
-#
-# Returns
-# time series plot of cumulative ER, GPP, and NEP
-#
-NEP_plotter <- function(NEP_dataframe, legend_pos){
-  NEP_dataframe$date <- lubridate::ymd(NEP_dataframe$date)
-  ggplot(data = NEP_dataframe) +
-    geom_line(aes(x = date, y = GPP_sum, color = "GPP"), size = 1.2) +
-    geom_line(aes(x = date, y = ER_sum, color = "ER"), size = 1.2) +
-    geom_line(aes(x = date, y = NEP, color = "NEP"), size = 1.2) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "grey") +
-    ylim(c(-400,500)) +
-    scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-06-01")),
-                 date_breaks = "1 month", date_labels = "%b") +
-    labs(x = NULL, y = bquote("Cumulative"~ O[2] ~ m^-2 ~ d^-1 ~ "(g)")) +
-    scale_color_manual(name = NULL, 
-                       values = c("NEP" = "#7CAE00", "ER" = "#F8766D", "GPP" = "#00BFC4")) +
-    guides(color = guide_legend(override.aes = list(size = 4))) +
-    theme_classic() + theme(legend.position = legend_pos)
-}
-```
