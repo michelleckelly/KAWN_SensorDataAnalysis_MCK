@@ -388,8 +388,6 @@ CNscale <- 20
 ra.med <- 0.5
 ra.low <- 0.2
 
-
-
 metab %>%
   select(date, GPP.eric, ER.eric) %>%
   # Calculate autotrophic N assimilation
