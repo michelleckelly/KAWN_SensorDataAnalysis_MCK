@@ -10,8 +10,7 @@ editor_options:
 ```{r setup}
 # grab streamPULSE pipeline tools
 #install.packages("devtools")
-#library(devtools)
-#install_github('streampulse/StreamPULSE', dependencies=TRUE)
+#devtools::install_github('streampulse/StreamPULSE', dependencies=TRUE)
 
 # grab latest version of streamMetabolizer
 #install.packages("streamMetabolizer", dependencies = TRUE, 
@@ -24,6 +23,7 @@ library(ggplot2)
 library(dplyr)
 library(gridExtra)
 library(tidyr)
+library(lubridate)
 ```
 
 ```{r metabolism.load}
@@ -62,8 +62,9 @@ fitdata.eric <- prep_metabolism(eric_data, type = model_type,
 # computing power. It took 1-2 hrs for me to run this model on a lab laptop)
 modelfit.eric <- fit_metabolism(fitdata.eric)
 # Save model results
-saveRDS(modelfit.eric, file = "./Outputs/MetabResults_Eric.RData") 
-write.csv(modelfit.eric$predictions, file = "./Outputs/MetabResults_Eric.csv")
+saveRDS(modelfit.eric, file = "./Outputs/MetabResults_EricRaw.RData") 
+write.csv(modelfit.eric$predictions, 
+          file = "./Outputs/MetabResults_EricRaw.csv")
   
 # Steve -------------------------------------------------------
 site_code.steve <- "KS_KANSASRFALLLEAF"
@@ -73,8 +74,9 @@ fitdata.steve <- prep_metabolism(steve_data, type = model_type,
                                  fillgaps = "interpolation",
                                  estimate_areal_depth = TRUE)
 modelfit.steve <- fit_metabolism(fitdata.steve)
-saveRDS(modelfit.steve, file = "./Outputs/MetabResults_Steve.RData") 
-write.csv(modelfit.steve$predictions, file = "./Outputs/MetabResults_Steve.csv")
+saveRDS(modelfit.steve, file = "./Outputs/MetabResults_SteveRaw.RData") 
+write.csv(modelfit.steve$predictions, 
+          file = "./Outputs/MetabResults_SteveRaw.csv")
   
 # Desoto ------------------------------------------------------
 site_code.desoto <- "KS_KANSASR"
@@ -84,13 +86,172 @@ fitdata.desoto <- prep_metabolism(desoto_data, type = model_type,
                                   fillgaps = "interpolation",
                                   estimate_areal_depth = TRUE)
 modelfit.desoto <- fit_metabolism(fitdata.desoto)
-saveRDS(modelfit.desoto, file = "./Outputs/MetabResults_Desoto.RData") 
+saveRDS(modelfit.desoto, file = "./Outputs/MetabResults_DesotoRaw.RData") 
 write.csv(modelfit.desoto$predictions, 
-          file = "./Outputs/MetabResults_Desoto.csv")
+          file = "./Outputs/MetabResults_DesotoRaw.csv")
 
 ```
 
-```{r DepthCheck}
+```{r metabolism.cleanup}
+# Clean raw data (by removing dates that sensor was buried) and save cleaned
+# model data as RData and CSV files ------------------------------------------
+# Site Eric
+# 2-20 thru 2-24
+modelfit.eric$predictions$GPP[modelfit.eric$predictions$date >= 
+                                ymd("2018-02-20") & 
+                                modelfit.eric$predictions$date <= 
+                                ymd("2018-02-24")] <- NA
+modelfit.eric$predictions$GPP.lower[modelfit.eric$predictions$date >= 
+                                      ymd("2018-02-20") & 
+                                      modelfit.eric$predictions$date <= 
+                                      ymd("2018-02-24")] <- NA
+modelfit.eric$predictions$ER[modelfit.eric$predictions$date >= 
+                               ymd("2018-02-20") & 
+                               modelfit.eric$predictions$date <= 
+                               ymd("2018-02-24")] <- NA
+modelfit.eric$predictions$ER.lower[modelfit.eric$predictions$date >= 
+                                   ymd("2018-02-20") & 
+                                   modelfit.eric$predictions$date <= 
+                                   ymd("2018-02-24")] <- NA
+# 3-05 thru 3-12
+modelfit.eric$predictions$GPP[modelfit.eric$predictions$date >= 
+                                ymd("2018-03-05") & 
+                                modelfit.eric$predictions$date <= 
+                                ymd("2018-03-12")] <- NA
+modelfit.eric$predictions$GPP.lower[modelfit.eric$predictions$date >= 
+                                    ymd("2018-03-05") & 
+                                    modelfit.eric$predictions$date <= 
+                                    ymd("2018-03-12")] <- NA
+modelfit.eric$predictions$ER[modelfit.eric$predictions$date >= 
+                             ymd("2018-03-05") & 
+                             modelfit.eric$predictions$date <= 
+                             ymd("2018-03-12")] <- NA
+modelfit.eric$predictions$ER.lower[modelfit.eric$predictions$date >= 
+                                   ymd("2018-03-05") & 
+                                   modelfit.eric$predictions$date <= 
+                                   ymd("2018-03-12")] <- NA
+# 3-28
+modelfit.eric$predictions$GPP[modelfit.eric$predictions$date == 
+                                ymd("2018-03-28")] <- NA
+modelfit.eric$predictions$GPP.lower[modelfit.eric$predictions$date == 
+                                      ymd("2018-03-28")] <- NA
+modelfit.eric$predictions$ER[modelfit.eric$predictions$date == 
+                                ymd("2018-03-28")] <- NA
+modelfit.eric$predictions$ER.lower[modelfit.eric$predictions$date == 
+                                      ymd("2018-03-28")] <- NA
+# 4-1 thru 4-5
+modelfit.eric$predictions$GPP[modelfit.eric$predictions$date >= 
+                                ymd("2018-04-01") & 
+                                modelfit.eric$predictions$date <= 
+                                ymd("2018-04-05")] <- NA
+modelfit.eric$predictions$GPP.lower[modelfit.eric$predictions$date >= 
+                                      ymd("2018-04-01") & 
+                                      modelfit.eric$predictions$date <= 
+                                      ymd("2018-04-05")] <- NA
+modelfit.eric$predictions$ER[modelfit.eric$predictions$date >= 
+                                ymd("2018-04-01") & 
+                                modelfit.eric$predictions$date <= 
+                                ymd("2018-04-05")] <- NA
+modelfit.eric$predictions$ER.lower[modelfit.eric$predictions$date >= 
+                                    ymd("2018-04-01") & 
+                                    modelfit.eric$predictions$date <= 
+                                    ymd("2018-04-05")] <- NA
+# 4-14 thru 4-17
+modelfit.eric$predictions$GPP[modelfit.eric$predictions$date >= 
+                                ymd("2018-04-14") & 
+                                modelfit.eric$predictions$date <= 
+                                ymd("2018-04-17")] <- NA
+modelfit.eric$predictions$GPP.lower[modelfit.eric$predictions$date >= 
+                                      ymd("2018-04-14") & 
+                                      modelfit.eric$predictions$date <= 
+                                      ymd("2018-04-17")] <- NA
+modelfit.eric$predictions$ER[modelfit.eric$predictions$date >= 
+                                ymd("2018-04-14") & 
+                                modelfit.eric$predictions$date <= 
+                                ymd("2018-04-17")] <- NA
+modelfit.eric$predictions$ER.lower[modelfit.eric$predictions$date >= 
+                                      ymd("2018-04-14") & 
+                                      modelfit.eric$predictions$date <= 
+                                      ymd("2018-04-17")] <- NA
+# 4-25 thru 4-30
+modelfit.eric$predictions$GPP[modelfit.eric$predictions$date >= 
+                                ymd("2018-04-25") & 
+                                modelfit.eric$predictions$date <= 
+                                ymd("2018-04-30")] <- NA
+modelfit.eric$predictions$GPP.lower[modelfit.eric$predictions$date >= 
+                                      ymd("2018-04-25") & 
+                                      modelfit.eric$predictions$date <= 
+                                      ymd("2018-04-30")] <- NA
+modelfit.eric$predictions$ER[modelfit.eric$predictions$date >= 
+                                ymd("2018-04-25") & 
+                                modelfit.eric$predictions$date <= 
+                                ymd("2018-04-30")] <- NA
+modelfit.eric$predictions$ER.lower[modelfit.eric$predictions$date >= 
+                                    ymd("2018-04-25") & 
+                                    modelfit.eric$predictions$date <= 
+                                    ymd("2018-04-30")] <- NA
+# Site Steve
+# 3-09 thru 3-10 marked "bad data" in streamPULSE
+modelfit.steve$predictions$GPP[modelfit.steve$predictions$date >= 
+                                ymd("2018-03-09") & 
+                                modelfit.steve$predictions$date <= 
+                                ymd("2018-03-10")] <- NA
+modelfit.steve$predictions$GPP.lower[modelfit.steve$predictions$date >= 
+                                      ymd("2018-03-09") & 
+                                      modelfit.steve$predictions$date <= 
+                                      ymd("2018-03-10")] <- NA
+modelfit.steve$predictions$ER[modelfit.steve$predictions$date >= 
+                                ymd("2018-03-09") & 
+                                modelfit.steve$predictions$date <= 
+                                ymd("2018-03-10")] <- NA
+modelfit.steve$predictions$ER.lower[modelfit.steve$predictions$date >= 
+                                      ymd("2018-03-09") & 
+                                      modelfit.steve$predictions$date <= 
+                                      ymd("2018-03-10")] <- NA
+# 3-30 thru 4-09 sensor shut off accidentally
+modelfit.steve$predictions$GPP[modelfit.steve$predictions$date >= 
+                                ymd("2018-03-30") & 
+                                modelfit.steve$predictions$date <= 
+                                ymd("2018-04-09")] <- NA
+modelfit.steve$predictions$GPP.lower[modelfit.steve$predictions$date >= 
+                                      ymd("2018-03-30") & 
+                                      modelfit.steve$predictions$date <= 
+                                      ymd("2018-04-09")] <- NA
+modelfit.steve$predictions$ER[modelfit.steve$predictions$date >= 
+                                ymd("2018-03-30") & 
+                                modelfit.steve$predictions$date <= 
+                                ymd("2018-04-09")] <- NA
+modelfit.steve$predictions$ER.lower[modelfit.steve$predictions$date >= 
+                                      ymd("2018-03-30") & 
+                                      modelfit.steve$predictions$date <= 
+                                      ymd("2018-04-09")] <- NA
+# 4-20 thru 5-01
+modelfit.steve$predictions$GPP[modelfit.steve$predictions$date >= 
+                                ymd("2018-04-20") & 
+                                modelfit.steve$predictions$date <= 
+                                ymd("2018-05-01")] <- NA
+modelfit.steve$predictions$GPP.lower[modelfit.steve$predictions$date >= 
+                                      ymd("2018-04-20") & 
+                                      modelfit.steve$predictions$date <= 
+                                      ymd("2018-05-01")] <- NA
+modelfit.steve$predictions$ER[modelfit.steve$predictions$date >= 
+                                ymd("2018-04-20") & 
+                                modelfit.steve$predictions$date <= 
+                                ymd("2018-05-01")] <- NA
+modelfit.steve$predictions$ER.lower[modelfit.steve$predictions$date >= 
+                                      ymd("2018-04-20") & 
+                                      modelfit.steve$predictions$date <= 
+                                      ymd("2018-05-01")] <- NA
+# Save as cleaned CSV and RData
+saveRDS(modelfit.eric, file = "./Outputs/MetabResults_Eric.RData") 
+write.csv(modelfit.eric$predictions, 
+          file = "./Outputs/MetabResults_Eric.csv")
+saveRDS(modelfit.steve, file = "./Outputs/MetabResults_Steve.RData") 
+write.csv(modelfit.steve$predictions, 
+          file = "./Outputs/MetabResults_Steve.csv")
+```
+
+```{r depth.check}
 # Check StreamMetabolizer calculated depth against USGS stream gauging data
 # at DeSoto gauge
 
@@ -161,3 +322,177 @@ NEP.eric <- NEP_calcs(modelfit.eric$predictions)
 NEP.steve <- NEP_calcs(modelfit.steve$predictions)
 NEP.desoto <- NEP_calcs(modelfit.desoto$predictions)
 ```
+
+```{r areal.extent}
+# Compute gas exchange distance
+# From Stream Ecosystems in a Changing Environment: 
+#   "One-station techniques measure a reach of stream that scales with the 
+#   transport distance of oxygen; a proposed distance is about three times 
+#   the transport distance of O2 (ie. 3V/K, Chapra and Di Toro 1991), which 
+#   corresponds to 95% O2 turnover in the reach. Spatial variability at the 
+#   spatial scale of this distance will bias estimates of one-station 
+#   metabolism. For example, a sonde placed in a tailwater below a dam may 
+#   measure oxygen processes both in the tailwater and in the upstream lake."
+
+# L = 3 v / K600
+# Where L = distance along river at which 95% of oxygen has turned over [m]
+#       v = average flow velocity [m / day]
+#       K600 = gas exchange coefficient predicted by model [day^-1]
+# Citations: Chapra & Del Toro 1991
+#            Hall et al. 2012
+#            Jones & Stanley Stream Ecosystems in a Changing... pg 158
+
+# Grab K600 values from the metabolism modeling data -------------------------
+# StreamMetabolizer uses the 50% condfidence interval (not the mean) GPP and 
+# ER measurements, which is why I'm grabbing the 50% confidence interval K600
+# measurements
+K600.eric <- 
+  modelfit.eric[["fit"]]@fit[["daily"]] %>%
+  select(date, K600_daily_50pct) %>%
+  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01"))
+K600.steve <- 
+  modelfit.steve[["fit"]]@fit[["daily"]] %>%
+  select(date, K600_daily_50pct) %>%
+  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01"))
+K600.desoto <- 
+  modelfit.desoto[["fit"]]@fit[["daily"]] %>%
+  select(date, K600_daily_50pct) %>%
+  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) 
+
+# Interpolate for velocity using v = Q/A -------------------------------------
+# Approximate river cross sectional A using interpolated depth and aerial w
+# Grab river width - this is from google maps data, same values used in 
+# uptake analysis
+w.Eric <- 210.9
+w.Steve <- 113.4
+w.Desoto <- 138.07
+# Calculate water velocity based on modeled depth and discharge
+v.eric <- 
+  modelfit.eric[["fit"]]@data %>%
+  select(date, solar.time, depth, discharge) %>%
+  group_by(date) %>%
+  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
+  summarise(depth_m = mean(depth), Q_m3s = mean(discharge), 
+            A_m2 = w.Eric*depth_m, v_ms = Q_m3s/A_m2,
+            v_mday = v_ms*86400)
+v.steve <- 
+  modelfit.steve[["fit"]]@data %>%
+  select(date, solar.time, depth, discharge) %>%
+  group_by(date) %>%
+  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
+  summarise(depth_m = mean(depth), Q_m3s = mean(discharge), 
+            A_m2 = w.Steve*depth_m, v_ms = Q_m3s/A_m2,
+            v_mday = v_ms*86400)
+v.desoto <- 
+  modelfit.desoto[["fit"]]@data %>%
+  select(date, solar.time, depth, discharge) %>%
+  group_by(date) %>%
+  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
+  summarise(depth_m = mean(depth), Q_m3s = mean(discharge), 
+            A_m2 = w.Desoto*depth_m, v_ms = Q_m3s/A_m2,
+            v_mday = v_ms*86400)
+# Run oxygen turnover distance calculation
+K600.eric <- 
+  full_join(K600.eric, v.eric) %>%
+  mutate(O2TurnL_m = 3*v_mday/K600_daily_50pct, O2TurnL_km = O2TurnL_m/1000)
+K600.steve <- 
+  full_join(K600.steve, v.steve) %>%
+  mutate(O2TurnL_m = 3*v_mday/K600_daily_50pct, O2TurnL_km = O2TurnL_m/1000)
+K600.desoto <- 
+  full_join(K600.desoto, v.desoto) %>%
+  mutate(O2TurnL_m = 3*v_mday/K600_daily_50pct, O2TurnL_km = O2TurnL_m/1000)
+
+# Summary stats --------------------------------------------------------------
+K600.eric %>% summarise_all(mean, na.rm = T) # 28.0 km
+K600.steve %>% summarise_all(mean, na.rm = T) # 16.1 km
+K600.desoto %>% summarise_all(mean, na.rm = T) # 21.1 km
+
+# Save as CSV files ----------------------------------------------------------
+saveRDS(K600.eric, file = "./Outputs/OxygenTurnover_Eric.RData")
+write.csv(K600.eric, file = "./Outputs/OxygenTurnover_Eric.CSV", row.names = F)
+
+saveRDS(K600.steve, file = "./Outputs/OxygenTurnover_Steve.RData")
+write.csv(K600.steve, file = "./Outputs/OxygenTurnover_Steve.CSV", 
+          row.names = F)
+
+saveRDS(K600.desoto, file = "./Outputs/OxygenTurnover_Desoto.RData")
+write.csv(K600.desoto, file = "./Outputs/OxygenTurnover_Desoto.CSV", 
+          row.names = F)
+```
+
+```{r stoich.scaling}
+# Predict areal N uptake rate based on metabolism
+# Assumptions: (Hall & Tank 2003)
+# 1. C production will drive autotrophic & heterotrophic demand for N (AKA, 
+#    assume a respiratory quotient = 1)
+# 2. Molar C:N scaling ratio = 20 [g C / g N] (Hall & Tank 2003) OR 
+#    Molar C:N scaling ratio = 12 [g C / g N] (Covino et al 2018, citing 
+#    steltzer & lamberti 2001)
+# 3. Net autotrophic production is 0.5*GPP (Odum 1957, Webster & Myer 1997)
+# 4. Heterotrophic respiration can be estimated from ecosystem respiration
+#    using the equation HR = ER - ra*GPP where HR is herotrophic respiration, 
+#    and ra is a growth efficiency term. Hall & Tank select a moderate growth 
+#    efficiency = 0.2 and low growth efficiency = 0.05 to bound their estimate
+# 5. Heterotrophic N assimilation can be calculated assuming a respiratory 
+#    quotient of 1 and a C:N scaling ratio of 20:1 (both Hall & Tank 2003 and
+#    Covino et al 2018 use 20 as ratio)
+
+# Equations -----------------------------------------------------------------
+
+# Autotrophic N assimilation = GPP [gO2/m2d] * Respiratory quotient [g C/g O2] 
+#                                  * Autotrophic respiration coefficient 
+#                                  * C:N scaling ratio [g N / g C]
+# Ua [g N / m2 day ] = GPP * 1 * 0.5 * 1/20 or 1/12
+
+# Heterotrophic respiration = ER - ra * GPP
+# HR [g O2 / m2 day] = ER - 0.5 or 0.2 * GPP
+
+# Heterotrophic N assimilation = HR [g O2 / m2 day] 
+#                                * Respiratory quotient [g C / g O2]
+#                                * C:N scaling ratio [g N / g C]
+# Heterotrophic N assimilation = HR * 1 * 1/20
+
+# Assumed constants ----------------------------------------------------------
+
+RespQuot <- 1
+AutoRespCoeff <- 0.5
+CNscale <- 20
+
+ra.med <- 0.5
+ra.low <- 0.2
+
+# Run calculation
+stoich.eric <- 
+  modelfit.eric$predictions %>%
+  select(date, GPP, ER) %>%
+  mutate(ER = abs(ER),
+         Uaut_gNm2day = GPP * RespQuot * AutoRespCoeff / CNscale,
+         HR = ER - ra.low * GPP,
+         Uhet_gNm2day = HR / CNscale,
+         U_gNm2day = Uaut_gNm2day + Uhet_gNm2day)
+stoich.steve <- 
+  modelfit.steve$predictions %>%
+  select(date, GPP, ER) %>%
+  mutate(ER = abs(ER),
+         Uaut_gNm2day = GPP * RespQuot * AutoRespCoeff / CNscale,
+         HR = ER - ra.low * GPP,
+         Uhet_gNm2day = HR / CNscale,
+         U_gNm2day = Uaut_gNm2day + Uhet_gNm2day)
+stoich.desoto <- 
+  modelfit.desoto$predictions %>%
+  select(date, GPP, ER) %>%
+  mutate(ER = abs(ER),
+         Uaut_gNm2day = GPP * RespQuot * AutoRespCoeff / CNscale,
+         HR = ER - ra.low * GPP,
+         Uhet_gNm2day = HR / CNscale,
+         U_gNm2day = Uaut_gNm2day + Uhet_gNm2day)
+
+# Save to RData and CSV
+saveRDS(stoich.eric, file = "./Outputs/StoichUptake_Eric.RData")
+write.csv(stoich.eric, file ="./Outputs/StoichUptake_Eric.CSV", row.names = F)
+saveRDS(stoich.steve, file = "./Outputs/StoichUptake_Steve.RData")
+write.csv(stoich.steve, file ="./Outputs/StoichUptake_Steve.CSV", row.names = F)
+saveRDS(stoich.desoto, file = "./Outputs/StoichUptake_Desoto.RData")
+write.csv(stoich.desoto, file ="./Outputs/StoichUptake_Desoto.CSV", row.names = F)
+```
+

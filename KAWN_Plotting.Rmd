@@ -17,7 +17,7 @@ library(gridExtra)
 ```
 
 ```{r Load data}
-#### Site location data ###
+# Site location data ---------------------------------------------------------
 coords <- read.csv("./Data/GPScoordinates_12Nov18.csv", 
                    stringsAsFactors = FALSE)
 # Rename site names
@@ -26,19 +26,17 @@ coords$SiteNickname[coords$SiteNickname == "Eric"] <- "S1"
 coords$SiteNickname[coords$SiteNickname == "Steve"] <- "S2"
 coords$SiteNickname[coords$SiteNickname == "Desoto"] <- "S3"
 
-### Sensor data ###
+# Sensor data ----------------------------------------------------------------
 sensor_eric <- 
   read.csv("./Data/StreamPULSE_Downloaded/KS_KANSASREASTLAWRENCE_sensorData.csv")
 sensor_steve <- 
   read.csv("./Data/StreamPULSE_Downloaded/KS_KANSASRFALLLEAF_sensorData.csv")
 sensor_desoto <- 
   read.csv("./Data/StreamPULSE_Downloaded/KS_KANSASR_sensorData.csv")
-
 # Count total percent of "Bad Data" points out of all data points
 sum(sensor_eric$flagtype %in% c("Bad Data"))/nrow(sensor_eric)*100 +
   sum(sensor_steve$flagtype %in% c("Bad Data"))/nrow(sensor_steve)*100 +
   sum(sensor_desoto$flagtype %in% c("Bad Data"))/nrow(sensor_desoto)*100
-
 # summarize sensor data: take daily averages & merge w/ metabolism
 dailyavg <- function(sensor_data){
   # if sensor data has a "bad data" flag, set value to NA
@@ -70,7 +68,7 @@ sensor_eric <- dailyavg(sensor_eric)
 sensor_steve <- dailyavg(sensor_steve)
 sensor_desoto <- dailyavg(sensor_desoto)
 
-### N mass balance data ###
+# Mass balance data ----------------------------------------------------------
 massbal <- readRDS("./Outputs/NMassBalance.rds")
 # bowersock load gets down to 0 which doesnt show up well on a log10 scaled 
 # plot, so bump up to 20 for plotting
@@ -81,91 +79,16 @@ massbal <- readRDS("./Outputs/NMassBalance.rds")
 massbal$Nitrate.steve_mgNL[massbal$date >= ymd("2018-03-10") & 
                              massbal$date <= ymd("2018-03-26")] <- NA
 
-### Metabolism results ###
+# Metabolism results ---------------------------------------------------------
 metab_eric <- readRDS("./Outputs/MetabResults_Eric.RData")$predictions
 metab_steve <- readRDS("./Outputs/MetabResults_Steve.RData")$predictions
 metab_desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")$predictions
 names(metab_desoto)[2:10] <- paste0(names(metab_desoto)[2:10], ".desoto")
+# Merge into one dataframe
 metab <- dplyr::full_join(metab_eric, metab_steve, by = "date", 
                           suffix = c(".eric", ".steve")) %>%
   dplyr::full_join(., metab_desoto, by = "date")
-# Metabolism bad dates removal
-# Eric
-metab$GPP.eric[metab$date >= ymd("2018-02-20") & 
-                 metab$date <= ymd("2018-02-24")] <- NA
-metab$ER.eric[metab$date >= ymd("2018-02-20") & 
-                 metab$date <= ymd("2018-02-24")] <- NA
-metab$GPP.lower.eric[metab$date >= ymd("2018-02-20") & 
-                       metab$date <= ymd("2018-02-24")] <- NA
-metab$ER.lower.eric[metab$date >= ymd("2018-02-20") & 
-                       metab$date <= ymd("2018-02-24")] <- NA
-metab$GPP.eric[metab$date >= ymd("2018-03-05") & 
-                 metab$date <= ymd("2018-03-12")] <- NA
-metab$ER.eric[metab$date >= ymd("2018-03-05") & 
-                 metab$date <= ymd("2018-03-12")] <- NA
-metab$GPP.lower.eric[metab$date >= ymd("2018-03-05") & 
-                       metab$date <= ymd("2018-03-12")] <- NA
-metab$ER.lower.eric[metab$date >= ymd("2018-03-05") & 
-                       metab$date <= ymd("2018-03-12")] <- NA
-metab$GPP.eric[metab$date == ymd("2018-03-28")] <- NA #Uncaught sensor burial?
-metab$ER.eric[metab$date == ymd("2018-03-28")] <- NA #Uncaught sensor burial?
-metab$GPP.lower.eric[metab$date == ymd("2018-03-28")] <- NA 
-metab$ER.lower.eric[metab$date == ymd("2018-03-28")] <- NA 
-metab$GPP.eric[metab$date > ymd("2018-04-01") & 
-                 metab$date <= ymd("2018-04-05")] <- NA
-metab$ER.eric[metab$date > ymd("2018-04-01") & 
-                 metab$date <= ymd("2018-04-05")] <- NA
-metab$GPP.lower.eric[metab$date > ymd("2018-04-01") & 
-                       metab$date <= ymd("2018-04-05")] <- NA
-metab$ER.lower.eric[metab$date > ymd("2018-04-01") & 
-                       metab$date <= ymd("2018-04-05")] <- NA
-metab$GPP.eric[metab$date >= ymd("2018-04-14") & 
-                 metab$date < ymd("2018-04-17")] <- NA
-metab$ER.eric[metab$date >= ymd("2018-04-14") & 
-                 metab$date < ymd("2018-04-17")] <- NA
-metab$GPP.lower.eric[metab$date >= ymd("2018-04-14") & 
-                       metab$date < ymd("2018-04-17")] <- NA
-metab$ER.lower.eric[metab$date >= ymd("2018-04-14") & 
-                       metab$date < ymd("2018-04-17")] <- NA
-metab$GPP.eric[metab$date >= ymd("2018-04-25") & 
-                 metab$date <= ymd("2018-04-30")] <- NA
-metab$ER.eric[metab$date >= ymd("2018-04-25") & 
-                 metab$date <= ymd("2018-04-30")] <- NA
-metab$GPP.lower.eric[metab$date >= ymd("2018-04-25") & 
-                       metab$date <= ymd("2018-04-30")] <- NA
-metab$ER.lower.eric[metab$date >= ymd("2018-04-25") & 
-                       metab$date <= ymd("2018-04-30")] <- NA
-# Steve
-#metab$GPP.steve[metab$date >= ymd("2018-02-01") & 
-                 #metab$date <= ymd("2018-02-10")] # Double check this
-# Likely dates but need double checking with O2 record:
-metab$GPP.steve[metab$date >= ymd("2018-03-09") & 
-                 metab$date <= ymd("2018-03-10")] <- NA # marked "bad data"
-metab$GPP.lower.steve[metab$date >= ymd("2018-03-09") & 
-                        metab$date <= ymd("2018-03-10")] <- NA
-metab$GPP.steve[metab$date >= ymd("2018-03-30") & 
-                 metab$date <= ymd("2018-04-09")] <- NA # No O2 data here 
-# because I shut the sensor off accidentally
-metab$GPP.lower.steve[metab$date >= ymd("2018-03-30") & 
-                        metab$date <= ymd("2018-04-09")] <- NA
-metab$GPP.steve[metab$date >= ymd("2018-04-20") & 
-                 metab$date <= ymd("2018-05-01")] <- NA
-metab$GPP.lower.steve[metab$date >= ymd("2018-04-20") & 
-                        metab$date <= ymd("2018-05-01")] <- NA
-metab$ER.steve[metab$date >= ymd("2018-03-09") & 
-                 metab$date <= ymd("2018-03-10")] <- NA # marked "bad data"
-metab$ER.lower.steve[metab$date >= ymd("2018-03-09") & 
-                        metab$date <= ymd("2018-03-10")] <- NA
-metab$ER.steve[metab$date >= ymd("2018-03-30") & 
-                 metab$date <= ymd("2018-04-09")] <- NA # No O2 data here 
-# because I shut the sensor off accidentally
-metab$ER.lower.steve[metab$date >= ymd("2018-03-30") & 
-                        metab$date <= ymd("2018-04-09")] <- NA
-metab$ER.steve[metab$date >= ymd("2018-04-20") & 
-                 metab$date <= ymd("2018-05-01")] <- NA
-metab$ER.lower.steve[metab$date >= ymd("2018-04-20") & 
-                        metab$date <= ymd("2018-05-01")] <- NA
-
+# Join with sensor data
 sensor_eric <- dplyr::full_join(sensor_eric, metab_eric, by = "date")
 sensor_steve <- dplyr::full_join(sensor_steve, metab_steve, by = "date")
 sensor_desoto <- dplyr::full_join(sensor_desoto, metab_desoto, by = "date")
@@ -181,7 +104,7 @@ sensor_desoto <- dplyr::full_join(sensor_desoto, metab_desoto, by = "date")
 # 2018-02-01 thru 2018-02-10 N sensor not yet deployed
 # 2018-03-10 thru 2018-03-22 N sensor burial
 
-### Reshape metab data ########################################################
+# Reshape metabolism dataframe -----------------------------------------------
 # Factorize release status
 metab$ReleaseStatus <- NA
 metab$ReleaseStatus[metab$date < ymd("2018-04-01")] <- "During"
@@ -212,18 +135,16 @@ levels(metab.long$site)[levels(metab.long$site)=="ER.desoto"] <- "S3"
 metab.long$model <- factor(metab.long$model, levels = c("GPP", "ER")) # Reorder
 metab.long$site <- factor(metab.long$site, levels = c("S1", "S2", "S3"))
 
-### Nitrate uptake results #####################################################
+# Nitrate uptake results -----------------------------------------------------
 # HAVE bad dates removed
 uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1.rds")
-uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-01"] <- NA # affected by rapid 
-#discharge change, U calculation overestimate
-uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-09"] <- NA # affected by sensor
-#burial that started around 03-10
+uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-01"] <- NA # affected by 
+# rapid discharge change, U calculation overestimate
+uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-09"] <- NA # affected by 
+# sensor burial that started around 03-10
 # Section date
 uptake <- uptake[uptake$Date >= ymd("2018-02-01") & 
                    uptake$Date < ymd("2018-05-01"),]
-
-### Reshape uptake data #######
 # Adjust from wide to long format
 uptake.long <- 
   uptake %>%
@@ -234,7 +155,6 @@ uptake.long <-
 uptake.long$site[uptake.long$site == "UaNO3_gNm2day.eric"] <- "S1"
 uptake.long$site[uptake.long$site == "UaNO3_gNm2day.steve"] <- "S2"
 uptake.long$site[uptake.long$site == "UaNO3_gNm2day.desoto"] <- "S3"
-
 supply.long <- 
   uptake %>%
   gather(site, Supply_gNm2day, Supply_gNm2day.eric, Supply_gNm2day.steve,
@@ -244,17 +164,9 @@ supply.long <-
 supply.long$site[supply.long$site == "Supply_gNm2day.eric"] <- "S1"
 supply.long$site[supply.long$site == "Supply_gNm2day.steve"] <- "S2"
 supply.long$site[supply.long$site == "Supply_gNm2day.desoto"] <- "S3"
-
-#vf.long <- tidyr::gather(uptake[c("Date","vf_mmmin.eric", 
-#                                  "vf_mmmin.steve", 
-#                                  "vf_mmmin.desoto")], key = site, 
-#                             value = vf_mmmin,
-#                             vf_mmmin.eric:vf_mmmin.desoto)
-
 # Factorize site name
 uptake.long$site <- factor(uptake.long$site)
 supply.long$site <- factor(supply.long$site)
-
 # Add Month column
 uptake.long <- 
   uptake.long %>% 
@@ -264,21 +176,8 @@ supply.long <-
   supply.long %>% 
   mutate(Month = factor(month(Date, label = TRUE, abbr = TRUE)),
          WeekGroup = factor(round_date(Date, period(week = 3))))
-
 uptake.long <- na.omit(uptake.long)
 
-#supply.long$site <- factor(supply.long$site, 
-#                           levels = c("NitrateSupply_gNm2day.eric", 
-#                                      "NitrateSupply_gNm2day.steve", 
-#                                      "NitrateSupply_gNm2day.desoto"))
-#levels(supply.long$site)[levels(supply.long$site)==
-#                           "NitrateSupply_gNm2day.eric"] <- "S1"
-#levels(supply.long$site)[levels(supply.long$site)==
-#                           "NitrateSupply_gNm2day.steve"] <- "S2"
-#levels(supply.long$site)[levels(supply.long$site)==
-#                           "NitrateSupply_gNm2day.desoto"] <- "S3"
-
-### Join data for comparison plotting ##########################################
 # Merge uptake data and metabolism data
 metab.long$Date <- metab.long$date
 uptake.metab.long <- dplyr::full_join(metab.long, uptake.long, 
@@ -286,31 +185,22 @@ uptake.metab.long <- dplyr::full_join(metab.long, uptake.long,
 uptake.metab.long$date <- NULL
 uptake.metab.long <- subset(uptake.metab.long, Date < ymd("2018-05-01"))
 
-# Merge uptake with N load
-#uptake.metab.mass.long <- dplyr::full_join(uptake.metab.long, supply.long, 
-#                                           by = c("Date", "site"))
-# Subset dates
-#uptake.metab.mass.long <- subset(uptake.metab.mass.long, 
-#                                 uptake.metab.mass.long$Date < ymd("2018-05-01"))
-#uptake.metab.mass.long <- subset(uptake.metab.mass.long, 
-#                                 uptake.metab.mass.long$Date >= ymd("2018-02-01"))
-
-# Load in Tank et al 2008 uptake meta-analysis
-tank <- read.csv("./Data/Meta-analysis/Tank_2008_uptakedata.csv",
-                 header = TRUE)
-tank$NO3_Cb_mgNL <- tank$NO3_Cb_ugNL/1000
-# Load in data from rode et al 2016, 
-rode.hensley <- read.csv("./Data/Meta-analysis/Rode_Hensley_SensorUptake.csv")
-
-# Load in Hall et al 2016 metabolism meta-analysis
-hall <- read.csv("./Data/Meta-analysis/Hall_2016_metabolismdata.csv", 
-                 header = TRUE)
-hall$q_m3s <- hall$q_Ls/1000
-
-# Load in DOC data
+# DOC data -------------------------------------------------------------------
 DOC <- read.csv("./Data/KAW_RAPID_DOC.csv", header = TRUE, 
                 stringsAsFactors = FALSE)
 DOC$SamplingDate <- lubridate::mdy(DOC$SamplingDate)
+
+# Meta analysis data ---------------------------------------------------------
+# Tank et al 2008 uptake meta-analysis
+tank <- read.csv("./Data/Meta-analysis/Tank_2008_uptakedata.csv",
+                 header = TRUE)
+tank$NO3_Cb_mgNL <- tank$NO3_Cb_ugNL/1000
+# Rode et al 2016
+rode.hensley <- read.csv("./Data/Meta-analysis/Rode_Hensley_SensorUptake.csv")
+# Hall et al 2016 metabolism meta-analysis
+hall <- read.csv("./Data/Meta-analysis/Hall_2016_metabolismdata.csv", 
+                 header = TRUE)
+hall$q_m3s <- hall$q_Ls/1000
 ```
 
 ```{r Calculation: Vf}
