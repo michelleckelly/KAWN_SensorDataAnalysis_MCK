@@ -135,7 +135,93 @@ desoto_uptake_Eqn1 <- HC_Eqn1(desoto_uptake)
 
 ```
 
-```{r thesis scaling by set length}
+```{r Scale by aerial extent of metabolism modeling}
+# Calculate uptake by scaling by the aerial extent integrated by metabolism 
+# estimates
+
+# Equation (Heffernan & Cohen 2010)
+# U = Q / A * SumNitrateDiff * 1000 L/m3 * 1/1000 gN/mgN * 86400 sec/day
+# where Q = discharge, m3 / s
+#       A = riverbed area, m2
+#         & A = river width * aerial extent integrated by metabolism estimates
+#       SumNitrateDiff = difference between pre-dawn max and current nitrate
+#                        summed over 24 hr block, mg-N / L
+#       U = autotrophic uptake, g-N / m2 day
+
+# Load in oxygen turnover data
+K600.eric <- readRDS("./Outputs/OxygenTurnover_Eric.RData")
+K600.steve <- readRDS("./Outputs/OxygenTurnover_Steve.RData")
+K600.desoto <- readRDS("./Outputs/OxygenTurnover_Desoto.RData")
+# Change case of date column
+K600.eric <- K600.eric %>% rename(Date = date)
+K600.steve <- K600.steve %>% rename(Date = date)
+K600.desoto <- K600.desoto %>% rename(Date = date)
+
+# Merge oxygen turnover data with uptake data
+eric_uptake_Eqn1 <- full_join(K600.eric, eric_uptake_Eqn1)
+steve_uptake_Eqn1 <- full_join(K600.steve, steve_uptake_Eqn1)
+desoto_uptake_Eqn1 <- full_join(K600.desoto, desoto_uptake_Eqn1)
+# Set width of river, this value measured using google maps, located in 
+# file RiverModel_AerialWidths.xlsx
+w.Eric <- 210.9 # m
+w.Steve <- 113.4 # m
+w.Desoto <- 138.07 # m
+
+# Compute riverbed area as river width * areal mixing extent
+# Compute nitrate uptake following equation, using 86400 as the conversion 
+# factor between seconds and days
+eric_uptake_Eqn1 <- 
+  eric_uptake_Eqn1 %>%
+  mutate(A = w.Eric * O2TurnL_m,
+         UaNO3_gNm2day = Mean.Discharge_m3s / A * SumDiff_mgNL * 86400) 
+steve_uptake_Eqn1 <- 
+  steve_uptake_Eqn1 %>%
+  mutate(A = w.Steve * O2TurnL_m,
+         UaNO3_gNm2day = Mean.Discharge_m3s / A * SumDiff_mgNL * 86400) 
+desoto_uptake_Eqn1 <- 
+  desoto_uptake_Eqn1 %>%
+  mutate(A = w.Desoto * O2TurnL_m,
+         UaNO3_gNm2day = Mean.Discharge_m3s / A * SumDiff_mgNL * 86400) 
+
+
+
+## Calculate Vf ################################################################
+
+## Calculate supply ############################################################
+
+# Supply = (Q * C) / (w * L)
+#        = ([m3 / s] * [mg-N / L]) / ([m] * [m])
+#        = [mg-N / (m2 sec)] * 86,400 [sec / day] * 1000 [L/m3] *1/1000 [g/mg]
+#        = [g-N / m2 day]
+
+# C     concentration of water column nitrate
+#       needs to be pre-dawn maximum water column nitrate, before any uptake 
+#       occurs
+
+#Uptake_Eqn1$Supply_gNm2day.eric <- 
+#  (Uptake_Eqn1$Mean.Discharge_m3s.eric * Uptake_Eqn1$Max.PreDawnN_mgL.eric) /
+#  (100*w.Eric) * 86400
+#Uptake_Eqn1$Supply_gNm2day.steve <- 
+#  (Uptake_Eqn1$Mean.Discharge_m3s.steve * Uptake_Eqn1$Max.PreDawnN_mgL.steve) / 
+#  (100*w.Steve) * 86400
+#Uptake_Eqn1$Supply_gNm2day.desoto <- 
+#  (Uptake_Eqn1$Mean.Discharge_m3s.desoto * Uptake_Eqn1$Max.PreDawnN_mgL.desoto) / 
+#  (100*w.Desoto) * 86400
+
+# Nix supply and percent change values whenever uptake values were bad
+#Uptake_Eqn1$Supply_gNm2day.eric[is.na(Uptake_Eqn1$UaNO3_gNm2day.eric)] <- NA
+#Uptake_Eqn1$Supply_gNm2day.steve[is.na(Uptake_Eqn1$UaNO3_gNm2day.steve)] <- NA
+#Uptake_Eqn1$Supply_gNm2day.desoto[is.na(Uptake_Eqn1$UaNO3_gNm2day.desoto)] <- NA
+
+#Uptake_Eqn1$NitrateChange_Perc.eric[is.na(Uptake_Eqn1$UaNO3_gNm2day.eric)] <- NA
+#Uptake_Eqn1$NitrateChange_Perc.steve[is.na(Uptake_Eqn1$UaNO3_gNm2day.steve)] <- NA
+#Uptake_Eqn1$NitrateChange_Perc.desoto[is.na(Uptake_Eqn1$UaNO3_gNm2day.desoto)] <- NA
+
+
+
+```
+
+```{r Depreciated: scale by set length (thesis)}
 # Calculate Uptake (Ua) and Supply with specific scaling for each site
   
   # Ua = SumNitrateDiff [mg/L] * Q [m3/s] / (w [m] * L[m] ) 
@@ -183,7 +269,7 @@ w.Desoto <- 138.07
     desoto_uptake_Eqn1$Mean.Discharge_m3s * 86400 / (w.Desoto * 100)
 ```
 
-```{r depth scaling}
+```{r Depreciated: depth scaling}
 # Unite uptake_Eqn1 data with StreamMetabolism modeled depth ###################
 # Load in modeled depth data
 modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
@@ -274,15 +360,11 @@ Uptake_Eqn1$Supply_gNm2day.desoto <-
   (Uptake_Eqn1$calcdepth_m.desoto*w.Desoto) *86400
 ```
 
-```{r cleanup and save}
+```{r Cleanup and save}
 # Set days where no uptake occured (negative values) to NA
 #eric_uptake_Eqn1$UaNO3_mgNm2day[eric_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
 #steve_uptake_Eqn1$UaNO3_mgNm2day[steve_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
 #desoto_uptake_Eqn1$UaNO3_mgNm2day[desoto_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
-# Convert
-#eric_uptake_Eqn1$UaNO3_gNm2day <- eric_uptake_Eqn1$UaNO3_mgNm2day / 1000
-#steve_uptake_Eqn1$UaNO3_gNm2day <- steve_uptake_Eqn1$UaNO3_mgNm2day / 1000
-#desoto_uptake_Eqn1$UaNO3_gNm2day <- desoto_uptake_Eqn1$UaNO3_mgNm2day / 1000
 
 # Merge calculations into a single dataframe
 Uptake_Eqn1 <- dplyr::full_join(eric_uptake_Eqn1, steve_uptake_Eqn1, 
@@ -290,26 +372,27 @@ Uptake_Eqn1 <- dplyr::full_join(eric_uptake_Eqn1, steve_uptake_Eqn1,
 Uptake_Eqn1 <- dplyr::full_join(Uptake_Eqn1, desoto_uptake_Eqn1, 
                                 by = "Date")
 # Rename columns
-names(Uptake_Eqn1)[names(Uptake_Eqn1) == "calcdepth_m"] <- 
-  "calcdepth_m.desoto"
-names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Max.PreDawnN_mgL"] <- 
-  "Max.PreDawnN_mgL.desoto"
-names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Min.Nitrate_mgL"] <- 
-  "Min.Nitrate_mgL.desoto"
-names(Uptake_Eqn1)[names(Uptake_Eqn1) == "NitrateChange_Perc"] <- 
-  "NitrateChange_Perc.desoto"
-names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Mean.Nitrate_mgL"] <- 
-  "Mean.Nitrate_mgL.desoto"
-names(Uptake_Eqn1)[names(Uptake_Eqn1) == "Mean.Discharge_m3s"] <- 
-  "Mean.Discharge_m3s.desoto"
-names(Uptake_Eqn1)[names(Uptake_Eqn1) == "SumDiff_mgNL"] <- 
-  "SumDiff_mgNL.desoto"
-names(Uptake_Eqn1)[names(Uptake_Eqn1) == "A_m2"] <- 
-  "A_m2.desoto"
-names(Uptake_Eqn1)[names(Uptake_Eqn1) == "UaNO3_mgNm2day"] <- 
-  "UaNO3_mgNm2day.desoto"
-names(Uptake_Eqn1)[names(Uptake_Eqn1) == "UaNO3_gNm2day"] <- 
-  "UaNO3_gNm2day.desoto"
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(K600_daily_50pct.desoto = 
+                                        K600_daily_50pct)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(depth_m.desoto = depth_m)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(Q_m3s.desoto = Q_m3s)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(A_m2.desoto = A_m2)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(v_ms.desoto = v_ms)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(v_mday.desoto = v_mday)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(O2TurnL_m.desoto = O2TurnL_m)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(O2TurnL_km.desoto = O2TurnL_km)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(Max.PreDawnN_mgL.desoto = 
+                                        Max.PreDawnN_mgL)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(Min.Nitrate_mgL.desoto = Min.Nitrate_mgL)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(NitrateChange_Perc.desoto = 
+                                        NitrateChange_Perc)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(Mean.Nitrate_mgL.desoto = 
+                                        Mean.Nitrate_mgL)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(Mean.Discharge_m3s.desoto = 
+                                        Mean.Discharge_m3s)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(SumDiff_mgNL.desoto = SumDiff_mgNL)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(A.desoto = A)
+Uptake_Eqn1 <- Uptake_Eqn1 %>% rename(UaNO3_gNm2day.desoto = UaNO3_gNm2day)
 
 # Add column to denote during waste release or after
 # During: dates prior to 1 April 2018
@@ -363,40 +446,6 @@ Uptake_Eqn1$UaNO3_gNm2day.desoto[Uptake_Eqn1$Date == ymd("2018-03-30")] <- NA
 # about 25% mixing across cross sectional area. Therefore, scale uptake:
 #Uptake_Eqn1$UaNO3_gNm2day.eric_scaled <- Uptake_Eqn1$UaNO3_gNm2day.eric*0.25
 
-## Calculate Vf ################################################################
-
-## Calculate supply ############################################################
-
-# Supply = (Q * C) / (w * L)
-#        = ([m3 / s] * [mg-N / L]) / ([m] * [m])
-#        = [mg-N / (m2 sec)] * 86,400 [sec / day] * 1000 [L/m3] *1/1000 [g/mg]
-#        = [g-N / m2 day]
-
-# C     concentration of water column nitrate
-#       needs to be pre-dawn maximum water column nitrate, before any uptake 
-#       occurs
-
-Uptake_Eqn1$Supply_gNm2day.eric <- 
-  (Uptake_Eqn1$Mean.Discharge_m3s.eric * Uptake_Eqn1$Max.PreDawnN_mgL.eric) /
-  (100*w.Eric) * 86400
-Uptake_Eqn1$Supply_gNm2day.steve <- 
-  (Uptake_Eqn1$Mean.Discharge_m3s.steve * Uptake_Eqn1$Max.PreDawnN_mgL.steve) / 
-  (100*w.Steve) * 86400
-Uptake_Eqn1$Supply_gNm2day.desoto <- 
-  (Uptake_Eqn1$Mean.Discharge_m3s.desoto * Uptake_Eqn1$Max.PreDawnN_mgL.desoto) / 
-  (100*w.Desoto) * 86400
-
-# Nix supply and percent change values whenever uptake values were bad
-Uptake_Eqn1$Supply_gNm2day.eric[is.na(Uptake_Eqn1$UaNO3_gNm2day.eric)] <- NA
-Uptake_Eqn1$Supply_gNm2day.steve[is.na(Uptake_Eqn1$UaNO3_gNm2day.steve)] <- NA
-Uptake_Eqn1$Supply_gNm2day.desoto[is.na(Uptake_Eqn1$UaNO3_gNm2day.desoto)] <- NA
-
-Uptake_Eqn1$NitrateChange_Perc.eric[is.na(Uptake_Eqn1$UaNO3_gNm2day.eric)] <- NA
-Uptake_Eqn1$NitrateChange_Perc.steve[is.na(Uptake_Eqn1$UaNO3_gNm2day.steve)] <- NA
-Uptake_Eqn1$NitrateChange_Perc.desoto[is.na(Uptake_Eqn1$UaNO3_gNm2day.desoto)] <- NA
-
-
-
 
 # Save dataframe
 write.csv(Uptake_Eqn1, 
@@ -404,16 +453,6 @@ write.csv(Uptake_Eqn1,
           row.names = FALSE)
 saveRDS(Uptake_Eqn1, file = "./Outputs/NitrateUptakeResults_Eqn1.rds")
 
-str(Uptake_Eqn1)
-
-# Calculate Uptake (Ua) and Supply with specific scaling for each site
-
-# Ua = SumNitrateDiff [mg/L] * Q [m3/s] / (w [m] * L[m] ) 
-#       * 1000 [L/m3] / 1000 [g/mg] * 86400 [sec/day]
-
-# Supply [g-N m-2 d-1] = 
-#             ( Q [L s-1] * C [g-N L-1] * 86400 [s d-1] ) / (w [m] * L [m])
-#                      = mass N load [g-N d-1] / (w [m] * L [m])
 ```
 
 ```{r Eqn 2 Uptake}
@@ -615,19 +654,3 @@ if (UptakeEqn == 2){
 }
 ```
 
-```{r Calculation: Uhet}
-# Calculate expected heterotrophic assimilation of nitrate (Uhet)
-# based on GPP, as in Convino et al 2018
-#
-# ra      # Autotrophic production efficiency factor (previously defined) 
-# N.C     # C:N ratio in Kansas River = 9C:1N (previously defined)
-rh <- 0.2 # Heterotrophic growth efficiency factor
-#
-# Equation:
-# ( ER [g O2 / (m^2 day)] - 0.5 efficiency factor * GPP [g O2 / (m^2 day)] )
-#         * [1 mol O2 / 32 g O2] * [1 mol C / 1 mol O2]
-#         * [1 mol N / 9 mol C ] C:N ratio * [14 g N / 1 mol N]
-#         * 0.2 heterotrophic growth efficiency factor
-#         = Uhet [g N / (m^2 day)]
--(UptakeMetab$ER.desoto - ra * UptakeMetab$GPP.desoto) * (1/32) * N.C * 14 * rh + UptakeMetab$UaGPP_gNm2day.desoto
-```
