@@ -1,0 +1,46 @@
+# Ignore history and RProject files
+*.Rhistory
+*.DS_Store
+/Data/.DS_Store
+*.Rproj
+
+# Ignore Rmd default cache directory
+/cache/
+
+# Ignore any temp files that are created by Rmd
+*.utf9.md
+*.knit.md
+*.tmp
+
+# Ignore Word files, powerpoint files, excel files, GIMP image files
+*.docx
+*.pptx
+*.xlsx
+*.xcf
+
+# Ignore NEON files folder containing giant .csv files 
+# (script is still reproducible without this folder, run DataCleanup to generate)
+/Data/NEONfiles/
+
+# Ignore StreamPULSE_DownloadedFrom metadata files and zip
+# file of streampulse sensor data
+# (script is still reproducible without these files,
+# access metadata through data.streampulse.org if needed)
+/Data/StreamPULSE_DownloadedFrom/*.txt
+/Data/StreamPULSE_DownloadedFrom/*.zip
+
+# Ignore folder of sensor data files that are uploaded to the streamPULSE server 
+# (script is still reproducible without this folder, all data can be accessed 
+# through the StreamPULSE repository)
+/Data/StreamPULSE_UploadedTo/
+.Rproj.user
+
+# Ignore RData files of metabolism results as these are over Github's 100 MB 
+# file size limit. Metabolism results are still saved in CSV files, so script
+# is still reproducible without these
+/Outputs/MetabResults_SteveRaw.RData
+/Outputs/MetabResults_Steve.RData
+/Outputs/MetabResults_EricRaw.RData
+/Outputs/MetabResults_Eric.RData
+/Outputs/MetabResults_Desoto.RData
+/Outputs/MetabResults_DesotoRaw.RData
