@@ -239,138 +239,6 @@ PR <-
   mutate(PR = GPP/abs(ER))
 ```
 
-```{r Calculation: Stoich Scaling of Metabolism}
-# Predict areal N uptake rate based on metabolism
-# Assumptions: (Hall & Tank 2003)
-# 1. C production will drive autotrophic & heterotrophic demand for N (AKA, 
-#    assume a respiratory quotient = 1)
-# 2. Molar C:N scaling ratio = 20 [g C / g N] (Hall & Tank 2003) OR 
-#    Molar C:N scaling ratio = 12 [g C / g N] (Covino et al 2018, citing 
-#    steltzer & lamberti 2001)
-# 3. Net autotrophic production is 0.5*GPP (Odum 1957, Webster & Myer 1997)
-# 4. Heterotrophic respiration can be estimated from ecosystem respiration
-#    using the equation HR = ER - ra*GPP where HR is herotrophic respiration, 
-#    and ra is a growth efficiency term. Hall & Tank select a moderate growth 
-#    efficiency = 0.2 and low growth efficiency = 0.05 to bound their estimate
-# 5. Heterotrophic N assimilation can be calculated assuming a respiratory 
-#    quotient of 1 and a C:N scaling ratio of 20:1 (both Hall & Tank 2003 and
-#    Covino et al 2018 use 20 as ratio)
-
-# Equations
-
-# Autotrophic N assimilation = GPP [gO2/m2d] * Respiratory quotient [g C/g O2] 
-#                                  * Autotrophic respiration coefficient 
-#                                  * C:N scaling ratio [g N / g C]
-# Ua [g N / m2 day ] = GPP * 1 * 0.5 * 1/20 or 1/12
-
-# Heterotrophic respiration = ER - ra * GPP
-# HR [g O2 / m2 day] = ER - 0.5 or 0.2 * GPP
-
-# Heterotrophic N assimilation = HR [g O2 / m2 day] 
-#                                * Respiratory quotient [g C / g O2]
-#                                * C:N scaling ratio [g N / g C]
-# Heterotrophic N assimilation = HR * 1 * 1/20
-
-RespQuot <- 1
-AutoRespCoeff <- 0.5
-CNscale <- 20
-
-ra.med <- 0.5
-ra.low <- 0.2
-
-metab %>%
-  select(date, GPP.eric, ER.eric) %>%
-  # Calculate autotrophic N assimilation
-  mutate(Ua_gNm2day.eric = GPP.eric*1*0.5/12,
-         HR = -(abs(ER.eric) - 0.2*GPP.eric),
-         Uh_gNm2day.eric = abs(HR)*1/20,
-         U_gNm2day.eric = Ua_gNm2day.eric + Uh_gNm2day.eric)
-
-metab %>%
-  select(date, GPP.desoto, ER.desoto) %>%
-  mutate()
-
-# Compute gas exchange distance
-# From Stream Ecosystems in a Changing Environment: 
-#   "One-station techniques measure a reach of stream that scales with the 
-#   transport distance of oxygen; a proposed distance is about three times 
-#   the transport distance of O2 (ie. 3V/K, Chapra and Di Toro 1991), which 
-#   corresponds to 95% O2 turnover in the reach. Spatial variability at the 
-#   spatial scale of this distance will bias estimates of one-station 
-#   metabolism. For example, a sonde placed in a tailwater below a dam may 
-#   measure oxygen processes both in the tailwater and in the upstream lake."
-
-# L = 3 v / K600
-# Where L = distance along river at which 95% of oxygen has turned over [m]
-#       v = average flow velocity [m / day]
-#       K600 = gas exchange coefficient predicted by model [day^-1]
-# Citations: Chapra & Del Toro 1991
-#            Hall et al. 2012
-#            Jones & Stanley Stream Ecosystems in a Changing... pg 158
-
-# Grab K600 values from the metabolism modeling data
-# StreamMetabolizer uses the 50% condfidence interval (not the mean) GPP and 
-# ER measurements, which is why I'm grabbing the 50% confidence interval K600
-# measurements
-modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
-modelfit.steve <- readRDS("./Outputs/MetabResults_Steve.RData")
-modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
-
-K600.desoto <- 
-  modelfit.desoto[["fit"]]@fit[["daily"]] %>%
-  select(date, K600_daily_50pct) %>%
-  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
-  summarise(K600_perday = mean(K600_daily_50pct))
-
-# Interpolate for velocity using v = Q/A
-# Approximate river cross sectional A using interpolated depth and aerial w
-# Grab aerial width - this is from google maps data, same values used in 
-# uptake analysis
-w.Eric <- 210.9
-w.Steve <- 113.4
-w.Desoto <- 138.07
-
-# Grab interpolated water depth [m] from model and measured discharge [m3/s]
-v.desoto <- 
-  modelfit.desoto[["fit"]]@data %>%
-  select(date, solar.time, depth, discharge) %>%
-  group_by(date) %>%
-  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
-  summarise(depth = mean(depth), discharge = mean(discharge)) %>%
-  ungroup() %>%
-  summarise(depth_m = mean(depth), Q_m3s = mean(discharge), 
-            A_m2 = w.Desoto*depth_m, v_ms = Q_m3s/A_m2,
-            v_mday = v_ms*86400)
-# Grab 
-bind_cols(K600.desoto, v.desoto) %>%
-  mutate(L_m = 3*v_mday/K600_perday, L_km = L_m/1000)
-
-# Result: Our metabolism estimates at desoto are integrating the cumulative 
-# effects of 20.9km above the sensor
-
-K600.eric <- 
-  modelfit.eric[["fit"]]@fit[["daily"]] %>%
-  select(date, K600_daily_50pct) %>%
-  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
-  summarise(K600_perday = mean(K600_daily_50pct, na.rm = T))
-v.eric <- 
-  modelfit.eric[["fit"]]@data %>%
-  select(date, solar.time, depth, discharge) %>%
-  group_by(date) %>%
-  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
-  summarise(depth = mean(depth), discharge = mean(discharge)) %>%
-  ungroup() %>%
-  summarise(depth_m = mean(depth), Q_m3s = mean(discharge), 
-            A_m2 = w.Eric*depth_m, v_ms = Q_m3s/A_m2,
-            v_mday = v_ms*86400)
-bind_cols(K600.eric, v.eric) %>%
-  mutate(L_m = 3*v_mday/K600_perday, L_km = L_m/1000)
-# Result: Our metabolism estimates at eric are integrating the cumulative 
-# effects of 20.5 km above the sensor (likely affected by dam signal)
-
-```
-
-
 ```{r Stats}
 metab.long$Month <- lubridate::month(metab.long$Date)
 # Correct date spans
@@ -1105,7 +973,7 @@ mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER.desoto,
 
 # U ############################################################################
 # Broken up by ReleaseStatus
-a <- 
+#a <- 
   ggplot(data = uptake.long, aes(x = Month, 
                                           y = UaNO3_gNm2day, fill = site)) +
   facet_wrap(~site, nrow = 1) +
@@ -1128,7 +996,7 @@ a <-
                                "S3" = "#F2AD00"),
                      limits = c("S1", "S1_scaled", "S2", "S3")) +
   # axis labels
-  labs(tag = "A") +
+  labs(tag = "a") +
   xlab(NULL) + 
   ylab(expression("U (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
   # plot theme
