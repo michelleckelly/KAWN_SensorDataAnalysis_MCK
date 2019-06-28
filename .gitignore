@@ -16,7 +16,11 @@
 *.docx
 *.pptx
 *.xlsx
-*.xcf
+
+# Ignore my folder of edited plots containing .xcf image files. Work is still
+# reproducible without this folder, these edited plots are moderately adjusted 
+# (e.g. have nicer margins, everything lined up properly)
+/GIMPEditedPlots/
 
 # Ignore NEON files folder containing giant .csv files 
 # (script is still reproducible without this folder, run DataCleanup to generate)
