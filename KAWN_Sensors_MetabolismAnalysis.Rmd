@@ -27,7 +27,7 @@ library(lubridate)
 ```
 
 ```{r metabolism.load}
-# Load in modeled metabolism data from file
+# Load in cleaned metabolism data from file
 # Skip this block if you haven't run the metabolism model, or if you want 
 # to re-compute the model
 
