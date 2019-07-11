@@ -367,6 +367,19 @@ cor.test(~vf_mmmin+value,
 cor.test(~vf_mmmin+value, 
          data = subset(vf.metab, model == "ER" & site == "S3"), 
          method = c("pearson"))
+
+cor.test(~UaNO3_gNm2day+value, 
+         data = subset(uptake.metab.long, model == "ER" & 
+                         site == "S1"),
+         method = c("pearson"))
+cor.test(~UaNO3_gNm2day+value, 
+         data = subset(uptake.metab.long, model == "ER" & 
+                         site == "S2"),
+         method = c("pearson"))
+cor.test(~UaNO3_gNm2day+value, 
+         data = subset(uptake.metab.long, model == "ER" & 
+                         site == "S3"),
+         method = c("pearson"))
 ```
 
 ```{r Calculation: Mean data}
@@ -873,8 +886,9 @@ a <-
   scale_fill_manual(values = c("S1" = "#FF0000", 
                                "S2" = "#23baaf", "S3" = "#F2AD00"),
                      breaks = c("S1", "S2", "S3")) +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
 # GPP, Steve
 b <- 
   ggplot(data = metab, aes(x = date)) +
@@ -892,8 +906,9 @@ b <-
   scale_fill_manual(values = c("S1" = "#FF0000", 
                                "S2" = "#23baaf", "S3" = "#F2AD00"),
                      breaks = c("S1", "S2", "S3")) +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
 # GPP, DeSoto
 c <- 
   ggplot(data = metab, aes(x = date)) +
@@ -911,8 +926,9 @@ c <-
   scale_fill_manual(values = c("S1" = "#FF0000", 
                                "S2" = "#23baaf", "S3" = "#F2AD00"),
                      breaks = c("S1", "S2", "S3")) +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
 # ER, eric
 d <- 
   ggplot(data = metab, aes(x = date)) +
@@ -930,8 +946,9 @@ d <-
   scale_fill_manual(values = c("S1" = "#FF0000", 
                                "S2" = "#23baaf", "S3" = "#F2AD00"),
                      breaks = c("S1", "S2", "S3")) +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
 e <- 
   ggplot(data = metab, aes(x = date)) +
   # Dots
@@ -948,8 +965,9 @@ e <-
   scale_fill_manual(values = c("S1" = "#FF0000", 
                                "S2" = "#23baaf", "S3" = "#F2AD00"),
                      breaks = c("S1", "S2", "S3")) +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
 f <- 
   ggplot(data = metab, aes(x = date)) +
   # Dots
@@ -966,8 +984,9 @@ f <-
   scale_fill_manual(values = c("S1" = "#FF0000", 
                                "S2" = "#23baaf", "S3" = "#F2AD00"),
                      breaks = c("S1", "S2", "S3")) +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none")
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
 
 grob <- grid.arrange(a,b,c,d,e,f, ncol = 3, nrow = 2)
 ggsave("./Plots/MetabPlot.png", grob, height = 4.5, width = 8.75, units = "in")
@@ -1061,9 +1080,10 @@ b <-
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"))
 grob <- grid.arrange(a,b)
-ggsave("./Plots/U.Vf_boxplot.png", grob, height = 4.25, width = 5.25, units = "in")
+ggsave("./Plots/U.Vf_boxplot.png", grob, height = 5, width = 5.25, units = "in")
 
-
+ggsave("./Plots/U_boxplot.png", a, height = 2.5, width = 5, units = "in")
+ggsave("./Plots/Vf_boxplot.png", b, height = 2.5, width = 4.8, units = "in")
 
 # Merge uptake.long with supply.long
 SU.long <- 
@@ -1131,22 +1151,22 @@ ggsave("./Plots/Supply_boxplot.png", height = 3, width = 7, units = "in")
 
 ```
 
-```{r Predicted uptake fig}
+```{r Fig 5: Predicted uptake fig}
 # Select columns you want
 stoich.eric <- 
   stoich.eric %>%
   dplyr::select(Date = date, Ua_gNm2day.eric = Uaut_gNm2day, 
-                U_gNm2day.eric = Uhet_gNm2day, 
+                Uhet_gNm2day.eric = Uhet_gNm2day, 
                 Ustoic_gNm2day.eric = U_gNm2day)
 stoich.steve <- 
   stoich.steve %>%
   dplyr::select(Date = date, Ua_gNm2day.steve = Uaut_gNm2day, 
-                U_gNm2day.steve = Uhet_gNm2day, 
+                Uhet_gNm2day.steve = Uhet_gNm2day, 
                 Ustoic_gNm2day.steve = U_gNm2day)
 stoich.desoto <- 
   stoich.desoto %>%
   dplyr::select(Date = date, Ua_gNm2day.desoto = Uaut_gNm2day, 
-                U_gNm2day.desoto = Uhet_gNm2day, 
+                Uhet_gNm2day.desoto = Uhet_gNm2day, 
                 Ustoic_gNm2day.desoto = U_gNm2day)
 # Merge with uptake
 stoich <- 
@@ -1155,9 +1175,33 @@ stoich <-
   dplyr::full_join(stoich.steve) %>%
   dplyr::full_join(stoich.desoto)
 
+## Correlation testing
+# Full time series
+cor.test(~UaNO3_gNm2day.eric+Ustoic_gNm2day.eric, 
+         data = stoich)
+cor.test(~UaNO3_gNm2day.steve+Ustoic_gNm2day.steve, 
+         data = stoich)
+cor.test(~UaNO3_gNm2day.desoto+Ustoic_gNm2day.desoto, 
+         data = stoich)
+# During
+cor.test(~UaNO3_gNm2day.eric+Ustoic_gNm2day.eric, 
+         data = subset(stoich, ReleaseStatus == "During"))
+cor.test(~UaNO3_gNm2day.steve+Ustoic_gNm2day.steve, 
+         data = subset(stoich, ReleaseStatus == "During"))
+cor.test(~UaNO3_gNm2day.desoto+Ustoic_gNm2day.desoto, 
+         data = subset(stoich, ReleaseStatus == "During"))
+# After
+cor.test(~UaNO3_gNm2day.eric+Ustoic_gNm2day.eric, 
+         data = subset(stoich, ReleaseStatus == "After"))
+cor.test(~UaNO3_gNm2day.steve+Ustoic_gNm2day.steve, 
+         data = subset(stoich, ReleaseStatus == "After"))
+cor.test(~UaNO3_gNm2day.desoto+Ustoic_gNm2day.desoto, 
+         data = subset(stoich, ReleaseStatus == "After"))
+
+
 # Black points: After (April), White points: during (Feb, March)
 # Eric
-a <- 
+#a <- 
   ggplot(data = stoich, aes(x = Ustoic_gNm2day.eric, 
                           y = UaNO3_gNm2day.eric, 
                           shape = ReleaseStatus)) +
@@ -1177,8 +1221,8 @@ a <-
   #                              "S3" = "#F2AD00"),
   #                   limits = c("S1", "S2", "S3")) +
   # Axis labels
-  xlab(bquote("Predicted U (g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression("U (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
   labs(tag = "a") +
   # Plot theme
   theme_classic() +
@@ -1206,8 +1250,8 @@ b <-
   #                              "S3" = "#F2AD00"),
   #                   limits = c("S1", "S2", "S3")) +
   # Axis labels
-  xlab(bquote("Predicted U (g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression("U (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
   labs(tag = "b") +
   # Plot theme
   theme_classic() +
@@ -1235,8 +1279,8 @@ c <-
   #                              "S3" = "#F2AD00"),
   #                   limits = c("S1", "S2", "S3")) +
   # Axis labels
-  xlab(bquote("Predicted U (g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression("U (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
   labs(tag = "c") +
   # Plot theme
   theme_classic() +
@@ -1245,11 +1289,11 @@ c <-
         axis.text = element_text(color = "black"))
 
 grob <- grid.arrange(a,b,c, ncol = 3, nrow = 1)
-ggsave(grob, file = "./Plots/U_Upred.png", height = 3, width = 9.5, 
+ggsave(grob, file = "./Plots/U_Upred.png", height = 2.75, width = 8.5, 
        units = "in")
 ```
 
-```{r Fig 5. Uptake vs metabolism}
+```{r Fig 6. GPP vs U & GPP vs Vf}
 a <- 
   ggplot(subset(uptake.metab.long, model == "GPP"), 
        aes(x = value, y = UaNO3_gNm2day, fill = site, 
@@ -1292,19 +1336,36 @@ a <-
   theme(legend.position = "none", legend.title = element_blank(),
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"))
-# ER vs U
+# GPP vs Vf
 b <- 
-  ggplot(subset(uptake.metab.long, model == "ER"), 
-       aes(x = -value, y = UaNO3_gNm2day, fill = site, 
-           shape = ReleaseStatus)) +
+  ggplot(subset(vf.metab, model == "GPP"), 
+       aes(x = value, y = vf_mmmin, fill = site, shape = ReleaseStatus)) +
   facet_grid(site~., scales = "free", switch = "y") +
+  # LM: S1, after, GPP
+  geom_smooth(data = subset(vf.metab, model == "GPP" & 
+                              ReleaseStatus == "After" &
+                              site == "S1"),
+              method = "lm", fullrange = F, aes(color = site), 
+              fill = "lightgrey", alpha = 0.2) +
+  # LM: S2, after, GPP
+  geom_smooth(data = subset(vf.metab, model == "GPP" & 
+                              ReleaseStatus == "After" & 
+                              site == "S2"),
+              method = "lm", fullrange = F, aes(color = site), 
+              fill = "lightgrey", alpha = 0.6) +
+  # LM: S3, during, GPP
+  geom_smooth(data = subset(vf.metab, model == "GPP" & 
+                              ReleaseStatus == "During" & 
+                              site == "S3"),
+              method = "lm", fullrange = F, aes(color = ReleaseStatus), 
+              fill = "lightgrey", alpha = 0.6) +
   # Plot points on top
-  geom_point(size = 2.5) +
+  geom_point(size = 2) +
     # Add correlation coeff
-  ggpubr::stat_cor(data = subset(uptake.metab.long, model == "ER"),
-                   method = "pearson", #label.x = c(5), 
-                   #label.y = c(-300, -600, -100, -250, 850, 750), size = 3,
-                   aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
+  ggpubr::stat_cor(data = subset(vf.metab, model == "GPP"),
+                   method = "pearson", #label.x = c(10), 
+                   aes(label = paste(..rr.label.., ..p.label.., 
+                                     sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
   scale_color_manual(values = c("During" = "black", "After" = "green", 
@@ -1314,9 +1375,9 @@ b <-
                                 "S3" = "#F2AD00"),
                      limits = c("S1", "S2", "S3")) +
   # Axis labels
-  scale_x_continuous(limits = c(-2, 25)) +
-  xlab(bquote("|ER| (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression("U (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  scale_x_continuous(limits = c(-3, 17)) +
+  xlab(bquote("GPP (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression(V[f] ~ "(mm" ~~ min^{-1}* ")")) +
   labs(tag = "b") +
   # Plot theme
   theme_classic() +
@@ -1325,10 +1386,14 @@ b <-
         axis.text = element_text(color = "black"))
 
 grob <- grid.arrange(a,b, ncol = 2)
-ggsave("./Plots/Uptake_GPP.png", grob, height = 6, width = 5.75, 
+ggsave("./Plots/GPP_U_Vf.png", grob, height = 6, width = 5.75, 
        units = "in")
 
 
+
+
+
+#######################################
 
 ##Plotting diel swing
 Uptake_Eqn1$Month <- month(Uptake_Eqn1$Date, label = TRUE, abbr = TRUE)
@@ -1429,37 +1494,20 @@ ggsave("./Plots/Diel_GPP.png", grob2, height = 6.5, width = 6.5, units = "in")
 
 ```
 
-```{r Fig 6. Vf vs metabolism}
-# Vf vs GPP
+```{r Fig 6. ER vs U & ER vs Vf}
+# ER vs U
 a <- 
-  ggplot(subset(vf.metab, model == "GPP"), 
-       aes(x = value, y = vf_mmmin, fill = site, shape = ReleaseStatus)) +
+  ggplot(subset(uptake.metab.long, model == "ER"), 
+       aes(x = -value, y = UaNO3_gNm2day, fill = site, 
+           shape = ReleaseStatus)) +
   facet_grid(site~., scales = "free", switch = "y") +
-  # LM: S1, after, GPP
-  geom_smooth(data = subset(vf.metab, model == "GPP" & 
-                              ReleaseStatus == "After" &
-                              site == "S1"),
-              method = "lm", fullrange = F, aes(color = site), 
-              fill = "lightgrey", alpha = 0.2) +
-  # LM: S2, after, GPP
-  geom_smooth(data = subset(vf.metab, model == "GPP" & 
-                              ReleaseStatus == "After" & 
-                              site == "S2"),
-              method = "lm", fullrange = F, aes(color = site), 
-              fill = "lightgrey", alpha = 0.6) +
-  # LM: S3, during, GPP
-  geom_smooth(data = subset(vf.metab, model == "GPP" & 
-                              ReleaseStatus == "During" & 
-                              site == "S3"),
-              method = "lm", fullrange = F, aes(color = ReleaseStatus), 
-              fill = "lightgrey", alpha = 0.6) +
   # Plot points on top
-  geom_point(size = 2) +
+  geom_point(size = 2.5) +
     # Add correlation coeff
-  ggpubr::stat_cor(data = subset(vf.metab, model == "GPP"),
-                   method = "pearson", #label.x = c(10), 
-                   aes(label = paste(..rr.label.., ..p.label.., 
-                                     sep = "*`,`~"))) +
+  ggpubr::stat_cor(data = subset(uptake.metab.long, model == "ER"),
+                   method = "pearson", #label.x = c(5), 
+                   #label.y = c(-300, -600, -100, -250, 850, 750), size = 3,
+                   aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
   scale_color_manual(values = c("During" = "black", "After" = "green", 
@@ -1469,9 +1517,9 @@ a <-
                                 "S3" = "#F2AD00"),
                      limits = c("S1", "S2", "S3")) +
   # Axis labels
-  scale_x_continuous(limits = c(-3, 17)) +
-  xlab(bquote("GPP (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression(V[f] ~ "(mm" ~~ min^{-1}* ")")) +
+  scale_x_continuous(limits = c(-2, 25)) +
+  xlab(bquote("|ER| (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression("U (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
   labs(tag = "a") +
   # Plot theme
   theme_classic() +
@@ -1519,7 +1567,7 @@ b <-
         axis.text = element_text(color = "black"))
 
 grob <- grid.arrange(a,b, ncol = 2)
-ggsave("./Plots/Vf_GPP.png", grob, height = 6, width = 5.75,  units = "in")
+ggsave("./Plots/ER_U_Vf.png", grob, height = 6, width = 5.75,  units = "in")
 ```
 
 ```{r Fig 7: Meta-analysis}
