@@ -38,7 +38,7 @@ sum(sensor_eric$flagtype %in% c("Bad Data"))/nrow(sensor_eric)*100 +
   sum(sensor_steve$flagtype %in% c("Bad Data"))/nrow(sensor_steve)*100 +
   sum(sensor_desoto$flagtype %in% c("Bad Data"))/nrow(sensor_desoto)*100
 # summarize sensor data: take daily averages & merge w/ metabolism
-dailyavg <- function(sensor_data){
+dailyavg <- function(sensor_data, avgs){
   # if sensor data has a "bad data" flag, set value to NA
   sensor_data$value[sensor_data$flagtype %in% c("Bad Data")] <- NA
   # reshape sensor data from long format to wide format
@@ -48,14 +48,16 @@ dailyavg <- function(sensor_data){
   # change time zone from UTC to central
   sensor_data$dateTime <- lubridate::with_tz(sensor_data$DateTime_UTC, 
                                              tzone = "America/Chicago")
-  # sort data file and find daily averages
-  sensor_data <- sensor_data %>%
-    dplyr::group_by(date = lubridate::date(dateTime)) %>% 
-    dplyr::summarise(Nitrate_mgL = mean(Nitrate_mgL, na.rm = TRUE),
-                     Discharge_m3s = mean(Discharge_m3s, na.rm = TRUE),
-                     DO_mgL = mean(DO_mgL, na.rm = TRUE),
-                     Light_PAR = mean(Light_PAR, na.rm = TRUE),
-                     WaterTemp_C = mean(WaterTemp_C, na.rm = TRUE))
+  if (avgs) {
+    # sort data file and find daily averages
+    sensor_data <- sensor_data %>%
+      dplyr::group_by(date = lubridate::date(dateTime)) %>% 
+      dplyr::summarise(Nitrate_mgL = mean(Nitrate_mgL, na.rm = TRUE),
+                       Discharge_m3s = mean(Discharge_m3s, na.rm = TRUE),
+                       DO_mgL = mean(DO_mgL, na.rm = TRUE),
+                       Light_PAR = mean(Light_PAR, na.rm = TRUE),
+                       WaterTemp_C = mean(WaterTemp_C, na.rm = TRUE))
+  }
   # Factorize release status
   sensor_data$ReleaseStatus <- NA
   sensor_data$ReleaseStatus[sensor_data$date < ymd("2018-04-01")] <- "During"
@@ -64,9 +66,16 @@ dailyavg <- function(sensor_data){
                                       levels = c("During", "After"))
   return(sensor_data)
 }
-sensor_eric <- dailyavg(sensor_eric)
-sensor_steve <- dailyavg(sensor_steve)
-sensor_desoto <- dailyavg(sensor_desoto)
+
+diel_eric <- dailyavg(sensor_eric, avgs = FALSE)
+diel_steve <- dailyavg(sensor_steve, avgs = FALSE)
+diel_desoto <- dailyavg(sensor_desoto, avgs = FALSE)
+
+sensor_eric <- dailyavg(sensor_eric, avgs = TRUE)
+sensor_steve <- dailyavg(sensor_steve, avgs = TRUE)
+sensor_desoto <- dailyavg(sensor_desoto, avgs = TRUE)
+
+
 
 # Mass balance data ----------------------------------------------------------
 massbal <- readRDS("./Outputs/NMassBalance.rds")
@@ -719,42 +728,6 @@ ggmap(googmap)
 ```
 
 ```{r Fig 2. N concentration}
-# N load plot
-ggplot(data = massbal, aes(x = date)) +
-  # Upstream (Bowersock)
-  geom_line(aes(y = NitrateLoad.bowersock_gNday/1000, color = "S0")) +
-  geom_point(aes(y = NitrateLoad.bowersock_gNday/1000, color = "S0")) +
-  # Bowersock: BDL designation
-  geom_point(data = massbal[massbal$Nitrate.bowersock_mgNL <= 0.1,],
-             aes(y = NitrateLoad.bowersock_gNday/1000), shape = 21, fill = "white") +
-  # Discharge (Eric)
-  geom_line(aes(y = NitrateLoad.eric_gNday/1000, color = "S1")) +
-  geom_point(aes(y = NitrateLoad.eric_gNday/1000, color = "S1")) +
-  # Downstream (Steve)
-  geom_line(aes(y = NitrateLoad.steve_gNday/1000, color = "S2")) +
-  geom_point(aes(y = NitrateLoad.steve_gNday/1000, color = "S2")) +
-  # Desoto
-  geom_line(aes(y = NitrateLoad.desoto_gNday/1000, color = "S3")) +
-  geom_point(aes(y = NitrateLoad.desoto_gNday/1000, color = "S3")) +
-  # Vertical line at 1-Apr-18
-  geom_vline(aes(xintercept = as_date("2018-04-01")), linetype = 2) +
-  # axis and color scales
-  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
-               date_breaks = "2 weeks", date_labels = "%b %e" ) + 
-  scale_y_log10()+
-  scale_color_manual(values = c("S0" = "#000000", "S1" = "#FF0000", 
-                                 "S2" = "#23baaf", "S3" = "#F2AD00"),
-                     breaks = c("S0", "S1", "S2", "S3")) +
-  scale_shape_manual(values = 21) +
-  # axis labels
-  xlab(NULL) + 
-  ylab(expression(NO[3]^{"-"}-N ~~ "Load  (kg" ~~ day^{-1} * ")"))+
-  # plot theme
-  theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA),
-        legend.position = "none", legend.title = element_blank())
-ggsave("./Plots/NitrateLoad_time.png", height = 4, width = 6, units = "in")
-
 # N concentration plot
 a <- 
   ggplot(data = massbal, aes(x = date)) +
@@ -808,29 +781,165 @@ b <-
   theme(panel.border = element_rect(color = "black", fill = NA),
         legend.position = "none", legend.title = element_blank(), 
         axis.text = element_text(color = "black"))
-ggsave("./Plots/T.Q_time.png",b,height = 1.75, width = 4.8)
+ggsave("./Plots/T.Q_time.png", b,height = 1.75, width = 4.8)
 
 # Arrange plots
 lay <- rbind(c(1),
              c(1),
              c(2))
-gridExtra::grid.arrange(a, b, layout_matrix = lay)
+grob1 <- gridExtra::grid.arrange(a, b, layout_matrix = lay)
 
-# Average temperature
-mean(sensor_desoto$WaterTemp_C, na.rm = TRUE)
-sd(sensor_desoto$WaterTemp_C, na.rm = TRUE)
-min(sensor_desoto$WaterTemp_C, na.rm = TRUE)
-max(sensor_desoto$WaterTemp_C, na.rm = TRUE)
-# Average discharge
-mean(sensor_desoto$Discharge_m3s, na.rm = TRUE)
-sd(sensor_desoto$Discharge_m3s, na.rm = TRUE)
-# Average nitrate
-mean(massbal$Nitrate.eric_mgNL[massbal$date < ymd("2018-04-01")], na.rm = TRUE) # during
-mean(massbal$Nitrate.eric_mgNL[massbal$date >= ymd("2018-04-01")], na.rm = TRUE) # post
-mean(massbal$Nitrate.steve_mgNL[massbal$date < ymd("2018-04-01")], na.rm = TRUE) # during
-mean(massbal$Nitrate.steve_mgNL[massbal$date >= ymd("2018-04-01")], na.rm = TRUE) # post
-mean(massbal$Nitrate.desoto_mgNL[massbal$date < ymd("2018-04-01")], na.rm = TRUE) # during
-mean(massbal$Nitrate.desoto_mgNL[massbal$date >= ymd("2018-04-01")], na.rm = TRUE) # post
+# Diel zoom-in 
+c <- 
+  ggplot(data = diel_eric, aes(x = dateTime)) +
+  # Add grey bars for local nighttime
+  geom_rect(aes(xmin = ymd_hms("2018-03-23 00:00:00"),
+                xmax = ymd_hms("2018-03-23 06:00:00"),
+                ymin = 0, ymax = 11), fill = "grey") +
+  geom_rect(aes(xmin = ymd_hms("2018-03-23 20:00:00"),
+                xmax = ymd_hms("2018-03-24 06:00:00"),
+                ymin = 0, ymax = 11), fill = "grey") +
+  geom_rect(aes(xmin = ymd_hms("2018-03-24 20:00:00"),
+                xmax = ymd_hms("2018-03-25 06:00:00"),
+                ymin = 0, ymax = 11), fill = "grey") +
+  geom_rect(aes(xmin = ymd_hms("2018-03-25 20:00:00"),
+                xmax = ymd_hms("2018-03-26 00:00:00"),
+                ymin = 0, ymax = 11), fill = "grey") +
+  # Plot S1 data on top
+  geom_point(aes(y = Nitrate_mgL, fill = "S1"), size = 1.2, shape = 21) +
+  
+  # axis and color scales
+  scale_x_datetime(limits = c(ymd_hms("2018-03-23 00:00:00"), 
+                              ymd_hms("2018-03-26 00:00:00")),
+               date_breaks = "1 day", date_labels = "%b %e" ) + 
+  scale_y_continuous(limits = c(0, 11))+
+  scale_fill_manual(values = c("S0" = "#000000", "S1" = "#FF0000", 
+                                 "S2" = "#23baaf", "S3" = "#F2AD00"),
+                     breaks = c("S0", "S1", "S2", "S3")) +
+  # axis labels
+  labs(tag = "c") +
+  xlab(NULL) + 
+  ylab(expression(NO[3]^{"-"} ~~ "(mg-N" ~~ L^{-1} * ")"))+
+  # plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"),
+        text = element_text(size = 8))
+d <- 
+  ggplot(data = diel_steve, aes(x = dateTime)) +
+    # Add grey bars for local nighttime
+  geom_rect(aes(xmin = ymd_hms("2018-03-28 00:00:00"),
+                xmax = ymd_hms("2018-03-28 06:00:00"),
+                ymin = 0, ymax = 0.6), fill = "grey") +
+  geom_rect(aes(xmin = ymd_hms("2018-03-28 20:00:00"),
+                xmax = ymd_hms("2018-03-29 06:00:00"),
+                ymin = 0, ymax = 0.6), fill = "grey") +
+  geom_rect(aes(xmin = ymd_hms("2018-03-29 20:00:00"),
+                xmax = ymd_hms("2018-03-30 06:00:00"),
+                ymin = 0, ymax = 0.6), fill = "grey") +
+  geom_rect(aes(xmin = ymd_hms("2018-03-30 20:00:00"),
+                xmax = ymd_hms("2018-03-31 00:00:00"),
+                ymin = 0, ymax = 0.6), fill = "grey") +
+  # S2
+  geom_point(aes(y = Nitrate_mgL, fill = "S2"), size = 1.2, shape = 21) +
+  # axis and color scales
+  scale_x_datetime(limits = c(ymd_hms("2018-03-28 00:00:00"), 
+                              ymd_hms("2018-03-31 00:00:00")),
+               date_breaks = "1 days", date_labels = "%b %e" ) + 
+  #scale_y_log10()+
+  scale_fill_manual(values = c("S0" = "#000000", "S1" = "#FF0000", 
+                                 "S2" = "#23baaf", "S3" = "#F2AD00"),
+                     breaks = c("S0", "S1", "S2", "S3")) +
+  scale_y_continuous(limits = c(0, 0.6)) +
+  # axis labels
+  labs(tag = "d") +
+  xlab(NULL) + 
+  ylab(expression(NO[3]^{"-"} ~~ "(mg-N" ~~ L^{-1} * ")"))+
+  # plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"),
+        text = element_text(size = 8))
+e <- 
+  ggplot(data = diel_desoto, aes(x = dateTime)) +
+  # Add grey bars for local nighttime
+  geom_rect(aes(xmin = ymd_hms("2018-03-24 00:00:00"),
+                xmax = ymd_hms("2018-03-24 06:00:00"),
+                ymin = 0, ymax = 0.75), fill = "grey") +
+  geom_rect(aes(xmin = ymd_hms("2018-03-24 20:00:00"),
+                xmax = ymd_hms("2018-03-25 06:00:00"),
+                ymin = 0, ymax = 0.75), fill = "grey") +
+  geom_rect(aes(xmin = ymd_hms("2018-03-25 20:00:00"),
+                xmax = ymd_hms("2018-03-26 06:00:00"),
+                ymin = 0, ymax = 0.75), fill = "grey") +
+  geom_rect(aes(xmin = ymd_hms("2018-03-26 20:00:00"),
+                xmax = ymd_hms("2018-03-27 00:00:00"),
+                ymin = 0, ymax = 0.75), fill = "grey") +
+  # S3
+  geom_point(aes(y = Nitrate_mgL, fill = "S3"), size = 1.2, shape = 21) +
+  # axis and color scales
+  scale_x_datetime(limits = c(ymd_hms("2018-03-24 00:00:00"), 
+                              ymd_hms("2018-03-27 00:00:00")),
+               date_breaks = "1 days", date_labels = "%b %e" ) + 
+  scale_y_continuous(limits = c(0, 0.75)) +
+  scale_fill_manual(values = c("S0" = "#000000", "S1" = "#FF0000", 
+                                 "S2" = "#23baaf", "S3" = "#F2AD00"),
+                     breaks = c("S0", "S1", "S2", "S3")) +
+  # axis labels
+  labs(tag = "e") +
+  xlab(NULL) + 
+  ylab(expression(NO[3]^{"-"} ~~ "(mg-N" ~~ L^{-1} * ")"))+
+  # plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"),
+        text = element_text(size = 8))
+
+grob2 <- gridExtra::grid.arrange(c, d, e, ncol = 1)
+gridExtra::grid.arrange(grob1, grob2, ncol = 2)
+
+ggsave("./Plots/DielN.png", grob2, height = 3.95, width = 2)
+
+### Depreciated ###
+
+# N load plot
+ggplot(data = massbal, aes(x = date)) +
+  # Upstream (Bowersock)
+  geom_line(aes(y = NitrateLoad.bowersock_gNday/1000, color = "S0")) +
+  geom_point(aes(y = NitrateLoad.bowersock_gNday/1000, color = "S0")) +
+  # Bowersock: BDL designation
+  geom_point(data = massbal[massbal$Nitrate.bowersock_mgNL <= 0.1,],
+             aes(y = NitrateLoad.bowersock_gNday/1000), shape = 21, fill = "white") +
+  # Discharge (Eric)
+  geom_line(aes(y = NitrateLoad.eric_gNday/1000, color = "S1")) +
+  geom_point(aes(y = NitrateLoad.eric_gNday/1000, color = "S1")) +
+  # Downstream (Steve)
+  geom_line(aes(y = NitrateLoad.steve_gNday/1000, color = "S2")) +
+  geom_point(aes(y = NitrateLoad.steve_gNday/1000, color = "S2")) +
+  # Desoto
+  geom_line(aes(y = NitrateLoad.desoto_gNday/1000, color = "S3")) +
+  geom_point(aes(y = NitrateLoad.desoto_gNday/1000, color = "S3")) +
+  # Vertical line at 1-Apr-18
+  geom_vline(aes(xintercept = as_date("2018-04-01")), linetype = 2) +
+  # axis and color scales
+  scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
+               date_breaks = "2 weeks", date_labels = "%b %e" ) + 
+  scale_y_log10()+
+  scale_color_manual(values = c("S0" = "#000000", "S1" = "#FF0000", 
+                                 "S2" = "#23baaf", "S3" = "#F2AD00"),
+                     breaks = c("S0", "S1", "S2", "S3")) +
+  scale_shape_manual(values = 21) +
+  # axis labels
+  xlab(NULL) + 
+  ylab(expression(NO[3]^{"-"}-N ~~ "Load  (kg" ~~ day^{-1} * ")"))+
+  # plot theme
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none", legend.title = element_blank())
+ggsave("./Plots/NitrateLoad_time.png", height = 4, width = 6, units = "in")
 
 # N supply plot
 ggplot(data = massbal, aes(x = date)) +
@@ -1315,10 +1424,10 @@ a <-
               method = "lm", fullrange = F, aes(color = site), 
               fill = "lightgrey", alpha = 0.6) +
   # Plot points on top
-  geom_point(size = 2.5) +
+  geom_point(size = 2) +
   # Add correlation coeff
-  ggpubr::stat_cor(method = "pearson", label.y.npc = "top", label.x = 0,
-                   aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
+  #ggpubr::stat_cor(method = "pearson", label.y.npc = "top", label.x = 0,
+  #                 aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
   scale_color_manual(values = c("During" = "black", "After" = "green", 
@@ -1362,10 +1471,10 @@ b <-
   # Plot points on top
   geom_point(size = 2) +
     # Add correlation coeff
-  ggpubr::stat_cor(data = subset(vf.metab, model == "GPP"),
-                   method = "pearson", #label.x = c(10), 
-                   aes(label = paste(..rr.label.., ..p.label.., 
-                                     sep = "*`,`~"))) +
+  #ggpubr::stat_cor(data = subset(vf.metab, model == "GPP"),
+  #                 method = "pearson", #label.x = c(10), 
+  #                 aes(label = paste(..rr.label.., ..p.label.., 
+  #                                   sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
   scale_color_manual(values = c("During" = "black", "After" = "green", 
@@ -1386,8 +1495,52 @@ b <-
         axis.text = element_text(color = "black"))
 
 grob <- grid.arrange(a,b, ncol = 2)
-ggsave("./Plots/GPP_U_Vf.png", grob, height = 6, width = 5.75, 
+ggsave("./Plots/GPP_U_Vf.png", grob, height = 5.5, width = 5, 
        units = "in")
+
+
+#######################################
+# Combined GPP vs U plot
+
+#a <- 
+  ggplot(subset(uptake.metab.long, model == "GPP"), 
+       aes(x = value, y = UaNO3_gNm2day, fill = ReleaseStatus, color = site,
+           shape = site)) +
+  #facet_grid(site~., scales = "free", switch = "y") +
+  # Linear model for During release
+  # LM for S1, after, GPP
+  geom_smooth(data = subset(uptake.metab.long, 
+                            model == "GPP" & 
+                            ReleaseStatus == "After" & 
+                            site == "S1"),
+              method = "lm", fullrange = F, aes(color = site), 
+              fill = "lightgrey", alpha = 0.6) +
+  # LM for S2, after, GPP
+  geom_smooth(data = subset(uptake.metab.long, 
+                            model == "GPP" & 
+                            ReleaseStatus == "After" & 
+                            site == "S2"),
+              method = "lm", fullrange = F, aes(color = site), 
+              fill = "lightgrey", alpha = 0.6) +
+  # Plot points on top
+  geom_point(size = 2.5) +
+  # Add correlation coeff
+  #ggpubr::stat_cor(method = "pearson", label.y.npc = "top", label.x = 0,
+  #                 aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
+  # Color scales
+  scale_shape_manual(values = c("S1" = 22, "S2" = 24, "S3" = 21)) +
+  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00")) +
+  scale_fill_manual(values = c("During" = "white", "After" = "black")) +
+  # Axis labels
+  xlab(bquote("GPP (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  ylab(expression("U (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  labs(tag = "a") +
+  # Plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"))
 
 
 
@@ -1494,7 +1647,7 @@ ggsave("./Plots/Diel_GPP.png", grob2, height = 6.5, width = 6.5, units = "in")
 
 ```
 
-```{r Fig 6. ER vs U & ER vs Vf}
+```{r Supplemental. ER vs U & ER vs Vf}
 # ER vs U
 a <- 
   ggplot(subset(uptake.metab.long, model == "ER"), 
@@ -1756,111 +1909,6 @@ ggplot() +
 
 ```
 
-```{r Nitrate load vs uptake}
-# Fig 5 nitrate load vs nitrate uptake scatterplot
-ggplot(subset(uptake.metab.mass.long, site == "S2" | site ==  "S3"), 
-       aes(x = NitrateSupply_gNm2day, y = UaNO3_gNm2day)) +
-  facet_grid(site~., scales = "free", switch = "y") +
-  geom_point(alpha = 0.4, shape = 16) +
-  #scale_x_log10() +
-  #scale_y_log10() +
-  geom_smooth(fullrange = FALSE) +
-  # Add correlation coeff
-  ggpubr::stat_cor(color = "black", method = "spearman") +
-  # Color scales
-  #scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-   #                             "S3" = "#F2AD00"),
-    #                 limits = c("S1", "S2", "S3")) +
-  # Axis labels
-  xlab(expression(NO[3]^{"-"} ~~ "Supply  (g-N" ~~ m^{-2} ~ day^{-1} * ")")) + 
-  ylab(expression(Ua-NO[3]^{"-"} ~~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-
-
-ggplot(uptake.metab.mass.long, aes(x = factor(month(Date, label = TRUE, abbr = TRUE)), 
-                                   y = NitrateSupply_gNm2day/UaNO3_gNm2day,
-                                   color = site)) +
-  facet_grid(~site) +
-  # Add line at median of data
-  stat_boxplot(geom = "errorbar", width = 0.5, 
-               position = position_dodge(width = 0.75)) +
-  # Add data points
-  geom_jitter(width = 0.2, alpha = 0.4, shape = 16) +
-  stat_summary(fun.y = mean, fun.ymin = mean, fun.ymax = mean, size = 1.5, 
-               shape = 21, fill = "white") +
-  # Add text for significance
-  ggpubr::stat_compare_means(#label = "p.signif", 
-                             aes(group = factor(month(Date, label = TRUE, 
-                                                      abbr = TRUE)))) +
-  # Color scales
-  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-                                "S3" = "#F2AD00"),
-                     limits = c("S1", "S2", "S3")) +
-  # Axis labels
-  xlab(NULL) + 
-  ylab("Supply : Uptake") +
-  # Plot theme
-  theme_classic() +
-  scale_y_log10() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-ggsave("./Plots/supplydemand.png", height = 5, width = 4.5, units = "in")
-
-# Supply:demand
-ggplot(uptake.metab.mass.long, aes(x = ReleaseStatus, 
-                                   y = NitrateSupply_gNm2day/UaNO3_gNm2day,
-                                   color = site)) +
-  facet_grid(~site) +
-  # Add line at median of data
-  #stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, 
-   #            geom = "crossbar", width = 0.6) +
-  
-  # Add data points
-  #geom_jitter(width = 0.2, alpha = 0.4, shape = 16) +
-  # Add text for significance
-  ggpubr::stat_compare_means(aes(group = ReleaseStatus)) +
-  # Color scales
-  scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-                                "S3" = "#F2AD00"),
-                     limits = c("S1", "S2", "S3")) +
-  # Axis labels
-  xlab("Release status") + 
-  ylab(expression("N supply :" ~ Ua-NO[3]^{"-"})) +
-  # Plot theme
-  theme_classic() +
-  scale_y_log10() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-
-# Broken up by week
-ggplot(uptake.metab.mass.long, aes(x = factor(round_date(Date, unit = period(day = 21))), 
-                                   y = NitrateSupply_gNm2day/UaNO3_gNm2day,
-                                   color = ReleaseStatus)) +
-  facet_grid(~site) +
-  # Add line at median of data
-  #stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, 
-   #            geom = "crossbar", width = 1) +
-  
-  geom_boxplot(outlier.shape = NA) +
-  # Add data points
-  geom_point(alpha = 0.4, shape = 16) +
-  # Add text for significance
-  #ggpubr::stat_compare_means(aes(group = round_date(Date, unit = "2 weeks"))) +
-  # Color scales
- # scale_color_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-  #                              "S3" = "#F2AD00"),
-   #                  limits = c("S1", "S2", "S3")) +
-  scale_y_log10()
-
-round_date(uptake.metab.mass.long$Date, unit = period(week = 2))
-```
-
 ```{r supplemental}
 # Plotting gpp vs water temp to see if gpp vs ua relationships are temp dependent
 # eric
@@ -1955,43 +2003,4 @@ ggplot(data = sensor_desoto, aes(x = ER.desoto, y = WaterTemp_C)) +
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"))
 
-```
-
-```{r supply}
-Uptake_Eqn1 <- 
-  Uptake_Eqn1 %>% 
-  mutate(Month = factor(month(Date, label = TRUE, abbr = TRUE)),
-         WeekGroup = factor(round_date(Date, period(week = 3))))
-
-
-ggplot(data = Uptake_Eqn1, aes(x = Month, 
-                                          y = PercRemoval.Desoto)) +
-  #facet_wrap(~site, nrow = 1) +
-  # Error bars
-  stat_boxplot(geom = "errorbar", width = 0.5, 
-               position = position_dodge(width = 0.75)) +
-  # Add text for significance
-  ggpubr::stat_compare_means(aes(group = Month), label = "p.format", 
-                             label.y.npc = "bottom") +
-  # Boxplots
-  geom_boxplot(outlier.shape = NA) +
-  # Jitter points
-  geom_point(position = position_jitter(), 
-             shape = 1, size = 2) +
-  #scale_y_log10() +
-  # Color scales
-  #scale_fill_manual(values = c("S1" = "#FF0000", "S1_scaled" = "#FF0000",
-   #                            "S2" = "#23baaf", 
-    #                           "S3" = "#F2AD00"),
-     #                limits = c("S1", "S1_scaled", "S2", "S3")) +
-  # axis labels
-  labs(tag = "A") +
-  #scale_y_continuous(limits = c(0,100)) +
-  xlab(NULL) + 
-  ylab("Percent removal, uptake/supply") +
-  # plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
 ```
