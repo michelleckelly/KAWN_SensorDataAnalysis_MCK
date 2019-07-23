@@ -5,6 +5,11 @@ editor_options:
   chunk_output_type: console
 ---
 
+Written by: Michelle Catherine Kelly
+License: 
+
+This code is 
+
 ```{r Setup}
 library(lubridate)
 library(ggplot2)
