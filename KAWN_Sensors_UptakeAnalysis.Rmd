@@ -1,11 +1,14 @@
 ---
-title: 'KAWN: Parameters vs Energetics'
+title: "Nitrate Uptake Analysis"
 author: "Michelle Catherine Kelly"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: html_document
+output: html_notebook
 editor_options: 
   chunk_output_type: console
 ---
+
+Copyright (c) 2019 Michelle Catherine Kelly  
+
+License: MIT License  
 
 ```{r setup}
 library(lubridate)

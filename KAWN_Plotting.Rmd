@@ -1,14 +1,14 @@
 ---
-title: "Kaw N plotting"
+title: "Figure File"
+author: "Michelle Catherine Kelly"
 output: html_notebook
 editor_options: 
   chunk_output_type: console
 ---
 
-Written by: Michelle Catherine Kelly
-License: 
+Copyright (c) 2019 Michelle Catherine Kelly  
 
-This code is 
+License: MIT License  
 
 ```{r Setup}
 library(lubridate)

@@ -1,13 +1,14 @@
 ---
-title: 'KAWN: Data loading and cleaning'
+title: "Data Load and Cleanup"
 author: "Michelle Catherine Kelly"
-date: "3 June 2018"
-output:
-  html_document: 
-    fig_caption: yes
+output: html_notebook
 editor_options: 
   chunk_output_type: console
 ---
+
+Copyright (c) 2019 Michelle Catherine Kelly  
+
+License: MIT License  
 
 ```{r setup, echo = FALSE, warning=FALSE, error=FALSE, message=FALSE}
 knitr::opts_chunk$set(cache=TRUE)
