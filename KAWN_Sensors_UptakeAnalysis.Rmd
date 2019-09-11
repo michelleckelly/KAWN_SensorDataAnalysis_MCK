@@ -98,7 +98,7 @@ HC_Eqn1 <- function(prepped_df){
   prepped_df <- 
     prepped_df %>%
     dplyr::group_by(DateTime_CST = lubridate::round_date(DateTime_CST, 
-                                                         unit = "3 hours")) %>%
+                                                         unit = "2 hours")) %>%
     dplyr::summarise(t = lubridate::hour(unique(DateTime_CST)),
                      Mean.Discharge_m3s = mean(Discharge_m3s, na.rm = TRUE),
                      Mean.Nitrate_mgL = mean(Nitrate_mgL, na.rm = TRUE))

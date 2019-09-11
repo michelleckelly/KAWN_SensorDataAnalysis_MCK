@@ -490,6 +490,7 @@ stoich.desoto <-
          Uhet_gNm2day = HR / CNscale,
          U_gNm2day = Uaut_gNm2day + Uhet_gNm2day)
 
+
 # Save to RData and CSV
 saveRDS(stoich.eric, file = "./Outputs/StoichUptake_Eric.RData")
 write.csv(stoich.eric, file ="./Outputs/StoichUptake_Eric.CSV", row.names = F)
