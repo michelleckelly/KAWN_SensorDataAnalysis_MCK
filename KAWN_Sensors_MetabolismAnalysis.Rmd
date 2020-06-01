@@ -1,8 +1,10 @@
 ---
 title: "Metabolism Modeling"
 author: "Michelle Catherine Kelly"
-output: html_notebook
-editor_options: 
+output:
+  html_document:
+    df_print: paged
+editor_options:
   chunk_output_type: console
 ---
 
@@ -43,8 +45,6 @@ modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
 # Model stream metabolism from raw data using StreamPULSE database and 
 # streamMetabolizer package
 
-# Unique user token for user michelleckelly, needed to access embargoed data
-user_token <- "a1a704245e5fda8ac9b4" 
 # Define the desired model type for streamMetabolizer
 model_type <-  "bayes"
 # Define the desired modeling framework 
@@ -55,7 +55,7 @@ model_name <-  "streamMetabolizer"
 # Full list of site codes available at: https://data.streampulse.org/sitelist
 site_code.eric <- "KS_KANSASREASTLAWRENCE"
 # Call to API to request data
-eric_data <- request_data(site_code.eric, token = user_token) 
+eric_data <- request_data(site_code.eric) 
 # Format data for modeling
 fitdata.eric <- prep_metabolism(eric_data, type = model_type, 
                                 model = model_name, rm_flagged = "Bad Data", 
@@ -71,7 +71,7 @@ write.csv(modelfit.eric$predictions,
   
 # Steve -------------------------------------------------------
 site_code.steve <- "KS_KANSASRFALLLEAF"
-steve_data <- request_data(site_code.steve, token = user_token) 
+steve_data <- request_data(site_code.steve) 
 fitdata.steve <- prep_metabolism(steve_data, type = model_type, 
                                  model = model_name, rm_flagged = "Bad Data", 
                                  fillgaps = "interpolation",
@@ -83,7 +83,7 @@ write.csv(modelfit.steve$predictions,
   
 # Desoto ------------------------------------------------------
 site_code.desoto <- "KS_KANSASR"
-desoto_data <- request_data(site_code.desoto, token = user_token)
+desoto_data <- request_data(site_code.desoto)
 fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, 
                                   model = model_name, rm_flagged = "Bad Data", 
                                   fillgaps = "interpolation",
@@ -253,6 +253,473 @@ saveRDS(modelfit.steve, file = "./Outputs/MetabResults_Steve.RData")
 write.csv(modelfit.steve$predictions, 
           file = "./Outputs/MetabResults_Steve.csv")
 ```
+
+```{r twoStation}
+########### Load libraries ####################################################
+library(mcmc)
+
+########### 1. Load raw data from StreamPulse #################################
+## Define time range
+start <- "2018-02-01"
+end <- "2018-05-01"
+
+## S1 ("Eric")
+site_code <- "KS_KANSASREASTLAWRENCE"
+S1 <- request_data(site_code, startdate = start, enddate = end)
+## S2 ("Steve")
+site_code <- "KS_KANSASRFALLLEAF"
+S2 <- request_data(site_code, startdate = start, enddate = end)
+## S3 ("Desoto")
+# Load desoto from file instead
+site_code <- "KS_KANSASR"
+S3 <- request_data(site_code, startdate = start, enddate = end)
+
+########### 2. Preprocess data using StreamPULSE functions ####################
+# Format data for modeling
+S1_preproc <- prep_metabolism(S1, rm_flagged = "Bad Data", 
+                                fillgaps = "interpolation",
+                                estimate_areal_depth = TRUE)
+S2_preproc <- prep_metabolism(S2, rm_flagged = "Bad Data", 
+                                fillgaps = "interpolation",
+                                estimate_areal_depth = TRUE)
+
+########## 3. Rename columns to match script format ###########################
+# First actual DO log for S1 is at 2018-02-25 02:55:16
+S1_preproc <- 
+  S1_preproc$data %>%
+  as_tibble() %>%
+  rename(datetime = solar.time, temp = temp.water, oxy = DO.obs) %>%
+  filter(datetime >= ymd_hms("2018-02-25 02:55:16", tz = "UTC") &
+                             datetime < ymd_hms("2018-04-20 14:40:00", tz = "UTC"))
+S2_preproc <- 
+  S2_preproc$data %>%
+  as_tibble() %>%
+  rename(datetime = solar.time, temp = temp.water, oxy = DO.obs) %>%
+  filter(datetime >= ymd_hms("2018-02-25 02:55:16", tz = "UTC") &
+           datetime < ymd_hms("2018-04-20 14:40:00", tz = "UTC"))
+
+# Remove seconds in time, this way datetimes will be equal
+second(S1_preproc$datetime) <- 0
+second(S2_preproc$datetime) <- 0
+# Add column for site
+S1_preproc$`river station` <- "S1"
+S2_preproc$`river station` <- "S2"
+# Merge dataframes
+TS_S1S2 <- full_join(S1_preproc, S2_preproc)
+
+# For identifying time periods with overlapping data
+#ggplot(data = TS_S1S2, aes(x = datetime, y = oxy, color = `river station`)) +
+#  geom_line() +
+#  scale_x_datetime(breaks = "1 week")
+
+# Data availability at both S1 and S2 during times:
+# 2018-02-25 02:55:00 to 2018-03-05 05:40:00
+# 2018-03-12 16:55:00 to 2018-03-28 00:40:00
+# 2018-03-29 00:10:00 to 2018-03-30 10:40:00
+
+# Section data
+TS_S1S2_a <- 
+  TS_S1S2 %>%
+  filter(datetime >= ymd_hms("2018-02-25 02:55:00", tz = "UTC") &
+           datetime <= ymd_hms("2018-03-05 05:40:00", tz = "UTC"))
+TS_S1S2_b <- 
+  TS_S1S2 %>%
+  filter(datetime >= ymd_hms("2018-03-12 16:55:00", tz = "UTC") &
+           datetime <= ymd_hms("2018-03-28 00:40:00", tz = "UTC"))
+TS_S1S2_c <- 
+  TS_S1S2 %>%
+  filter(datetime >= ymd_hms("2018-03-29 00:10:00", tz = "UTC") &
+           datetime <= ymd_hms("2018-03-30 10:40:00", tz = "UTC"))
+
+# Any remaining NA gaps?
+sum(is.na(TS_S1S2_a))
+sum(is.na(TS_S1S2_b))
+sum(is.na(TS_S1S2_c))
+
+############# 4. Estimate Travel time #########################################
+# Travel time = time for a parcel of H2O to travel from S1 to S2
+
+# Variables needed:
+# Mean H2O velocity at S1 (where v = Q/A, see equations in areal.extent chunk) 
+# Mean H2O velocity at S2
+# Distance between S1 and S2 = 5.13 km = 5130 m
+
+# Load in calculated water velocity, area, oxygen turnover
+S1_O2Turn <- readRDS(file = "./Outputs/OxygenTurnover_Eric.RData")
+S2_O2Turn <- readRDS(file = "./Outputs/OxygenTurnover_Steve.RData")
+
+# Filter for dates of interest, join dataframes, at each date compute the mean 
+# of velocity at S1 and S2
+v_S1S2 <- 
+  left_join(S1_O2Turn %>% filter(date >= date("2018-02-25")),
+          S2_O2Turn %>% filter(date >= date("2018-02-25")), 
+          by = "date", suffix = c(".S1", ".S2")) %>%
+  select(date, v_ms.S1, v_ms.S2)
+# Compute the mean v of S1 and S2 on each date
+v_S1S2$v_ms.mean <- apply(v_S1S2[c("v_ms.S1","v_ms.S2")], MARGIN = 1, 
+                          FUN = mean)
+# Compute overall mean velocity at S1 and S2, and the mean of the daily means
+v_S1S2.mean <- v_S1S2 %>% summarise(mean(v_ms.S1), mean(v_ms.S2), 
+                                    mean(v_ms.mean))
+
+# Travel time [s] = distance [m] / velocity [m/s]
+tt_S1S2 <- 5130 / v_S1S2.mean[3]
+# Convert from sec to days
+tt_S1S2[2] <- tt_S1S2/86400
+names(tt_S1S2) <- c("tt_sec", "tt_days")
+
+############# 5. Pull kmean, ksd #########################################
+# This isn't perfect because this K is estimated from the one station 
+# metabolism models. It would be better to have an independent estimate of K
+
+## Pull a better estimate for K using the nighttime regression method
+K_S1S2 <- 
+  left_join(S1_O2Turn %>% filter(date >= date("2018-02-25")),
+          S2_O2Turn %>% filter(date >= date("2018-02-25")), 
+          by = "date", suffix = c(".S1", ".S2")) %>%
+  select(date, K600_daily_50pct.S1, K600_daily_50pct.S2)
+# Compute the mean of S1 and S2 on each date
+K_S1S2$k600.mean <- apply(K_S1S2[c("K600_daily_50pct.S1","K600_daily_50pct.S2")], 
+                       MARGIN = 1, FUN = mean)
+# Compute overall mean at S1 and S2, and the mean of the daily means
+K_S1S2.mean <- K_S1S2 %>% summarise(mean(K600_daily_50pct.S1), 
+                                    mean(K600_daily_50pct.S2), 
+                                    mean(k600.mean), sd(k600.mean))
+
+############# 6. Pull z #########################################
+# This z value has flaws for the same reason as above
+z_S1S2 <- 
+  left_join(S1_O2Turn %>% filter(date >= date("2018-02-25")),
+          S2_O2Turn %>% filter(date >= date("2018-02-25")), 
+          by = "date", suffix = c(".S1", ".S2")) %>%
+  select(date, depth_m.S1, depth_m.S2)
+# Compute the mean of S1 and S2 on each date
+z_S1S2$z.mean <- apply(z_S1S2[c("depth_m.S1","depth_m.S2")], 
+                       MARGIN = 1, FUN = mean)
+# Compute overall mean at S1 and S2, and the mean of the daily means
+z_S1S2.mean <- z_S1S2 %>% summarise(mean(depth_m.S1), 
+                                    mean(depth_m.S2), 
+                                    mean(z.mean))
+
+############## The below script is adapted from Hall et al 2016 ###############
+
+# Load chron package
+library(chron)
+
+# Function to convert time column to chron object
+timeConvert <- function(data){
+  # Mutate time column
+  data <- 
+    data %>%
+    mutate(date = date(datetime), 
+           time = paste(hour(datetime), minute(datetime), second(datetime), 
+                        sep = ":"))
+  # Convert to chron object
+  dtime <- chron(dates = as.character(data$date), 
+               times = as.character(data$time),
+               format = c(dates = "y-m-d", times = "h:m:s"))
+  return(dtime)
+}
+
+TS_S1S2$dtime <- timeConvert(TS_S1S2)
+TS_S1S2_a$dtime <- timeConvert(TS_S1S2_a)
+TS_S1S2_b$dtime <- timeConvert(TS_S1S2_b)
+TS_S1S2_c$dtime <- timeConvert(TS_S1S2_c)
+
+# File format
+# LDO is output from sonde, oxy is calibration correction if necessary. 
+# Light can be in any units that you want iven that the model has a linear 
+# GPP and light reponse
+ # river station    date     time      datetime temp  LDO  oxy light modlight              dtime
+# 1 buffalo     up1 7/21/10 22:00:00 7/21/10 22:00 9.59 8.66 8.66     0        0  	(07/21/10 22:00:00)
+# 2 buffalo     up1 7/21/10 22:05:00 7/21/10 22:05 9.59 8.65 8.65     0        0  	(07/21/10 22:05:00)
+# 3 buffalo     up1 7/21/10 22:10:00 7/21/10 22:10 9.58 8.63 8.63     0        0  	(07/21/10 22:10:00)
+# 4 buffalo     up1 7/21/10 22:15:00 7/21/10 22:15 9.57 8.64 8.64     0        0  	(07/21/10 22:15:00)
+# 5 buffalo     up1 7/21/10 22:20:00 7/21/10 22:20 9.56 8.63 8.63     0        0 	(07/21/10 22:20:00)
+# 6 buffalo     up1 7/21/10 22:25:00 7/21/10 22:25 9.55 8.61 8.61     0        0 	(07/21/10 22:25:00)
+
+# Function to estimate K at temperature 'temp'from K600.  Wanninkhof 1992.
+Kcor <- function (temp, K600) {
+	K600 / (600/(1800.6-(temp*120.1)+(3.7818*temp^2)-(0.047608*temp^3)))^-0.5
+}
+
+########### twostationpostsum FUNCTION: Calculate MCMC for data ###############
+# This function prepares the data for any given river, runs the MCMC and 
+# returns posterior distributions
+
+# ARGUMENTS:
+# data          Dataframe name of cleaned raw two station data (ex. "TS_S1S2")
+# upName        Character name of upstream station (ex. "S1")
+# downName      Character name of downstream station (ex. "S2")
+# start         First guess at GPP, ER ranges
+# z           average river depth (??)
+# bp            barometric pressure [units] --- should be unneeded for us as we already have sat o2
+# tt            travel time [units]
+# Kmean   
+# Ksd
+# nbatch
+# scale
+#data <- TS_S1S2
+#upName <- "S1"
+#tt <- as.numeric(tt_S1S2[2])
+
+twostationpostsum <- function(data, upName, downName, start, z, tt, Kmean, Ksd, 
+                              nbatch, scale) {
+  # Add date column
+  data <- data %>% group_by(date = date(datetime))
+  
+  # Initialize empty vectors to store results from modeling
+  date <- vector(length = length(unique(data$date)))
+  GPP <- vector(mode = "numeric", length = length(unique(data$date)))
+  GPP.lower <- vector(mode = "numeric", length = length(unique(data$date)))
+  GPP.upper <- vector(mode = "numeric", length = length(unique(data$date)))
+  ER <- vector(mode = "numeric", length = length(unique(data$date)))
+  ER.lower <- vector(mode = "numeric", length = length(unique(data$date)))
+  ER.upper <- vector(mode = "numeric", length = length(unique(data$date)))
+  K <- vector(mode = "numeric", length = length(unique(data$date)))
+  K.lower <- vector(mode = "numeric", length = length(unique(data$date)))
+  K.upper <- vector(mode = "numeric", length = length(unique(data$date)))
+  s <- vector(mode = "numeric", length = length(unique(data$date)))
+  s.lower <- vector(mode = "numeric", length = length(unique(data$date)))
+  s.upper <- vector(mode = "numeric", length = length(unique(data$date)))
+  accept <- vector(length = length(unique(data$date)))
+  
+  # For loop iterating through each day of data
+  for (i in 1:length(unique(data$date))){
+    # Subset data to single day of interest (ith date in date string)
+    data <- subset(data, date = unique(data$date)[i])
+    # Seperate data into upstream and downstream sections
+    updata <- data[data$`river station` == upName,]
+    downdata <- data[data$`river station` == downName,]
+    
+    # NOTE: In Hall et al, the number below was 0.00347222, which corresponds to:
+    # 0.00347222 days = 5 minutes, as their O2 sensors took 5-minute readings.
+    # Here, our sensors took 15 minute readings. So:
+    # 15 minutes = 0.0104166667 days
+    # number of 15 min readings bewteen up and down probe corresponding to travel 
+    # time tt
+    lag <- as.numeric(round(tt/0.0104166667))
+    
+    # trim the ends of the oxy and temp data by the lag so that oxydown[1] 
+    # is the value that is the travel time later than oxy up.  The below calls 
+    # are designed to work with our data structure.
+  	tempup <- updata$temp[1:as.numeric(length(updata$temp)-lag)] # trim the end by the lag
+  	oxyup <- updata$oxy[1:as.numeric(length(updata$temp)-lag)]
+  	# define osat 
+  	osat <- updata$DO.sat[1:as.numeric(length(updata$temp)-lag)]
+  	
+  	tempdown <- downdata$temp[(1+lag):length(downdata$temp)]
+  	oxydown <- downdata$oxy[(1+lag):length(downdata$temp)]
+  	
+  	light <- downdata$light
+  	
+  	# perform MCMC
+  	# see documentation on mcmc
+  	met.post <- metrop(tspost, initial = start, nbatch = nbatch, scale = scale, 
+  	                   tempup = tempup, tempdown = tempdown, oxyup = oxyup, 
+  	                   osat = osat,
+  	                   oxydown = oxydown,  z = z, light = light, tt = tt, 
+  	                   Kmean = Kmean, Ksd = Ksd, debug = TRUE)
+    
+  	# Calculate overall estimates for each day
+    gppr <- quantile(met.post$batch[(950:nbatch),1], c(0.025, 0.5, 0.975))
+    err <- quantile(met.post$batch[(950:nbatch),2], c(0.025, 0.5, 0.975))
+    Kr <- quantile(met.post$batch[(950:nbatch),3], c(0.025, 0.5, 0.975))
+    sr <- quantile(met.post$batch[(950:nbatch),4], c(0.025, 0.5, 0.975))
+    
+    # Add results to vectors
+    date[i] <- ymd(unique(data$date)[i])
+    GPP[i] <- gppr[2]
+    GPP.lower[i] <- gppr[1]
+    GPP.upper[i] <- gppr[3]
+    ER[i] <- err[2]
+    ER.lower[i] <- err[1]
+    ER.upper[i] <- err[3]
+    K[i] <- Kr[2]
+    K.lower[i] <- Kr[1]
+    K.upper[i] <- Kr[3]
+    s[i] <- sr[2]
+    s.lower[i] <- sr[1]
+    s.upper[i] <- sr[3]
+    accept[i] <- met.post$accept # log likelihood plus priors, should be about 0.2
+  }
+  
+  predictions <- data.frame(date, GPP, GPP.lower, GPP.upper, ER, ER.lower, 
+                            ER.upper, K, K.lower, K.upper, s, s.lower, s.upper)
+  output <- list(predictions = predictions, accept = accept)
+  
+  return(output)
+}
+
+########### tspost FUNCTION: Calculate posterior probablility of model ########
+# This function calculates the posterior probability of the model given 
+# parameters
+# Called within twostationpostsum
+#
+# ARGUMENTS:
+# MET          Dataframe name of cleaned raw two station data (ex. "TS_S1S2")
+# tempup        Temperature data from upstream station [deg C]
+# tempdown      Temperature data from downstream station [deg C]
+# oxyup         Oxygen data from upstream station [mg-O2/L]
+# oxydown       Oxygen data from downstream station [mg-O2/L]
+# Light         [any light unit]
+# tt            travel time [days]
+# Kmean   
+# Ksd
+
+tspost <- function(MET, tempup, tempdown, oxyup, oxydown, light, tt, z, osat, Kmean, Ksd){
+	# Assign the paramters we solve for to easy to understand values
+	GPP <- MET[1]
+	ER <- MET[2]
+	K <- MET[3]
+	# Always model the log of variance so that one does not get a 
+	# negative standard deviation
+	sigma <- exp(MET[4]) 
+	
+	lag <- as.numeric(round(tt/0.0104166667))
+	
+	metab <- vector(mode = "numeric", length = length(oxyup)) #create empty vector
+
+  # Below is equation 4 in the paper, solving for downstream O2 at at each 5 
+	# min interval. It references other functions:  Kcor converts K600 to KO2 
+	# for a given temperature. 
+  for (i in 1:length(oxyup)){
+    metab[i] <- (oxyup[i] + ((GPP/z)*(sum(light[i:(i+lag)])/sum(light))) + 
+                   ER*tt/z + 
+                   (Kcor(tempup[i],Kmean))*tt*(osat[i] - 
+                                             oxyup[i] + 
+                                             osat[i])/2) / 
+      (1+ Kcor(tempup[i],Kmean)*tt/2) 
+    }
+	
+	# likelhood is below.  dnorm caculates the probablity density of a normal 
+	# distribution, note log.
+	loglik <- sum(dnorm(oxydown, metab, sigma, log=TRUE))
+	
+	# Priors, note wide distributions for GPP and ER
+	prior <- (dnorm(GPP, mean=5, sd=10, log=TRUE)) + 
+	  (dnorm(ER, mean=-5, sd=10, log=TRUE)) + 
+	  (dnorm(K, mean=Kmean, sd=Ksd, log=TRUE))
+	
+	loglik + prior 
+}
+
+########### twosbayesplot FUNCTION: Plot data ########
+## plotting function. Saves data too.
+# ARGUMENTS:
+# data          Dataframe name of cleaned raw two station data (ex. "TS_S1S2")
+# upName        Character name of upstream station (ex. "S1")
+# downName      Character name of downstream station (ex. "S2")
+
+twosbayesplot<-function(GPP, ER, data, Kmean, z, tt, upName, downName) {
+	#number of 5 min readings bewteen up and down probe corresponding 
+  # to travel time tt
+	lag <- as.numeric(round(tt/0.0104166667))
+	
+	# trim the ends of the oxy and temp data by the lag so that oxydown[1] 
+	# is the value that is the travel time later than oxy up. The below 
+	# calls are designed to work with our data structure.
+	
+	# Seperate data into upstream and downstream sections
+  updata <- data[data$`river station` == upName,]
+  downdata <- data[data$`river station` == downName,]
+	
+	tempup <- updata$temp[1:as.numeric(length(updata$temp)-lag)] # trim the end by the lag
+	tempdown <- downdata$temp[(1+lag):length(downdata$temp)]
+	
+	oxyup <- updata$oxy[1:as.numeric(length(updata$temp)-lag)]
+	# define osat 
+	osat <- updata$DO.sat[1:as.numeric(length(updata$temp)-lag)]
+	oxydown <- downdata$oxy[(1+lag):length(downdata$temp)]
+	
+	timeup <- updata$dtime[1:(length(updata$temp)-lag)]
+	timedown <- downdata$dtime[(1+lag):length(downdata$temp)]
+	
+	light <- downdata$light
+  
+	# Initialize an empty vector
+	metab <- numeric(length(oxyup))
+	# Calculate metabolism at each timestep
+	for (i in 1:length(oxyup)) {
+	  metab[i] <- (oxyup[i] + ((GPP/z)*(sum(light[i:(i+lag)]) / sum(light))) +
+	                 ER*tt/z + 
+	                 (Kcor(tempup[i],Kmean))*tt*(osat[i] - 
+	                                               oxyup[i] + 
+	                                           osat[i])/2) / 
+	    (1 + Kcor(tempup[i],Kmean)*tt/2) 
+	}
+	
+	# Plot
+	#plot(timeup,oxyup, col="blue", type="l", xlab="Time", ylab="Dissolved oxygen (mg/L)", 
+	#     cex.lab=1.5, cex.axis=1.5, lwd=3)
+  #points(timedown,oxydown)
+  #points(timedown, metab, col = "red")
+  #text(timedown[85], quantile(oxydown, 0.8), "downstream", col="black")
+  #text(timedown[85], quantile(oxydown, 0.75), "model", col="red")
+  #text(timedown[85], quantile(oxydown, 0.70), "upstream", col="blue")
+
+  oxymodel <- data.frame(timeup, timedown, metab, oxydown, oxyup)
+  return(oxymodel)
+  #write.csv(oxymodel, file ="/Users/bobhall/Rivers/oxymodel.csv")
+}
+
+########### Call 2-station metabolism modeling function #######################
+
+# Full time series
+# Model
+tsout <- twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
+                           data = TS_S1S2, z = as.numeric(z_S1S2.mean[3]), 
+                           tt = 2/86400, 
+                           Kmean = as.numeric(K_S1S2.mean[3]), 
+                           Ksd = as.numeric(K_S1S2.mean[4]), 
+                           upName = "S1", downName = "S2", 
+                           nbatch = 20000, scale = 0.04)
+ # Plot
+twosbayesplot(GPP = tsout$gppr, ER = tsout$err, data = TS_S1S2, 
+              z = as.numeric(z_S1S2.mean[3]), 
+              tt = as.numeric(tt_S1S2[2]), 
+              Kmean = as.numeric(K_S1S2.mean[3]), 
+              upName = "S1", downName = "S2")
+
+###see caveats on using MCMC to solve for 3 parameters above.
+
+# Time block a, 2018-02-25 thru 2018-03-05
+tsout_a <-twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
+                           data = TS_S1S2_a, z = as.numeric(z_S1S2.mean[3]), 
+                           tt = 2/86400, 
+                           Kmean = as.numeric(K_S1S2.mean[3]), 
+                           Ksd = as.numeric(K_S1S2.mean[4]), 
+                           upName = "S1", downName = "S2", 
+                           nbatch = 20000, scale = 0.04)
+
+plot(x = tsout_b[[1]]$date, y = tsout_b[[1]]$GPP)
+plot(tsout_a[[2]])
+
+tsout_b <-twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
+                           data = TS_S1S2_b, z = as.numeric(z_S1S2.mean[3]), 
+                           tt = 2/86400, 
+                           Kmean = as.numeric(K_S1S2.mean[3]), 
+                           Ksd = as.numeric(K_S1S2.mean[4]), 
+                           upName = "S1", downName = "S2", 
+                           nbatch = 20000, scale = 0.04)
+
+
+
+# need to figure out how to pull each day's ER estimate out of the model
+oxymodel_a <- twosbayesplot(GPP = tsout_a$gppr, ER = tsout_a$err, data = TS_S1S2_a, 
+              z = as.numeric(z_S1S2.mean[3]), 
+              tt = as.numeric(tt_S1S2[2]), 
+              Kmean = as.numeric(K_S1S2.mean[3]), 
+              upName = "S1", downName = "S2")
+# plot
+ggplot(data = oxymodel_a) +
+  geom_point(aes(x = as.POSIXct(timeup), y = oxyup, col = "Upstream O2")) +
+  geom_point(aes(x = as.POSIXct(timedown), y = oxydown, col = "Downstream O2")) +
+  geom_point(aes(x = as.POSIXct(timedown), y = metab, col = "Modeled O2"))
+
+
+```
+
 
 ```{r depth.check}
 # Check StreamMetabolizer calculated depth against USGS stream gauging data

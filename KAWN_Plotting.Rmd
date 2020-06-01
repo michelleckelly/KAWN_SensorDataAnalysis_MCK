@@ -730,6 +730,8 @@ grob <- grid.arrange(grob, c, ncol = 2)
 # N concentration plot
 a <- 
   ggplot(data = massbal, aes(x = date)) +
+  # Add vertical line at release stop date
+  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # S0
   geom_point(data = massbal[massbal$date < as.Date("2018-02-26"),], 
              aes(x = date, y = Nitrate.bowersock_mgNL, fill = "white"), 
@@ -765,9 +767,13 @@ ggsave("./Plots/Nitrate_time.png", a, height = 77, width = 120,
 
 # Temperature and discharge
 b <- 
+  # Water temperature and discharge from the Desoto site
   ggplot(data = sensor_desoto, aes(x = date)) +
+  # Add vertical line at release stop date
+  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
+  # Add data
   geom_line(aes(y = WaterTemp_C), color = "black") +
-  geom_line(aes(y = Discharge_m3s/2), linetype = 2) +
+  geom_line(aes(y = Discharge_m3s/2), color = "grey") +
   # axis and color scales
   scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
                date_breaks = "2 weeks", date_labels = "%b %e" ) + 
@@ -985,6 +991,8 @@ ggplot(data = massbal, aes(x = date)) +
 # GPP, Eric
 a <- 
   ggplot(data = metab, aes(x = date)) +
+  # Add vertical line at release stop date
+  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # Dots
   geom_ribbon(aes(ymin = GPP.lower.eric, ymax = GPP.upper.eric), fill = "lightgrey") +
   geom_point(aes(y = GPP.eric, fill = "S1"), size = 2, shape = 21) +
@@ -1006,6 +1014,8 @@ a <-
 # GPP, Steve
 b <- 
   ggplot(data = metab, aes(x = date)) +
+  # Add vertical line at release stop date
+  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # Dots
   geom_ribbon(aes(ymin = GPP.lower.steve, ymax = GPP.upper.steve), fill = "lightgrey") +
   geom_point(aes(y = GPP.steve, fill = "S2"), size = 2, shape = 21) +
@@ -1027,6 +1037,8 @@ b <-
 # GPP, DeSoto
 c <- 
   ggplot(data = metab, aes(x = date)) +
+  # Add vertical line at release stop date
+  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # Dots
   geom_ribbon(aes(ymin = GPP.lower.desoto, ymax = GPP.upper.desoto), fill = "lightgrey") +
   geom_point(aes(y = GPP.desoto, fill = "S3"), size = 2, shape = 21) +
@@ -1048,6 +1060,8 @@ c <-
 # ER, eric
 d <- 
   ggplot(data = metab, aes(x = date)) +
+  # Add vertical line at release stop date
+  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # Dots
   geom_ribbon(aes(ymin = ER.lower.eric, ymax = ER.upper.eric), fill = "lightgrey") +
   geom_point(aes(y = ER.eric, fill = "S1"), size = 2, shape = 21) +
@@ -1068,6 +1082,8 @@ d <-
         text = element_text(size = 8))
 e <- 
   ggplot(data = metab, aes(x = date)) +
+  # Add vertical line at release stop date
+  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # Dots
   geom_ribbon(aes(ymin = ER.lower.steve, ymax = ER.upper.steve), fill = "lightgrey") +
   geom_point(aes(y = ER.steve, fill = "S2"), size = 2, shape = 21) +
@@ -1088,6 +1104,8 @@ e <-
         text = element_text(size = 8))
 f <- 
   ggplot(data = metab, aes(x = date)) +
+  # Add vertical line at release stop date
+  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # Dots
   geom_ribbon(aes(ymin = ER.lower.desoto, ymax = ER.upper.desoto), fill = "lightgrey") +
   geom_point(aes(y = ER.desoto, fill = "S3"), size = 2, shape = 21) +
@@ -1129,31 +1147,20 @@ mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER.desoto,
 ```
 
 ```{r Fig 4: Uptake and Vf}
-### Assemble data into a boxplot ##############################################
-#uptake.metab.long <- 
-#  uptake.metab.long %>% 
-#  mutate(Month = factor(month(Date, label = TRUE, abbr = TRUE)),
-#         WeekGroup = factor(round_date(Date, period(week = 3))))
-#str(uptake.metab.long)
-
 # U ############################################################################
-# Broken up by ReleaseStatus
 a <- 
-  ggplot(data = uptake.long, aes(x = Month, 
-                                          y = UaNO3_gNm2day, fill = site)) +
+  ggplot(data = uptake.long, aes(x = Date, y = UaNO3_gNm2day, fill = site)) +
   facet_wrap(~site, nrow = 1) +
-  # Error bars
-  stat_boxplot(geom = "errorbar", width = 0.5, 
-               position = position_dodge(width = 0.75)) +
-  # Add text for significance
-  ggpubr::stat_compare_means(aes(group = Month), label = "p.format", 
-                             label.y.npc = "bottom") +
-  # Boxplots
-  geom_boxplot(outlier.shape = NA) +
-  # Jitter points
-  geom_point(position = position_jitterdodge(dodge.width = 1, 
-                                             jitter.width = 1), 
-             shape = 1, size = 2) +
+  # Add vertical line at release stop date
+  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
+  # Add regression line to S3
+  geom_smooth(data = subset(uptake.long, site == "S3"), method = lm, 
+              color = "black", fill = "grey") +
+  # Add points
+  geom_point(shape = 21) +
+  # Add R2 and p value labels to plot
+  #ggpubr::stat_cor(label.y.npc = 0.2, digits = 2,
+  #                 aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~"))) +
   scale_y_log10() +
   # Color scales
   scale_fill_manual(values = c("S1" = "#FF0000", "S1_scaled" = "#FF0000",
@@ -1175,20 +1182,18 @@ ggsave("./Plots/U_boxplot.png", a, height = 57.5, width = 127, units = "mm",
 
 # Vf ###########################################################################
 b <- 
-  ggplot(data = vf, aes(x = Month, y = vf_mmmin, fill = site)) +
+  ggplot(data = vf, aes(x = Date, y = vf_mmmin, fill = site)) +
   facet_grid(~site) +
-  # Error bars
-  stat_boxplot(geom = "errorbar", width = 0.5, 
-               position = position_dodge(width = 0.75)) +
-  # Box plots
-  geom_boxplot(outlier.shape = NA) +
-  # Jitter points
-  geom_point(position = position_jitterdodge(dodge.width = 1, 
-                                             jitter.width = 1), 
-             shape = 1, size = 2) +
-  # Add text for significance
-  ggpubr::stat_compare_means(aes(group = Month), label = "p.format", 
-                             label.y.npc = "top") +
+  # Add vertical line at release stop date
+  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
+  # Add regression line to S2
+  geom_smooth(data = subset(vf, site == "S2"), method = lm, 
+              color = "black", fill = "grey") +
+  # Add points
+  geom_point(shape = 21) +
+  # Add R2 and p value labels to plot
+  #ggpubr::stat_cor(label.y.npc = 0.9, digits = 2,
+  #                 aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~"))) +
   # Labels
   labs(tag = "b") +
   xlab(NULL) +
@@ -2035,5 +2040,35 @@ ggplot(data = sensor_desoto, aes(x = ER.desoto, y = WaterTemp_C)) +
   theme(legend.position = "none", legend.title = element_blank(),
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"))
+
+```
+
+```{r AddressingReviewerComments_JGRB1}
+## Reviewer 1, 212: Do ER and K covary within a site? If so, bad news for estimating ER. ##
+
+# Load K600 estimates from files
+s1k <- readRDS("./Outputs/MetabResults_Eric.RData")$fit
+s2k <- readRDS("./Outputs/MetabResults_Steve.RData")$fit
+s3k <- readRDS("./Outputs/MetabResults_Desoto.RData")$fit
+
+s1k <- 
+  s1k@fit$daily %>%
+  select(GPP_daily_mean, ER_daily_mean, K600_daily_mean)
+s2k <- 
+  s2k@fit$daily %>%
+  select(GPP_daily_mean, ER_daily_mean, K600_daily_mean)
+s3k <- 
+  s3k@fit$daily %>%
+  select(GPP_daily_mean, ER_daily_mean, K600_daily_mean)
+
+cov(s1k$ER_daily_mean, s1k$K600_daily_mean, use = "complete.obs") # Covariance
+cor(s1k$ER_daily_mean, s1k$K600_daily_mean, use = "complete.obs") # Correlation coeff
+
+cov(s2k$ER_daily_mean, s2k$K600_daily_mean, use = "complete.obs") # Covariance
+cor(s2k$ER_daily_mean, s2k$K600_daily_mean, use = "complete.obs") # Correlation coeff
+
+cov(s3k$ER_daily_mean, s3k$K600_daily_mean, use = "complete.obs") # Covariance
+cor(s3k$ER_daily_mean, s3k$K600_daily_mean, use = "complete.obs") # Correlation coeff
+
 
 ```
