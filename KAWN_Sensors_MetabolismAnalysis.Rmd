@@ -440,30 +440,140 @@ TS_S1S2_c$dtime <- timeConvert(TS_S1S2_c)
 # 5 buffalo     up1 7/21/10 22:20:00 7/21/10 22:20 9.56 8.63 8.63     0        0 	(07/21/10 22:20:00)
 # 6 buffalo     up1 7/21/10 22:25:00 7/21/10 22:25 9.55 8.61 8.61     0        0 	(07/21/10 22:25:00)
 
+############################ Internal Functions ###############################
 # Function to estimate K at temperature 'temp'from K600.  Wanninkhof 1992.
 Kcor <- function (temp, K600) {
 	K600 / (600/(1800.6-(temp*120.1)+(3.7818*temp^2)-(0.047608*temp^3)))^-0.5
 }
 
+########### tspost FUNCTION: Calculate posterior probablility of model ########
+# This function calculates the posterior probability of the model given 
+# parameters
+# Called within twostationpostsum
+#
+# ARGUMENTS:
+# MET          Dataframe name of cleaned raw two station data (ex. "TS_S1S2")
+# tempup        Temperature data from upstream station [deg C]
+# tempdown      Temperature data from downstream station [deg C]
+# oxyup         Oxygen data from upstream station [mg-O2/L]
+# oxydown       Oxygen data from downstream station [mg-O2/L]
+# Light         [any light unit]
+# tt            travel time [days]
+# Kmean   
+# Ksd
+tspost <- function(MET, tempup, tempdown, oxyup, oxydown, light, tt, z, osat, Kmean, Ksd){
+	# Assign the paramters we solve for to easy to understand values
+	GPP <- MET[1]
+	ER <- MET[2]
+	K <- MET[3]
+	# Always model the log of variance so that one does not get a 
+	# negative standard deviation
+	sigma <- exp(MET[4]) 
+	
+	lag <- as.numeric(round(tt/0.0104166667))
+	
+	metab <- vector(mode = "numeric", length = length(oxyup)) #create empty vector
+
+  # Below is equation 4 in the paper, solving for downstream O2 at at each 5 
+	# min interval. It references other functions:  Kcor converts K600 to KO2 
+	# for a given temperature. 
+  for (i in 1:length(oxyup)){
+    metab[i] <- (oxyup[i] + ((GPP/z)*(sum(light[i:(i+lag)])/sum(light))) + 
+                   ER*tt/z + 
+                   (Kcor(tempup[i],Kmean))*tt*(osat[i] - 
+                                             oxyup[i] + 
+                                             osat[i])/2) / 
+      (1+ Kcor(tempup[i],Kmean)*tt/2) 
+    }
+	
+	# likelhood is below.  dnorm caculates the probablity density of a normal 
+	# distribution, note log.
+	loglik <- sum(dnorm(oxydown, metab, sigma, log=TRUE))
+	
+	# Priors, note wide distributions for GPP and ER
+	prior <- (dnorm(GPP, mean=5, sd=10, log=TRUE)) + 
+	  (dnorm(ER, mean=-5, sd=10, log=TRUE)) + 
+	  (dnorm(K, mean=Kmean, sd=Ksd, log=TRUE))
+	
+	loglik + prior 
+}
+
+##### O2TimeSeries FUNCTION: Return modeled oxygen time series from ##########
+###################### median GPP, ER estimates ##############################
+# ARGUMENTS:
+# GPP
+# ER
+# O2data    Dataframe of cleaned raw two station data (ex. "TS_S1S2")
+# Kmean
+# z
+# tt
+# upName        Character name of upstream station (ex. "S1")
+# downName      Character name of downstream station (ex. "S2")
+O2TimeSeries <- function(GPP, ER, O2data, Kmean, z, tt, upName, downName) {
+  # Ungroup O2data
+  O2data <- O2data %>% ungroup()
+  
+	#number of 5 min readings bewteen up and down probe corresponding 
+  # to travel time tt
+	lag <- as.numeric(round(tt/0.0104166667))
+	
+	# trim the ends of the oxy and temp data by the lag so that oxydown[1] 
+	# is the value that is the travel time later than oxy up. The below 
+	# calls are designed to work with our data structure.
+	
+	# Seperate data into upstream and downstream sections
+  updata <- O2data[O2data$`river station` == upName,]
+  downdata <- O2data[O2data$`river station` == downName,]
+	
+	tempup <- updata$temp[1:as.numeric(length(updata$temp)-lag)] # trim the end by the lag
+	tempdown <- downdata$temp[(1+lag):length(downdata$temp)]
+	
+	oxyup <- updata$oxy[1:as.numeric(length(updata$temp)-lag)]
+	# define osat 
+	osat <- updata$DO.sat[1:as.numeric(length(updata$temp)-lag)]
+	oxydown <- downdata$oxy[(1+lag):length(downdata$temp)]
+	
+	timeup <- updata$dtime[1:(length(updata$temp)-lag)]
+	timedown <- downdata$dtime[(1+lag):length(downdata$temp)]
+	
+	light <- downdata$light
+  
+	# Initialize an empty vector
+	modeledO2 <- numeric(length(oxyup))
+	# Calculate metabolism at each timestep
+	for (i in 1:length(oxyup)) {
+	  modeledO2[i] <- (oxyup[i] + ((GPP/z)*(sum(light[i:(i+lag)]) / sum(light))) +
+	                 ER*tt/z + 
+	                 (Kcor(tempup[i],Kmean))*tt*(osat[i] - 
+	                                               oxyup[i] + 
+	                                           osat[i])/2) / 
+	    (1 + Kcor(tempup[i],Kmean)*tt/2) 
+	}
+	
+	# Convert time from chron to posixct
+	timeup <- as.POSIXlt(timeup)
+	timedown <- as.POSIXlt(timedown)
+	
+  oxymodel <- data.frame(timeup, timedown, oxydown, oxyup, modeledO2)
+  return(oxymodel)
+}
+
+
+################# Two station modeling function ###############################
 ########### twostationpostsum FUNCTION: Calculate MCMC for data ###############
 # This function prepares the data for any given river, runs the MCMC and 
 # returns posterior distributions
-
 # ARGUMENTS:
 # data          Dataframe name of cleaned raw two station data (ex. "TS_S1S2")
 # upName        Character name of upstream station (ex. "S1")
 # downName      Character name of downstream station (ex. "S2")
 # start         First guess at GPP, ER ranges
-# z           average river depth (??)
-# bp            barometric pressure [units] --- should be unneeded for us as we already have sat o2
-# tt            travel time [units]
-# Kmean   
-# Ksd
-# nbatch
-# scale
-#data <- TS_S1S2
-#upName <- "S1"
-#tt <- as.numeric(tt_S1S2[2])
+# z             average river depth [m]
+# tt            travel time [days]
+# Kmean         mean K for study period
+# Ksd           standard deviation of K
+# nbatch        number of MCMC trials
+# scale         
 
 twostationpostsum <- function(O2data, upName, downName, start, z, tt, Kmean, Ksd, 
                               nbatch, scale) {
@@ -510,7 +620,7 @@ twostationpostsum <- function(O2data, upName, downName, start, z, tt, Kmean, Ksd
     
     if (length(updata$temp) < lag) {
       # If there is less data during a day than the lag interval, move to next day
-      message("ERROR: model not computed for", dateList[i], "as insufficient observations provided.")
+      message("ERROR: model not computed for ", dateList[i], " as insufficient observations provided.")
       break
     } else{
       # Else continue
@@ -554,224 +664,131 @@ twostationpostsum <- function(O2data, upName, downName, start, z, tt, Kmean, Ksd
       s.upper[i] <- sr[3]
       accept[i] <- met.post$accept # log likelihood plus priors, should be about 0.2
     }
-    #i = i+1
   }
   # Create dataframe of predicted metabolism values
-  pred.metab <- data.frame(dateList, GPP, GPP.lower, GPP.upper, ER, ER.lower, 
+  pred.metab <- data.frame(date = dateList, GPP, GPP.lower, GPP.upper, ER, ER.lower, 
                             ER.upper, K, K.lower, K.upper, s, s.lower, s.upper)
   
-  ### Calculate model-predicted O2 values from median metabolism estimates ########
-  # Initialize empty vectors to store modeled O2 data
-  #modeledO2 <- vector(mode = "numeric", length = length(data))
-  
-  # Seperate the full dataset into upstream and downstream sections
-  #updata <- data[data$`river station` == upName,]
-  #downdata <- data[data$`river station` == downName,]
-  
-  # These should be used in checking the fit of the model (comparing to 
-  # upstream and downstream O2)
-  # Seperate data into upstream and downstream sections
-  #timeup <- updata$dtime[1:as.numeric(length(updata$temp)-lag)]
-  #timedown <- downdata$dtime[(1+lag):as.numeric(length(downdata$temp))]
-  
-  #tempup <- updata$temp[1:as.numeric(length(updata$temp)-lag)]
-  #tempdown <- downdata$temp[(1+lag):length(downdata$temp)]
-  
-  #oxyup <- updata$oxy[1:as.numeric(length(updata$temp)-lag)]
-  #osat <- updata$DO.sat[1:as.numeric(length(updata$temp)-lag)]
-  #oxydown <- downdata$oxy[(1+lag):length(downdata$temp)]
-  
-  #light <- downdata$light
-  
-  # Use 50% quantiles of GPP, ER, K to calculate model predicted O2
-  # We want to pull the GPP, ER, K on the date 
-  #pred.metab$GPP[downdata$date == pred.metab$date]
-  
-  #for (j in 1:length(pred.metab)) {
-    # Iterate for each day of metabolism prediction
-  #  date 
-  #}
-  
-  #pred.metab$GPP[pred.metab$date == ]
-  
-  #for (i in 1:length(oxyup)){
-  #  modeledO2[i] <- (oxyup[i] + ((gppr[2]/z)*(sum(light[i:(i+lag)])/sum(light))) + 
-  #                 err[2]*tt/z + 
-  #                 (Kcor(tempup[i],Kr[2]))*tt*(osat[i] - oxyup[i] + osat[i])/2) / 
-  #    (1+ Kcor(tempup[i],Kr[2])*tt/2) 
-  #}
+  # Call O2TimeSeries function to return modeled O2 values based on median GPP and ER
+  # modeling results
+  oxymodel <- O2TimeSeries(GPP = pred.metab$GPP, ER = pred.metab$ER, 
+                           O2data = O2data, Kmean = Kmean, z = z, tt = tt, 
+                           upName = upName, downName = downName)
   
   # Create output list to return to user
-  output <- list(pred.metab = pred.metab, accept = accept)
+  output <- list(pred.metab = pred.metab, accept = accept, oxymodel = oxymodel)
   
   return(output)
 }
 
-########### tspost FUNCTION: Calculate posterior probablility of model ########
-# This function calculates the posterior probability of the model given 
-# parameters
-# Called within twostationpostsum
-#
-# ARGUMENTS:
-# MET          Dataframe name of cleaned raw two station data (ex. "TS_S1S2")
-# tempup        Temperature data from upstream station [deg C]
-# tempdown      Temperature data from downstream station [deg C]
-# oxyup         Oxygen data from upstream station [mg-O2/L]
-# oxydown       Oxygen data from downstream station [mg-O2/L]
-# Light         [any light unit]
-# tt            travel time [days]
-# Kmean   
-# Ksd
-
-tspost <- function(MET, tempup, tempdown, oxyup, oxydown, light, tt, z, osat, Kmean, Ksd){
-	# Assign the paramters we solve for to easy to understand values
-	GPP <- MET[1]
-	ER <- MET[2]
-	K <- MET[3]
-	# Always model the log of variance so that one does not get a 
-	# negative standard deviation
-	sigma <- exp(MET[4]) 
-	
-	lag <- as.numeric(round(tt/0.0104166667))
-	
-	metab <- vector(mode = "numeric", length = length(oxyup)) #create empty vector
-
-  # Below is equation 4 in the paper, solving for downstream O2 at at each 5 
-	# min interval. It references other functions:  Kcor converts K600 to KO2 
-	# for a given temperature. 
-  for (i in 1:length(oxyup)){
-    metab[i] <- (oxyup[i] + ((GPP/z)*(sum(light[i:(i+lag)])/sum(light))) + 
-                   ER*tt/z + 
-                   (Kcor(tempup[i],Kmean))*tt*(osat[i] - 
-                                             oxyup[i] + 
-                                             osat[i])/2) / 
-      (1+ Kcor(tempup[i],Kmean)*tt/2) 
-    }
-	
-	# likelhood is below.  dnorm caculates the probablity density of a normal 
-	# distribution, note log.
-	loglik <- sum(dnorm(oxydown, metab, sigma, log=TRUE))
-	
-	# Priors, note wide distributions for GPP and ER
-	prior <- (dnorm(GPP, mean=5, sd=10, log=TRUE)) + 
-	  (dnorm(ER, mean=-5, sd=10, log=TRUE)) + 
-	  (dnorm(K, mean=Kmean, sd=Ksd, log=TRUE))
-	
-	loglik + prior 
-}
-
-########### twosbayesplot FUNCTION: Plot data ########
-## plotting function. Saves data too.
-# ARGUMENTS:
-# data          Dataframe name of cleaned raw two station data (ex. "TS_S1S2")
-# upName        Character name of upstream station (ex. "S1")
-# downName      Character name of downstream station (ex. "S2")
-
-twosbayesplot<-function(GPP, ER, data, Kmean, z, tt, upName, downName) {
-	#number of 5 min readings bewteen up and down probe corresponding 
-  # to travel time tt
-	lag <- as.numeric(round(tt/0.0104166667))
-	
-	# trim the ends of the oxy and temp data by the lag so that oxydown[1] 
-	# is the value that is the travel time later than oxy up. The below 
-	# calls are designed to work with our data structure.
-	
-	# Seperate data into upstream and downstream sections
-  updata <- data[data$`river station` == upName,]
-  downdata <- data[data$`river station` == downName,]
-	
-	tempup <- updata$temp[1:as.numeric(length(updata$temp)-lag)] # trim the end by the lag
-	tempdown <- downdata$temp[(1+lag):length(downdata$temp)]
-	
-	oxyup <- updata$oxy[1:as.numeric(length(updata$temp)-lag)]
-	# define osat 
-	osat <- updata$DO.sat[1:as.numeric(length(updata$temp)-lag)]
-	oxydown <- downdata$oxy[(1+lag):length(downdata$temp)]
-	
-	timeup <- updata$dtime[1:(length(updata$temp)-lag)]
-	timedown <- downdata$dtime[(1+lag):length(downdata$temp)]
-	
-	light <- downdata$light
-  
-	# Initialize an empty vector
-	metab <- numeric(length(oxyup))
-	# Calculate metabolism at each timestep
-	for (i in 1:length(oxyup)) {
-	  metab[i] <- (oxyup[i] + ((GPP/z)*(sum(light[i:(i+lag)]) / sum(light))) +
-	                 ER*tt/z + 
-	                 (Kcor(tempup[i],Kmean))*tt*(osat[i] - 
-	                                               oxyup[i] + 
-	                                           osat[i])/2) / 
-	    (1 + Kcor(tempup[i],Kmean)*tt/2) 
-	}
-	
-	# Plot
-	#plot(timeup,oxyup, col="blue", type="l", xlab="Time", ylab="Dissolved oxygen (mg/L)", 
-	#     cex.lab=1.5, cex.axis=1.5, lwd=3)
-  #points(timedown,oxydown)
-  #points(timedown, metab, col = "red")
-  #text(timedown[85], quantile(oxydown, 0.8), "downstream", col="black")
-  #text(timedown[85], quantile(oxydown, 0.75), "model", col="red")
-  #text(timedown[85], quantile(oxydown, 0.70), "upstream", col="blue")
-
-  oxymodel <- data.frame(timeup, timedown, metab, oxydown, oxyup)
-  return(oxymodel)
-  #write.csv(oxymodel, file ="/Users/bobhall/Rivers/oxymodel.csv")
-}
-
-########### Call 2-station metabolism modeling function #######################
-
-# Full time series
-# Model
-tsout <- twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
-                           data = TS_S1S2, z = as.numeric(z_S1S2.mean[3]), 
-                           tt = 2/86400, 
-                           Kmean = as.numeric(K_S1S2.mean[3]), 
-                           Ksd = as.numeric(K_S1S2.mean[4]), 
-                           upName = "S1", downName = "S2", 
-                           nbatch = 20000, scale = 0.04)
- # Plot
-twosbayesplot(GPP = tsout$gppr, ER = tsout$err, data = TS_S1S2, 
-              z = as.numeric(z_S1S2.mean[3]), 
-              tt = as.numeric(tt_S1S2[2]), 
-              Kmean = as.numeric(K_S1S2.mean[3]), 
-              upName = "S1", downName = "S2")
-
-###see caveats on using MCMC to solve for 3 parameters above.
-
+########### Run 2-station metabolism modeling function #######################
 # Time block a, 2018-02-25 thru 2018-03-05
 tsout_a <- twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
-                           O2data = TS_S1S2_a, z = as.numeric(z_S1S2.mean[3]), 
-                           tt = as.numeric(tt_S1S2[3]), 
-                           Kmean = as.numeric(K_S1S2.mean[3]), 
-                           Ksd = as.numeric(K_S1S2.mean[4]), 
-                           upName = "S1", downName = "S2", 
-                           nbatch = 20000, scale = 0.04)
-
-plot(x = tsout_b[[1]]$date, y = tsout_b[[1]]$GPP)
-plot(tsout_a[[2]])
+                             O2data = TS_S1S2_a, 
+                             z = as.numeric(z_S1S2.mean[3]), 
+                             tt = as.numeric(tt_S1S2[3]), 
+                             Kmean = as.numeric(K_S1S2.mean[3]), 
+                             Ksd = as.numeric(K_S1S2.mean[4]), 
+                             upName = "S1", downName = "S2", 
+                             nbatch = 20000, scale = 0.04)
 
 tsout_b <-twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
-                           data = TS_S1S2_b, z = as.numeric(z_S1S2.mean[3]), 
-                           tt = 2/86400, 
-                           Kmean = as.numeric(K_S1S2.mean[3]), 
-                           Ksd = as.numeric(K_S1S2.mean[4]), 
-                           upName = "S1", downName = "S2", 
-                           nbatch = 20000, scale = 0.04)
+                            O2data = TS_S1S2_b, 
+                            z = as.numeric(z_S1S2.mean[3]), 
+                            tt = as.numeric(tt_S1S2[3]), 
+                            Kmean = as.numeric(K_S1S2.mean[3]), 
+                            Ksd = as.numeric(K_S1S2.mean[4]), 
+                            upName = "S1", downName = "S2", 
+                            nbatch = 20000, scale = 0.04)
+
+# Check modeled oxygen
+ggplot(data = tsout_a$oxymodel) +
+  geom_line(aes(x = timeup, y = oxyup, color = "S1")) +
+  geom_line(aes(x = timedown, y = oxydown, color = "S2")) +
+  geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2"))
+# Check modeled GPP and ER
+ggplot(data = tsout_a$pred.metab) +
+  geom_ribbon(aes(x = dateList, ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.5) +
+  geom_line(aes(x = dateList, y = GPP, color = "GPP")) +
+  geom_line(aes(x = dateList, y = -ER, color = "ER")) +
+  geom_ribbon(aes(x = dateList, ymin = -ER.lower, ymax = -ER.upper, fill = "ER"), alpha = 0.5)
+# CIs are really large rn - might go down if iterations are increased
+# Check K
+ggplot(data = tsout_a$pred.metab) +
+  geom_line(aes(x = dateList, y = K, color = "K")) +
+  geom_ribbon(aes(x = dateList, ymin = K.lower, ymax = K.upper, fill = "K"), alpha = 0.5)
 
 
 
-# need to figure out how to pull each day's ER estimate out of the model
-oxymodel_a <- twosbayesplot(GPP = tsout_a$gppr, ER = tsout_a$err, data = TS_S1S2_a, 
-              z = as.numeric(z_S1S2.mean[3]), 
-              tt = as.numeric(tt_S1S2[2]), 
-              Kmean = as.numeric(K_S1S2.mean[3]), 
-              upName = "S1", downName = "S2")
-# plot
-ggplot(data = oxymodel_a) +
-  geom_point(aes(x = as.POSIXct(timeup), y = oxyup, col = "Upstream O2")) +
-  geom_point(aes(x = as.POSIXct(timedown), y = oxydown, col = "Downstream O2")) +
-  geom_point(aes(x = as.POSIXct(timedown), y = metab, col = "Modeled O2"))
+
+
+
+##function for nighttime regression.  Reports K600, units of 1/d.  Make sure you set the times approprately, i.e. just after dark to whenever deltaO2 reaches 0
+
+####
+# Add date column
+o2file <- TS_S1S2_a
+#o2file <- o2file %>% group_by(date = date(datetime))
+# Subset first day of data
+o#2file <- subset(o2file, date == unique(o2file$date)[1])
+####
+ggplot(data = o2file, aes(x = datetime, y = light)) +
+  geom_point()
+
+
+nightStart = "17:45:00"
+nightEnd = "06:45:00"
+
+# Need some way to group by night blocks
+
+
+# nightStart    Time (in HH:MM:SS) that nighttime begins in solar time
+# nightEnd      Time (in HH:MM:SS) that nighttime ends in solar time
+nightreg <- function(o2file, nightStart, nightEnd, bp) {
+  ## Trim the daily data so it's only during nighttime
+  # Create decimal time column
+  o2file$decimalTime <- hour(o2file$datetime) + minute(o2file$datetime)/60
+  # Calculate hours since noon, where 0 would = noon, 1 = 1PM, 2 = 2PM... 12 = midnight
+  o2file$timeSinceNoon <- o2file$decimalTime - 12
+  # Convert nightStart to decimal time since noon
+  nightStart <- hms(nightStart)
+  nightStart <- (hour(nightStart) + minute(nightStart)/60) - 12
+  # Convert nightEnd to decimal time since noon
+  nightEnd <- hms(nightEnd)
+  nightEnd <- (hour(nightEnd) + minute(nightEnd)/60) - 12
+  # Subset nighttime data
+  o2night <- o2file[data.table::between(o2file$timeSinceNoon, nightStart, 12) | 
+                      data.table::between(o2file$timeSinceNoon, -12, nightEnd),]
+  
+  # Need some way to group by night blocks
+  
+  temp <- o2night$temp
+  oxy <- o2night$oxy
+  # Calculate moving average on oxy data ###### left off here #########
+  oxyf1 <- filter(as.numeric(o2night$oxy), rep(1/3, 3), sides=2)
+
+#trim the ends of the oxy data
+oxyf2<- oxyf1[c(-1,-length(oxyf1))]
+
+##calculate delO/delt
+deltaO2<-((oxyf2[-1]-oxyf2[-length(oxyf2)])/5)*1440
+
+#Trim the first two and last one from the temp data to match the filter oxy data
+temptrim<-temp[c(-2:-1,-length(temp))]
+#calc the dodef
+satdef<-osat(temptrim,bp)-oxyf2[-1]
+
+#calculate regression and plot
+nreg<-lm(deltaO2~satdef)
+plot(satdef,deltaO2)
+abline(nreg)
+
+coeff<-coef(nreg)
+
+out<-list(coeff, K600fromO2(mean(temp), coeff[2]))##gives both the regression coefficients and converts the slope to K600
+out
+}
+
 
 
 ```
