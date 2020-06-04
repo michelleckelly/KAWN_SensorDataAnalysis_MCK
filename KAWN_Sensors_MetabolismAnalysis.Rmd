@@ -364,9 +364,11 @@ v_S1S2.mean <- v_S1S2 %>% summarise(mean(v_ms.S1), mean(v_ms.S2),
 
 # Travel time [s] = distance [m] / velocity [m/s]
 tt_S1S2 <- 5130 / v_S1S2.mean[3]
+# Convert from sec to hrs
+tt_S1S2[2] <-tt_S1S2[1] / 3600
 # Convert from sec to days
-tt_S1S2[2] <- tt_S1S2/86400
-names(tt_S1S2) <- c("tt_sec", "tt_days")
+tt_S1S2[3] <- tt_S1S2[1] / 86400
+names(tt_S1S2) <- c("tt_sec", "tt_hours", "tt_days")
 
 ############# 5. Pull kmean, ksd #########################################
 # This isn't perfect because this K is estimated from the one station 
@@ -463,31 +465,33 @@ Kcor <- function (temp, K600) {
 #upName <- "S1"
 #tt <- as.numeric(tt_S1S2[2])
 
-twostationpostsum <- function(data, upName, downName, start, z, tt, Kmean, Ksd, 
+twostationpostsum <- function(O2data, upName, downName, start, z, tt, Kmean, Ksd, 
                               nbatch, scale) {
   # Add date column
-  data <- data %>% group_by(date = date(datetime))
+  O2data <- O2data %>% group_by(date = date(datetime))
+  # Create list of unique dates in data
+  dateList <- unique(O2data$date)
   
   # Initialize empty vectors to store results from modeling
-  date <- vector(length = length(unique(data$date)))
-  GPP <- vector(mode = "numeric", length = length(unique(data$date)))
-  GPP.lower <- vector(mode = "numeric", length = length(unique(data$date)))
-  GPP.upper <- vector(mode = "numeric", length = length(unique(data$date)))
-  ER <- vector(mode = "numeric", length = length(unique(data$date)))
-  ER.lower <- vector(mode = "numeric", length = length(unique(data$date)))
-  ER.upper <- vector(mode = "numeric", length = length(unique(data$date)))
-  K <- vector(mode = "numeric", length = length(unique(data$date)))
-  K.lower <- vector(mode = "numeric", length = length(unique(data$date)))
-  K.upper <- vector(mode = "numeric", length = length(unique(data$date)))
-  s <- vector(mode = "numeric", length = length(unique(data$date)))
-  s.lower <- vector(mode = "numeric", length = length(unique(data$date)))
-  s.upper <- vector(mode = "numeric", length = length(unique(data$date)))
-  accept <- vector(length = length(unique(data$date)))
+  #date <- vector(length = length(unique(data$date)))
+  GPP <- vector(mode = "numeric", length = length(unique(O2data$date)))
+  GPP.lower <- vector(mode = "numeric", length = length(unique(O2data$date)))
+  GPP.upper <- vector(mode = "numeric", length = length(unique(O2data$date)))
+  ER <- vector(mode = "numeric", length = length(unique(O2data$date)))
+  ER.lower <- vector(mode = "numeric", length = length(unique(O2data$date)))
+  ER.upper <- vector(mode = "numeric", length = length(unique(O2data$date)))
+  K <- vector(mode = "numeric", length = length(unique(O2data$date)))
+  K.lower <- vector(mode = "numeric", length = length(unique(O2data$date)))
+  K.upper <- vector(mode = "numeric", length = length(unique(O2data$date)))
+  s <- vector(mode = "numeric", length = length(unique(O2data$date)))
+  s.lower <- vector(mode = "numeric", length = length(unique(O2data$date)))
+  s.upper <- vector(mode = "numeric", length = length(unique(O2data$date)))
+  accept <- vector(length = length(unique(O2data$date)))
   
   # For loop iterating through each day of data
-  for (i in 1:length(unique(data$date))){
+  for (i in 1:length(dateList)){
     # Subset data to single day of interest (ith date in date string)
-    data <- subset(data, date = unique(data$date)[i])
+    data <- subset(O2data, date == dateList[i])
     # Seperate data into upstream and downstream sections
     updata <- data[data$`river station` == upName,]
     downdata <- data[data$`river station` == downName,]
@@ -503,50 +507,102 @@ twostationpostsum <- function(data, upName, downName, start, z, tt, Kmean, Ksd,
     # trim the ends of the oxy and temp data by the lag so that oxydown[1] 
     # is the value that is the travel time later than oxy up.  The below calls 
     # are designed to work with our data structure.
-  	tempup <- updata$temp[1:as.numeric(length(updata$temp)-lag)] # trim the end by the lag
-  	oxyup <- updata$oxy[1:as.numeric(length(updata$temp)-lag)]
-  	# define osat 
-  	osat <- updata$DO.sat[1:as.numeric(length(updata$temp)-lag)]
-  	
-  	tempdown <- downdata$temp[(1+lag):length(downdata$temp)]
-  	oxydown <- downdata$oxy[(1+lag):length(downdata$temp)]
-  	
-  	light <- downdata$light
-  	
-  	# perform MCMC
-  	# see documentation on mcmc
-  	met.post <- metrop(tspost, initial = start, nbatch = nbatch, scale = scale, 
-  	                   tempup = tempup, tempdown = tempdown, oxyup = oxyup, 
-  	                   osat = osat,
-  	                   oxydown = oxydown,  z = z, light = light, tt = tt, 
-  	                   Kmean = Kmean, Ksd = Ksd, debug = TRUE)
     
-  	# Calculate overall estimates for each day
-    gppr <- quantile(met.post$batch[(950:nbatch),1], c(0.025, 0.5, 0.975))
-    err <- quantile(met.post$batch[(950:nbatch),2], c(0.025, 0.5, 0.975))
-    Kr <- quantile(met.post$batch[(950:nbatch),3], c(0.025, 0.5, 0.975))
-    sr <- quantile(met.post$batch[(950:nbatch),4], c(0.025, 0.5, 0.975))
-    
-    # Add results to vectors
-    date[i] <- ymd(unique(data$date)[i])
-    GPP[i] <- gppr[2]
-    GPP.lower[i] <- gppr[1]
-    GPP.upper[i] <- gppr[3]
-    ER[i] <- err[2]
-    ER.lower[i] <- err[1]
-    ER.upper[i] <- err[3]
-    K[i] <- Kr[2]
-    K.lower[i] <- Kr[1]
-    K.upper[i] <- Kr[3]
-    s[i] <- sr[2]
-    s.lower[i] <- sr[1]
-    s.upper[i] <- sr[3]
-    accept[i] <- met.post$accept # log likelihood plus priors, should be about 0.2
+    if (length(updata$temp) < lag) {
+      # If there is less data during a day than the lag interval, move to next day
+      message("ERROR: model not computed for", dateList[i], "as insufficient observations provided.")
+      break
+    } else{
+      # Else continue
+      tempup <- updata$temp[1:as.numeric(length(updata$temp)-lag)] # trim the end by the lag
+    	oxyup <- updata$oxy[1:as.numeric(length(updata$temp)-lag)]
+    	# define osat 
+    	osat <- updata$DO.sat[1:as.numeric(length(updata$temp)-lag)]
+    	
+    	tempdown <- downdata$temp[(1+lag):length(downdata$temp)]
+    	oxydown <- downdata$oxy[(1+lag):length(downdata$temp)]
+    	
+    	light <- downdata$light
+    	
+    	# perform MCMC
+    	# see documentation on mcmc
+    	met.post <- metrop(tspost, initial = start, nbatch = nbatch, scale = scale, 
+    	                   tempup = tempup, tempdown = tempdown, oxyup = oxyup, 
+    	                   osat = osat,
+    	                   oxydown = oxydown,  z = z, light = light, tt = tt, 
+    	                   Kmean = Kmean, Ksd = Ksd, debug = TRUE)
+    	
+    	# Calculate overall estimates for each day
+      gppr <- quantile(met.post$batch[(950:nbatch),1], c(0.025, 0.5, 0.975))
+      err <- quantile(met.post$batch[(950:nbatch),2], c(0.025, 0.5, 0.975))
+      Kr <- quantile(met.post$batch[(950:nbatch),3], c(0.025, 0.5, 0.975))
+      sr <- quantile(met.post$batch[(950:nbatch),4], c(0.025, 0.5, 0.975))
+      
+      # Add results to vectors
+      #date[i] <- ymd(unique(data$date)[i])
+      GPP[i] <- gppr[2]
+      GPP.lower[i] <- gppr[1]
+      GPP.upper[i] <- gppr[3]
+      ER[i] <- err[2]
+      ER.lower[i] <- err[1]
+      ER.upper[i] <- err[3]
+      K[i] <- Kr[2]
+      K.lower[i] <- Kr[1]
+      K.upper[i] <- Kr[3]
+      s[i] <- sr[2]
+      s.lower[i] <- sr[1]
+      s.upper[i] <- sr[3]
+      accept[i] <- met.post$accept # log likelihood plus priors, should be about 0.2
+    }
+    #i = i+1
   }
-  
-  predictions <- data.frame(date, GPP, GPP.lower, GPP.upper, ER, ER.lower, 
+  # Create dataframe of predicted metabolism values
+  pred.metab <- data.frame(dateList, GPP, GPP.lower, GPP.upper, ER, ER.lower, 
                             ER.upper, K, K.lower, K.upper, s, s.lower, s.upper)
-  output <- list(predictions = predictions, accept = accept)
+  
+  ### Calculate model-predicted O2 values from median metabolism estimates ########
+  # Initialize empty vectors to store modeled O2 data
+  #modeledO2 <- vector(mode = "numeric", length = length(data))
+  
+  # Seperate the full dataset into upstream and downstream sections
+  #updata <- data[data$`river station` == upName,]
+  #downdata <- data[data$`river station` == downName,]
+  
+  # These should be used in checking the fit of the model (comparing to 
+  # upstream and downstream O2)
+  # Seperate data into upstream and downstream sections
+  #timeup <- updata$dtime[1:as.numeric(length(updata$temp)-lag)]
+  #timedown <- downdata$dtime[(1+lag):as.numeric(length(downdata$temp))]
+  
+  #tempup <- updata$temp[1:as.numeric(length(updata$temp)-lag)]
+  #tempdown <- downdata$temp[(1+lag):length(downdata$temp)]
+  
+  #oxyup <- updata$oxy[1:as.numeric(length(updata$temp)-lag)]
+  #osat <- updata$DO.sat[1:as.numeric(length(updata$temp)-lag)]
+  #oxydown <- downdata$oxy[(1+lag):length(downdata$temp)]
+  
+  #light <- downdata$light
+  
+  # Use 50% quantiles of GPP, ER, K to calculate model predicted O2
+  # We want to pull the GPP, ER, K on the date 
+  #pred.metab$GPP[downdata$date == pred.metab$date]
+  
+  #for (j in 1:length(pred.metab)) {
+    # Iterate for each day of metabolism prediction
+  #  date 
+  #}
+  
+  #pred.metab$GPP[pred.metab$date == ]
+  
+  #for (i in 1:length(oxyup)){
+  #  modeledO2[i] <- (oxyup[i] + ((gppr[2]/z)*(sum(light[i:(i+lag)])/sum(light))) + 
+  #                 err[2]*tt/z + 
+  #                 (Kcor(tempup[i],Kr[2]))*tt*(osat[i] - oxyup[i] + osat[i])/2) / 
+  #    (1+ Kcor(tempup[i],Kr[2])*tt/2) 
+  #}
+  
+  # Create output list to return to user
+  output <- list(pred.metab = pred.metab, accept = accept)
   
   return(output)
 }
@@ -684,9 +740,9 @@ twosbayesplot(GPP = tsout$gppr, ER = tsout$err, data = TS_S1S2,
 ###see caveats on using MCMC to solve for 3 parameters above.
 
 # Time block a, 2018-02-25 thru 2018-03-05
-tsout_a <-twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
-                           data = TS_S1S2_a, z = as.numeric(z_S1S2.mean[3]), 
-                           tt = 2/86400, 
+tsout_a <- twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
+                           O2data = TS_S1S2_a, z = as.numeric(z_S1S2.mean[3]), 
+                           tt = as.numeric(tt_S1S2[3]), 
                            Kmean = as.numeric(K_S1S2.mean[3]), 
                            Ksd = as.numeric(K_S1S2.mean[4]), 
                            upName = "S1", downName = "S2", 
