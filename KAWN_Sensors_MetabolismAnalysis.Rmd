@@ -725,26 +725,17 @@ ggplot(data = tsout_a$pred.metab) +
 
 ##function for nighttime regression.  Reports K600, units of 1/d.  Make sure you set the times approprately, i.e. just after dark to whenever deltaO2 reaches 0
 
-####
-# Add date column
-o2file <- TS_S1S2_a
-#o2file <- o2file %>% group_by(date = date(datetime))
-# Subset first day of data
-o#2file <- subset(o2file, date == unique(o2file$date)[1])
-####
-ggplot(data = o2file, aes(x = datetime, y = light)) +
-  geom_point()
-
-
-nightStart = "17:45:00"
-nightEnd = "06:45:00"
-
-# Need some way to group by night blocks
-
+##Convert KO2 to K600
+K600fromO2 <- function(temp, KO2) {
+  ((600/(1800.6-(120.1*temp)+(3.7818*temp^2)-(0.047608*temp^3)))^-0.5)*KO2
+}
 
 # nightStart    Time (in HH:MM:SS) that nighttime begins in solar time
 # nightEnd      Time (in HH:MM:SS) that nighttime ends in solar time
-nightreg <- function(o2file, nightStart, nightEnd, bp) {
+nightreg <- function(o2file, nightStart, nightEnd, downName) {
+  # Section off the data so we're only dealing with the downstream data
+  o2file <- o2file[o2file$`river station` == downName,]
+  
   ## Trim the daily data so it's only during nighttime
   # Create decimal time column
   o2file$decimalTime <- hour(o2file$datetime) + minute(o2file$datetime)/60
@@ -760,36 +751,81 @@ nightreg <- function(o2file, nightStart, nightEnd, bp) {
   o2night <- o2file[data.table::between(o2file$timeSinceNoon, nightStart, 12) | 
                       data.table::between(o2file$timeSinceNoon, -12, nightEnd),]
   
-  # Need some way to group by night blocks
+  # Add column to distinguish night time `days` of data
+  # We'll then loop through these `days` to calculate K estimate
+  # on each `day`
+  o2night <- 
+    o2night %>%
+    mutate(nightBlock = case_when(timeSinceNoon < 0 ~ date(datetime) - 1,
+                                  timeSinceNoon > 0 ~ date(datetime)))
+  # Create list of unique nightBlocks
+  nightList <- unique(o2night$nightBlock)
   
-  temp <- o2night$temp
-  oxy <- o2night$oxy
-  # Calculate moving average on oxy data ###### left off here #########
-  oxyf1 <- filter(as.numeric(o2night$oxy), rep(1/3, 3), sides=2)
-
-#trim the ends of the oxy data
-oxyf2<- oxyf1[c(-1,-length(oxyf1))]
-
-##calculate delO/delt
-deltaO2<-((oxyf2[-1]-oxyf2[-length(oxyf2)])/5)*1440
-
-#Trim the first two and last one from the temp data to match the filter oxy data
-temptrim<-temp[c(-2:-1,-length(temp))]
-#calc the dodef
-satdef<-osat(temptrim,bp)-oxyf2[-1]
-
-#calculate regression and plot
-nreg<-lm(deltaO2~satdef)
-plot(satdef,deltaO2)
-abline(nreg)
-
-coeff<-coef(nreg)
-
-out<-list(coeff, K600fromO2(mean(temp), coeff[2]))##gives both the regression coefficients and converts the slope to K600
-out
+  # Initialize vectors to store results
+  regIntercept <- vector(mode = "numeric", length = length(nightList))
+  regSlope <- vector(mode = "numeric", length = length(nightList))
+  K600 <- vector(mode = "numeric", length = length(nightList))
+  #satdeficit <- vector(mode = "numeric", length = nrow(o2night))
+  #deltaoxy <- vector(mode = "numeric", length = nrow(o2night))
+  
+  # Need some way to group by night blocks
+  for (i in 1:length(nightList)) {
+    # Subset data to single nightblock of interest
+    data <- subset(o2night, nightBlock == nightList[i])
+    
+    # Create lists of temp, oxy, oxysat for each nighttime block
+    temp <- data$temp
+    oxy <- data$oxy
+    oxysat <- data$DO.sat
+    
+    # Calculate moving average on oxy data
+    oxyf1 <- stats::filter(as.numeric(data$oxy), rep(1/3, 3), sides=2)
+    # trim the ends of the oxy data
+    oxyf2 <- oxyf1[c(-1,-length(oxyf1))]
+    # calculate delO/delt
+    deltaO2 <- ((oxyf2[-1] - oxyf2[-length(oxyf2)])/15)*1440 ## CHECK: IS /5 B/C THEY HAVE 5 MIN SAMPLING TIME? this is my hunch, so I've adjusted to /15
+    
+    # Trim the first two and last one from the oxysat data to match the filter oxy data
+    oxysattrim <- oxysat[c(-2:-1, -length(oxyf2))]
+    # Calc the dodef
+    satdef <- oxysattrim - oxyf2[-1]
+    
+    # Calculate regression
+    nreg <- lm(deltaO2 ~ satdef)
+    coeff <- coef(nreg)
+    # Convert the slope of the regression to K600 value
+    calcK600 <- as.numeric(K600fromO2(mean(temp), coeff[2]))
+    
+    # Save results to lists
+    regIntercept[i] <- as.numeric(coeff[1])
+    regSlope[i] <- as.numeric(coeff[2])
+    K600[i] <- calcK600
+    plot(satdef,deltaO2, main = nightList[i])
+    abline(nreg)
+  }
+  # Create dataframe of daily estimates
+  dailyEstimates <- data.frame(date = nightList, intercept = regIntercept, 
+                               slope = regSlope, K600 = K600)
+  
+  # Return daily estimates and mean K600 for period
+  out <- list(dailyEstimates = dailyEstimates, meanK600 = mean(dailyEstimates$K600))
+  return(out)
 }
 
+# Run function
+k600_a <- nightreg(o2file = TS_S1S2_a, nightStart = "17:45:00", 
+                   nightEnd = "06:30:00", downName = "S2")
+# Check through the plots to make sure none of them look weird
+# 2018-02-24 looks weird, probably because there's just data starting at 3AM onwards 
+# for this date
+# Therefore, compute mean K600 without 2018-02-24:
+mean(k600_a$dailyEstimates$K600[-1])
+  # the slope on these values seems weirdly high. I'm not sure if I trust this estimator
 
+k600_b <- nightreg(o2file = TS_S1S2_b, nightStart = "17:45:00", 
+                   nightEnd = "06:30:00", downName = "S2")
+k600_c <- nightreg(o2file = TS_S1S2_c, nightStart = "17:45:00", 
+                   nightEnd = "06:30:00", downName = "S2")
 
 ```
 
