@@ -18,16 +18,13 @@ License: MIT License
 #devtools::install_github('streampulse/StreamPULSE', dependencies=TRUE)
 
 # grab latest version of streamMetabolizer
-#install.packages("streamMetabolizer", dependencies = TRUE, 
-#                repos = c("https://owi.usgs.gov/R", "https://cran.rstudio.com"))
+remotes::install_github('appling/unitted')
+remotes::install_github("USGS-R/streamMetabolizer")
 
 # load packages
 library(StreamPULSE)
 library(streamMetabolizer)
-library(ggplot2)
-library(dplyr)
-library(gridExtra)
-library(tidyr)
+library(tidyverse)
 library(lubridate)
 ```
 
@@ -681,49 +678,8 @@ twostationpostsum <- function(O2data, upName, downName, start, z, tt, Kmean, Ksd
   return(output)
 }
 
-########### Run 2-station metabolism modeling function #######################
-# Time block a, 2018-02-25 thru 2018-03-05
-tsout_a <- twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
-                             O2data = TS_S1S2_a, 
-                             z = as.numeric(z_S1S2.mean[3]), 
-                             tt = as.numeric(tt_S1S2[3]), 
-                             Kmean = as.numeric(K_S1S2.mean[3]), 
-                             Ksd = as.numeric(K_S1S2.mean[4]), 
-                             upName = "S1", downName = "S2", 
-                             nbatch = 20000, scale = 0.04)
-
-tsout_b <-twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
-                            O2data = TS_S1S2_b, 
-                            z = as.numeric(z_S1S2.mean[3]), 
-                            tt = as.numeric(tt_S1S2[3]), 
-                            Kmean = as.numeric(K_S1S2.mean[3]), 
-                            Ksd = as.numeric(K_S1S2.mean[4]), 
-                            upName = "S1", downName = "S2", 
-                            nbatch = 20000, scale = 0.04)
-
-# Check modeled oxygen
-ggplot(data = tsout_a$oxymodel) +
-  geom_line(aes(x = timeup, y = oxyup, color = "S1")) +
-  geom_line(aes(x = timedown, y = oxydown, color = "S2")) +
-  geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2"))
-# Check modeled GPP and ER
-ggplot(data = tsout_a$pred.metab) +
-  geom_ribbon(aes(x = dateList, ymin = GPP.lower, ymax = GPP.upper, fill = "GPP"), alpha = 0.5) +
-  geom_line(aes(x = dateList, y = GPP, color = "GPP")) +
-  geom_line(aes(x = dateList, y = -ER, color = "ER")) +
-  geom_ribbon(aes(x = dateList, ymin = -ER.lower, ymax = -ER.upper, fill = "ER"), alpha = 0.5)
-# CIs are really large rn - might go down if iterations are increased
-# Check K
-ggplot(data = tsout_a$pred.metab) +
-  geom_line(aes(x = dateList, y = K, color = "K")) +
-  geom_ribbon(aes(x = dateList, ymin = K.lower, ymax = K.upper, fill = "K"), alpha = 0.5)
-
-
-
-
-
-
-##function for nighttime regression.  Reports K600, units of 1/d.  Make sure you set the times approprately, i.e. just after dark to whenever deltaO2 reaches 0
+##function for nighttime regression.  Reports K600, units of 1/d.  Make sure you
+# set the times approprately, i.e. just after dark to whenever deltaO2 reaches 0
 
 ##Convert KO2 to K600
 K600fromO2 <- function(temp, KO2) {
@@ -824,8 +780,105 @@ mean(k600_a$dailyEstimates$K600[-1])
 
 k600_b <- nightreg(o2file = TS_S1S2_b, nightStart = "17:45:00", 
                    nightEnd = "06:30:00", downName = "S2")
+mean(k600_b$dailyEstimates$K600[-1])
+
 k600_c <- nightreg(o2file = TS_S1S2_c, nightStart = "17:45:00", 
                    nightEnd = "06:30:00", downName = "S2")
+k600_c$dailyEstimates$K600[2] # Only 2 days of data here
+
+########### Run 2-station metabolism modeling function #######################
+# Using K estimates from nighttime regression
+
+# Time block a, 2018-02-25 thru 2018-03-05
+tsout_a_origK <- twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
+                             O2data = TS_S1S2_a, 
+                             z = as.numeric(z_S1S2.mean[3]), 
+                             tt = as.numeric(tt_S1S2[3]), 
+                             Kmean = as.numeric(K_S1S2.mean[3]), 
+                             Ksd = as.numeric(K_S1S2.mean[4]), 
+                             upName = "S1", downName = "S2", 
+                             nbatch = 200000, scale = 0.3)
+# Scale needs to be tuned so that acceptance rate is around 25%
+tsout_a_origK[["accept"]]
+
+tsout_a_NTK <- twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
+                             O2data = TS_S1S2_a, 
+                             z = as.numeric(z_S1S2.mean[3]), 
+                             tt = as.numeric(tt_S1S2[3]), 
+                             Kmean = mean(k600_a$dailyEstimates$K600[-1]), 
+                             Ksd = sd(k600_a$dailyEstimates$K600[-1]), 
+                             upName = "S1", downName = "S2", 
+                             nbatch = 200000, scale = 0.3)
+tsout_a_NTK[["accept"]]
+
+tsout_b <-twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
+                            O2data = TS_S1S2_b, 
+                            z = as.numeric(z_S1S2.mean[3]), 
+                            tt = as.numeric(tt_S1S2[3]), 
+                             Kmean = mean(k600_b$dailyEstimates$K600[-1]), 
+                             Ksd = sd(k600_b$dailyEstimates$K600[-1]),
+                            upName = "S1", downName = "S2", 
+                            nbatch = 200000, scale = 0.3)
+tsout_b[["accept"]]
+
+tsout_c <-twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
+                            O2data = TS_S1S2_c, 
+                            z = as.numeric(z_S1S2.mean[3]), 
+                            tt = as.numeric(tt_S1S2[3]), 
+                             Kmean = mean(k600_c$dailyEstimates$K600[-1]), 
+                             Ksd = sd(k600_c$dailyEstimates$K600[-1]),
+                            upName = "S1", downName = "S2", 
+                            nbatch = 200000, scale = 0.3)
+
+### Save estimates
+saveRDS(tsout_a_NTK, 
+        file = "./Outputs/MetabResults_TwoStation_a_nighttimeK.RData")
+saveRDS(tsout_a_origK, 
+        file = "./Outputs/MetabResults_TwoStation_a_estimatedK.RData")
+saveRDS(tsout_b, 
+        file = "./Outputs/MetabResults_TwoStation_b_nighttimeK.RData")
+
+## Merge into one dataframe
+
+# Check modeled oxygen
+ggplot(data = tsout_a_origK$oxymodel) +
+  geom_line(aes(x = timeup, y = oxyup, color = "S1")) +
+  geom_line(aes(x = timedown, y = oxydown, color = "S2")) +
+  geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2"))
+ggplot(data = tsout_a_NTK$oxymodel) +
+  geom_line(aes(x = timeup, y = oxyup, color = "S1")) +
+  geom_line(aes(x = timedown, y = oxydown, color = "S2")) +
+  geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2"))
+# Check modeled GPP and ER
+ggplot(data = tsout_a_origK$pred.metab) +
+  geom_ribbon(aes(x = date, ymin = GPP.lower, ymax = GPP.upper, 
+                  fill = "GPP"), alpha = 0.5) +
+  geom_line(aes(x = date, y = GPP, color = "GPP")) +
+  geom_line(aes(x = date, y = -ER, color = "ER")) +
+  geom_ribbon(aes(x = date, ymin = -ER.lower, ymax = -ER.upper, 
+                  fill = "ER"), alpha = 0.5)
+
+ggplot(data = tsout_b$pred.metab) +
+  geom_ribbon(aes(x = date, ymin = GPP.lower, ymax = GPP.upper, 
+                  fill = "GPP"), alpha = 0.5) +
+  geom_line(aes(x = date, y = GPP, color = "GPP")) +
+  geom_line(aes(x = date, y = -ER, color = "ER")) +
+  geom_ribbon(aes(x = date, ymin = -ER.lower, ymax = -ER.upper, 
+                  fill = "ER"), alpha = 0.5)
+
+# CIs are really large rn - might go down if iterations are increased
+# Check K
+ggplot(data = tsout_a_origK$pred.metab) +
+  geom_line(aes(x = date, y = K, color = "K")) +
+  geom_ribbon(aes(x = date, ymin = K.lower, ymax = K.upper, fill = "K"), 
+              alpha = 0.5)
+ggplot(data = tsout_a_NTK$pred.metab) +
+  geom_line(aes(x = date, y = K, color = "K")) +
+  geom_ribbon(aes(x = date, ymin = K.lower, ymax = K.upper, fill = "K"), 
+              alpha = 0.5)
+
+
+
 
 ```
 
