@@ -18,8 +18,8 @@ License: MIT License
 #devtools::install_github('streampulse/StreamPULSE', dependencies=TRUE)
 
 # grab latest version of streamMetabolizer
-remotes::install_github('appling/unitted')
-remotes::install_github("USGS-R/streamMetabolizer")
+#remotes::install_github('appling/unitted')
+#remotes::install_github("USGS-R/streamMetabolizer")
 
 # load packages
 library(StreamPULSE)
@@ -32,13 +32,11 @@ library(lubridate)
 # Load in cleaned metabolism data from file
 # Skip this block if you haven't run the metabolism model, or if you want 
 # to re-compute the model
-
-modelfit.eric <- readRDS("./Outputs/MetabResults_Eric.RData")
-modelfit.steve <- readRDS("./Outputs/MetabResults_Steve.RData")
+modelfit.S1S2 <- readRDS()
 modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
 ```
 
-```{r metabolism.calculate}
+```{r singleStation}
 # Model stream metabolism from raw data using StreamPULSE database and 
 # streamMetabolizer package
 
@@ -46,38 +44,7 @@ modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
 model_type <-  "bayes"
 # Define the desired modeling framework 
 model_name <-  "streamMetabolizer"
-  
-# Eric ----------------------------------------------------------
-# Define the site code from the StreamPULSE site list
-# Full list of site codes available at: https://data.streampulse.org/sitelist
-site_code.eric <- "KS_KANSASREASTLAWRENCE"
-# Call to API to request data
-eric_data <- request_data(site_code.eric) 
-# Format data for modeling
-fitdata.eric <- prep_metabolism(eric_data, type = model_type, 
-                                model = model_name, rm_flagged = "Bad Data", 
-                                fillgaps = "interpolation",
-                                estimate_areal_depth = TRUE)
-# Fit metabolism model (Run time for this step may be long, depending on your
-# computing power. It took 1-2 hrs for me to run this model on a lab laptop)
-modelfit.eric <- fit_metabolism(fitdata.eric)
-# Save model results
-saveRDS(modelfit.eric, file = "./Outputs/MetabResults_EricRaw.RData") 
-write.csv(modelfit.eric$predictions, 
-          file = "./Outputs/MetabResults_EricRaw.csv")
-  
-# Steve -------------------------------------------------------
-site_code.steve <- "KS_KANSASRFALLLEAF"
-steve_data <- request_data(site_code.steve) 
-fitdata.steve <- prep_metabolism(steve_data, type = model_type, 
-                                 model = model_name, rm_flagged = "Bad Data", 
-                                 fillgaps = "interpolation",
-                                 estimate_areal_depth = TRUE)
-modelfit.steve <- fit_metabolism(fitdata.steve)
-saveRDS(modelfit.steve, file = "./Outputs/MetabResults_SteveRaw.RData") 
-write.csv(modelfit.steve$predictions, 
-          file = "./Outputs/MetabResults_SteveRaw.csv")
-  
+
 # Desoto ------------------------------------------------------
 site_code.desoto <- "KS_KANSASR"
 desoto_data <- request_data(site_code.desoto)
@@ -89,7 +56,89 @@ modelfit.desoto <- fit_metabolism(fitdata.desoto)
 saveRDS(modelfit.desoto, file = "./Outputs/MetabResults_DesotoRaw.RData") 
 write.csv(modelfit.desoto$predictions, 
           file = "./Outputs/MetabResults_DesotoRaw.csv")
+```
 
+```{r areal.extent}
+# Compute gas exchange distance at S3
+# From Stream Ecosystems in a Changing Environment: 
+#   "One-station techniques measure a reach of stream that scales with the 
+#   transport distance of oxygen; a proposed distance is about three times 
+#   the transport distance of O2 (ie. 3V/K, Chapra and Di Toro 1991), which 
+#   corresponds to 95% O2 turnover in the reach. Spatial variability at the 
+#   spatial scale of this distance will bias estimates of one-station 
+#   metabolism. For example, a sonde placed in a tailwater below a dam may 
+#   measure oxygen processes both in the tailwater and in the upstream lake."
+
+# L = 3 v / K600
+# Where L = distance along river at which 95% of oxygen has turned over [m]
+#       v = average flow velocity [m / day]
+#       K600 = gas exchange coefficient predicted by model [day^-1]
+# Citations: Chapra & Del Toro 1991
+#            Hall et al. 2012
+#            Jones & Stanley Stream Ecosystems in a Changing... pg 158
+
+# Grab K600 values from the metabolism modeling data -------------------------
+# StreamMetabolizer uses the 50% condfidence interval (not the mean) GPP and 
+# ER measurements, which is why I'm grabbing the 50% confidence interval K600
+# measurements
+K600.desoto <- 
+  modelfit.desoto[["fit"]]@fit[["daily"]] %>%
+  select(date, K600_daily_50pct) %>%
+  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) 
+
+# Interpolate for velocity using v = Q/A -------------------------------------
+# Approximate river cross sectional A using interpolated depth and aerial w
+# Grab river width - this is from google maps data, same values used in 
+# uptake analysis
+w.Eric <- 210.9
+w.Steve <- 113.4
+w.Desoto <- 138.07
+# Calculate water velocity based on modeled depth and discharge
+v.S1 <- 
+  S1_preproc %>%
+  select(datetime, depth, discharge) %>%
+  group_by(date = date(datetime)) %>%
+  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
+  summarise(depth_m = mean(depth), Q_m3s = mean(discharge), 
+            A_m2 = w.Eric*depth_m, v_ms = Q_m3s/A_m2,
+            v_mday = v_ms*86400)
+v.S2 <- 
+  S2_preproc %>%
+  select(datetime, depth, discharge) %>%
+  group_by(date = date(datetime)) %>%
+  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
+  summarise(depth_m = mean(depth), Q_m3s = mean(discharge), 
+            A_m2 = w.Steve*depth_m, v_ms = Q_m3s/A_m2,
+            v_mday = v_ms*86400)
+v.desoto <- 
+  modelfit.desoto[["fit"]]@data %>%
+  select(date, solar.time, depth, discharge) %>%
+  group_by(date) %>%
+  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
+  summarise(depth_m = mean(depth), Q_m3s = mean(discharge), 
+            A_m2 = w.Desoto*depth_m, v_ms = Q_m3s/A_m2,
+            v_mday = v_ms*86400)
+# Run oxygen turnover distance calculation
+K600.desoto <- 
+  full_join(K600.desoto, v.desoto) %>%
+  mutate(O2TurnL_m = 3*v_mday/K600_daily_50pct, O2TurnL_km = O2TurnL_m/1000)
+
+# Summary stats --------------------------------------------------------------
+v.S1 %>% summarise_all(mean, na.rm = T)
+v.S2 %>% summarise_all(mean, na.rm = T)
+K600.desoto %>% summarise_all(mean, na.rm = T)
+
+# Save as CSV files ----------------------------------------------------------
+saveRDS(v.S1, file = "./Outputs/Velocity_S1.RData")
+write.csv(v.S1, file = "./Outputs/Velocity_S1.CSV", row.names = F)
+
+saveRDS(v.S2, file = "./Outputs/Velocity_S2.RData")
+write.csv(v.S2, file = "./Outputs/Velocity_S2.CSV", 
+          row.names = F)
+
+saveRDS(K600.desoto, file = "./Outputs/OxygenTurnover_Desoto.RData")
+write.csv(K600.desoto, file = "./Outputs/OxygenTurnover_Desoto.CSV", 
+          row.names = F)
 ```
 
 ```{r metabolism.cleanup}
@@ -266,10 +315,6 @@ S1 <- request_data(site_code, startdate = start, enddate = end)
 ## S2 ("Steve")
 site_code <- "KS_KANSASRFALLLEAF"
 S2 <- request_data(site_code, startdate = start, enddate = end)
-## S3 ("Desoto")
-# Load desoto from file instead
-site_code <- "KS_KANSASR"
-S3 <- request_data(site_code, startdate = start, enddate = end)
 
 ########### 2. Preprocess data using StreamPULSE functions ####################
 # Format data for modeling
@@ -342,66 +387,113 @@ sum(is.na(TS_S1S2_c))
 # Distance between S1 and S2 = 5.13 km = 5130 m
 
 # Load in calculated water velocity, area, oxygen turnover
-S1_O2Turn <- readRDS(file = "./Outputs/OxygenTurnover_Eric.RData")
-S2_O2Turn <- readRDS(file = "./Outputs/OxygenTurnover_Steve.RData")
+S1_v <- readRDS(file = "./Outputs/Velocity_S1.RData")
+S2_v <- readRDS(file = "./Outputs/Velocity_S2.RData")
 
 # Filter for dates of interest, join dataframes, at each date compute the mean 
 # of velocity at S1 and S2
 v_S1S2 <- 
-  left_join(S1_O2Turn %>% filter(date >= date("2018-02-25")),
-          S2_O2Turn %>% filter(date >= date("2018-02-25")), 
+  left_join(S1_v %>% filter(date >= date("2018-02-25")),
+          S2_v %>% filter(date >= date("2018-02-25")), 
           by = "date", suffix = c(".S1", ".S2")) %>%
   select(date, v_ms.S1, v_ms.S2)
 # Compute the mean v of S1 and S2 on each date
 v_S1S2$v_ms.mean <- apply(v_S1S2[c("v_ms.S1","v_ms.S2")], MARGIN = 1, 
                           FUN = mean)
+
+# Section into time blocks
+# 2018-02-25 02:55:00 to 2018-03-05 05:40:00
+# 2018-03-12 16:55:00 to 2018-03-28 00:40:00
+v_S1S2_a <- 
+  v_S1S2 %>%
+  filter(date >= date("2018-02-25") & date <= date("2018-03-05"))
+v_S1S2_b <- 
+  v_S1S2 %>%
+  filter(date >= date("2018-03-12") & date <= date("2018-03-28"))
+
 # Compute overall mean velocity at S1 and S2, and the mean of the daily means
-v_S1S2.mean <- v_S1S2 %>% summarise(mean(v_ms.S1), mean(v_ms.S2), 
-                                    mean(v_ms.mean))
+v_S1S2_a.mean <-
+  v_S1S2_a %>%
+  summarise(mean(v_ms.S1, na.rm = T), 
+            mean(v_ms.S2, na.rm = T), 
+            mean(v_ms.mean, na.rm = T),
+            sd(v_ms.S1, na.rm = T), 
+            sd(v_ms.S2, na.rm = T), 
+            sd(v_ms.mean, na.rm = T))
+
+v_S1S2_b.mean <-
+  v_S1S2_b %>%
+  summarise(mean(v_ms.S1, na.rm = T), 
+            mean(v_ms.S2, na.rm = T), 
+            mean(v_ms.mean, na.rm = T),
+            sd(v_ms.S1, na.rm = T), 
+            sd(v_ms.S2, na.rm = T), 
+            sd(v_ms.mean, na.rm = T))
 
 # Travel time [s] = distance [m] / velocity [m/s]
-tt_S1S2 <- 5130 / v_S1S2.mean[3]
 # Convert from sec to hrs
-tt_S1S2[2] <-tt_S1S2[1] / 3600
 # Convert from sec to days
-tt_S1S2[3] <- tt_S1S2[1] / 86400
-names(tt_S1S2) <- c("tt_sec", "tt_hours", "tt_days")
+tt_S1S2_a <- tibble(date = v_S1S2_a$date,
+                    tt_sec = 5130 / v_S1S2_a$v_ms.mean,
+                    tt_hours = tt_sec / 3600,
+                    tt_days = tt_sec / 86400)
+tt_S1S2_b <- tibble(date = v_S1S2_b$date,
+                    tt_sec = 5130 / v_S1S2_b$v_ms.mean,
+                    tt_hours = tt_sec / 3600,
+                    tt_days = tt_sec / 86400)
 
-############# 5. Pull kmean, ksd #########################################
-# This isn't perfect because this K is estimated from the one station 
-# metabolism models. It would be better to have an independent estimate of K
+# Compute mean and standard deviation
+tt_S1S2_a.mean <- 
+  tt_S1S2_a %>%
+  summarise(mean(tt_days, na.rm = T),
+            sd(tt_days, na.rm = T))
+tt_S1S2_b.mean <- 
+  tt_S1S2_b %>%
+  summarise(mean(tt_days, na.rm = T),
+            sd(tt_days, na.rm = T))
 
-## Pull a better estimate for K using the nighttime regression method
-K_S1S2 <- 
-  left_join(S1_O2Turn %>% filter(date >= date("2018-02-25")),
-          S2_O2Turn %>% filter(date >= date("2018-02-25")), 
-          by = "date", suffix = c(".S1", ".S2")) %>%
-  select(date, K600_daily_50pct.S1, K600_daily_50pct.S2)
-# Compute the mean of S1 and S2 on each date
-K_S1S2$k600.mean <- apply(K_S1S2[c("K600_daily_50pct.S1","K600_daily_50pct.S2")], 
-                       MARGIN = 1, FUN = mean)
-# Compute overall mean at S1 and S2, and the mean of the daily means
-K_S1S2.mean <- K_S1S2 %>% summarise(mean(K600_daily_50pct.S1), 
-                                    mean(K600_daily_50pct.S2), 
-                                    mean(k600.mean), sd(k600.mean))
-
-############# 6. Pull z #########################################
-# This z value has flaws for the same reason as above
+############# 5. Pull z #########################################
 z_S1S2 <- 
-  left_join(S1_O2Turn %>% filter(date >= date("2018-02-25")),
-          S2_O2Turn %>% filter(date >= date("2018-02-25")), 
+  left_join(S1_v %>% filter(date >= date("2018-02-25")),
+          S2_v %>% filter(date >= date("2018-02-25")), 
           by = "date", suffix = c(".S1", ".S2")) %>%
   select(date, depth_m.S1, depth_m.S2)
+
+# Section into time blocks
+# 2018-02-25 02:55:00 to 2018-03-05 05:40:00
+# 2018-03-12 16:55:00 to 2018-03-28 00:40:00
+z_S1S2_a <- 
+  z_S1S2 %>%
+  filter(date >= date("2018-02-25") & date <= date("2018-03-05"))
+z_S1S2_b <- 
+  z_S1S2 %>%
+  filter(date >= date("2018-03-12") & date <= date("2018-03-28"))
+
 # Compute the mean of S1 and S2 on each date
-z_S1S2$z.mean <- apply(z_S1S2[c("depth_m.S1","depth_m.S2")], 
+z_S1S2_a$z.mean <- apply(z_S1S2_a[c("depth_m.S1","depth_m.S2")], 
                        MARGIN = 1, FUN = mean)
+z_S1S2_b$z.mean <- apply(z_S1S2_b[c("depth_m.S1","depth_m.S2")], 
+                       MARGIN = 1, FUN = mean)
+
 # Compute overall mean at S1 and S2, and the mean of the daily means
-z_S1S2.mean <- z_S1S2 %>% summarise(mean(depth_m.S1), 
-                                    mean(depth_m.S2), 
-                                    mean(z.mean))
+z_S1S2_a.mean <- 
+  z_S1S2_a %>% 
+  summarise(mean(depth_m.S1, na.rm = T), 
+            mean(depth_m.S2, na.rm = T), 
+            mean(z.mean, na.rm = T),
+            sd(depth_m.S1, na.rm = T), 
+            sd(depth_m.S2, na.rm = T), 
+            sd(z.mean, na.rm = T))
+z_S1S2_b.mean <- 
+  z_S1S2_b %>% 
+  summarise(mean(depth_m.S1, na.rm = T), 
+            mean(depth_m.S2, na.rm = T), 
+            mean(z.mean, na.rm = T),
+            sd(depth_m.S1, na.rm = T), 
+            sd(depth_m.S2, na.rm = T), 
+            sd(z.mean, na.rm = T))
 
 ############## The below script is adapted from Hall et al 2016 ###############
-
 # Load chron package
 library(chron)
 
@@ -424,18 +516,6 @@ TS_S1S2$dtime <- timeConvert(TS_S1S2)
 TS_S1S2_a$dtime <- timeConvert(TS_S1S2_a)
 TS_S1S2_b$dtime <- timeConvert(TS_S1S2_b)
 TS_S1S2_c$dtime <- timeConvert(TS_S1S2_c)
-
-# File format
-# LDO is output from sonde, oxy is calibration correction if necessary. 
-# Light can be in any units that you want iven that the model has a linear 
-# GPP and light reponse
- # river station    date     time      datetime temp  LDO  oxy light modlight              dtime
-# 1 buffalo     up1 7/21/10 22:00:00 7/21/10 22:00 9.59 8.66 8.66     0        0  	(07/21/10 22:00:00)
-# 2 buffalo     up1 7/21/10 22:05:00 7/21/10 22:05 9.59 8.65 8.65     0        0  	(07/21/10 22:05:00)
-# 3 buffalo     up1 7/21/10 22:10:00 7/21/10 22:10 9.58 8.63 8.63     0        0  	(07/21/10 22:10:00)
-# 4 buffalo     up1 7/21/10 22:15:00 7/21/10 22:15 9.57 8.64 8.64     0        0  	(07/21/10 22:15:00)
-# 5 buffalo     up1 7/21/10 22:20:00 7/21/10 22:20 9.56 8.63 8.63     0        0 	(07/21/10 22:20:00)
-# 6 buffalo     up1 7/21/10 22:25:00 7/21/10 22:25 9.55 8.61 8.61     0        0 	(07/21/10 22:25:00)
 
 ############################ Internal Functions ###############################
 # Function to estimate K at temperature 'temp'from K600.  Wanninkhof 1992.
@@ -554,7 +634,6 @@ O2TimeSeries <- function(GPP, ER, O2data, Kmean, z, tt, upName, downName) {
   oxymodel <- data.frame(timeup, timedown, oxydown, oxyup, modeledO2)
   return(oxymodel)
 }
-
 
 ################# Two station modeling function ###############################
 ########### twostationpostsum FUNCTION: Calculate MCMC for data ###############
@@ -776,7 +855,6 @@ k600_a <- nightreg(o2file = TS_S1S2_a, nightStart = "17:45:00",
 # for this date
 # Therefore, compute mean K600 without 2018-02-24:
 mean(k600_a$dailyEstimates$K600[-1])
-  # the slope on these values seems weirdly high. I'm not sure if I trust this estimator
 
 k600_b <- nightreg(o2file = TS_S1S2_b, nightStart = "17:45:00", 
                    nightEnd = "06:30:00", downName = "S2")
@@ -790,37 +868,28 @@ k600_c$dailyEstimates$K600[2] # Only 2 days of data here
 # Using K estimates from nighttime regression
 
 # Time block a, 2018-02-25 thru 2018-03-05
-tsout_a_origK <- twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
+tsout_a <- twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
                              O2data = TS_S1S2_a, 
-                             z = as.numeric(z_S1S2.mean[3]), 
-                             tt = as.numeric(tt_S1S2[3]), 
-                             Kmean = as.numeric(K_S1S2.mean[3]), 
-                             Ksd = as.numeric(K_S1S2.mean[4]), 
-                             upName = "S1", downName = "S2", 
-                             nbatch = 200000, scale = 0.3)
-# Scale needs to be tuned so that acceptance rate is around 25%
-tsout_a_origK[["accept"]]
-
-tsout_a_NTK <- twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
-                             O2data = TS_S1S2_a, 
-                             z = as.numeric(z_S1S2.mean[3]), 
-                             tt = as.numeric(tt_S1S2[3]), 
+                             z = as.numeric(z_S1S2_a.mean[3]), 
+                             tt = as.numeric(tt_S1S2_a.mean$`mean(tt_days, na.rm = T)`), 
                              Kmean = mean(k600_a$dailyEstimates$K600[-1]), 
                              Ksd = sd(k600_a$dailyEstimates$K600[-1]), 
                              upName = "S1", downName = "S2", 
                              nbatch = 200000, scale = 0.3)
-tsout_a_NTK[["accept"]]
+# Scale needs to be tuned so that acceptance rate is around 25%
+tsout_a[["accept"]]
 
 tsout_b <-twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
                             O2data = TS_S1S2_b, 
-                            z = as.numeric(z_S1S2.mean[3]), 
-                            tt = as.numeric(tt_S1S2[3]), 
+                            z = as.numeric(z_S1S2_b.mean[3]), 
+                            tt = as.numeric(tt_S1S2_b.mean$`mean(tt_days, na.rm = T)`), 
                              Kmean = mean(k600_b$dailyEstimates$K600[-1]), 
                              Ksd = sd(k600_b$dailyEstimates$K600[-1]),
                             upName = "S1", downName = "S2", 
                             nbatch = 200000, scale = 0.3)
 tsout_b[["accept"]]
 
+# Not enough time steps to run group C
 tsout_c <-twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
                             O2data = TS_S1S2_c, 
                             z = as.numeric(z_S1S2.mean[3]), 
@@ -829,28 +898,20 @@ tsout_c <-twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6),
                              Ksd = sd(k600_c$dailyEstimates$K600[-1]),
                             upName = "S1", downName = "S2", 
                             nbatch = 200000, scale = 0.3)
+tsout_c[["accept"]]
 
-### Save estimates
-saveRDS(tsout_a_NTK, 
-        file = "./Outputs/MetabResults_TwoStation_a_nighttimeK.RData")
-saveRDS(tsout_a_origK, 
-        file = "./Outputs/MetabResults_TwoStation_a_estimatedK.RData")
-saveRDS(tsout_b, 
-        file = "./Outputs/MetabResults_TwoStation_b_nighttimeK.RData")
+#tsout_a <- readRDS(file = "./Outputs/MetabResults_TwoStation_a_nighttimeK.RData")
+#tsout_b <- readRDS(file = "./Outputs/MetabResults_TwoStation_b_nighttimeK.RData")
 
 ## Merge into one dataframe
 
 # Check modeled oxygen
-ggplot(data = tsout_a_origK$oxymodel) +
-  geom_line(aes(x = timeup, y = oxyup, color = "S1")) +
-  geom_line(aes(x = timedown, y = oxydown, color = "S2")) +
-  geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2"))
-ggplot(data = tsout_a_NTK$oxymodel) +
+ggplot(data = tsout_a$oxymodel) +
   geom_line(aes(x = timeup, y = oxyup, color = "S1")) +
   geom_line(aes(x = timedown, y = oxydown, color = "S2")) +
   geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2"))
 # Check modeled GPP and ER
-ggplot(data = tsout_a_origK$pred.metab) +
+ggplot(data = tsout_a$pred.metab) +
   geom_ribbon(aes(x = date, ymin = GPP.lower, ymax = GPP.upper, 
                   fill = "GPP"), alpha = 0.5) +
   geom_line(aes(x = date, y = GPP, color = "GPP")) +
@@ -866,64 +927,26 @@ ggplot(data = tsout_b$pred.metab) +
   geom_ribbon(aes(x = date, ymin = -ER.lower, ymax = -ER.upper, 
                   fill = "ER"), alpha = 0.5)
 
-# CIs are really large rn - might go down if iterations are increased
-# Check K
-ggplot(data = tsout_a_origK$pred.metab) +
-  geom_line(aes(x = date, y = K, color = "K")) +
-  geom_ribbon(aes(x = date, ymin = K.lower, ymax = K.upper, fill = "K"), 
-              alpha = 0.5)
-ggplot(data = tsout_a_NTK$pred.metab) +
-  geom_line(aes(x = date, y = K, color = "K")) +
-  geom_ribbon(aes(x = date, ymin = K.lower, ymax = K.upper, fill = "K"), 
-              alpha = 0.5)
+full_join(tsout_a$pred.metab, tsout_b$pred.metab)
 
+ggplot(data = full_join(tsout_a$pred.metab, tsout_b$pred.metab)) +
+  geom_ribbon(aes(x = date, ymin = GPP.lower, ymax = GPP.upper, 
+                  fill = "GPP"), alpha = 0.5) +
+  geom_line(aes(x = date, y = GPP, color = "GPP")) +
+  geom_line(aes(x = date, y = -ER, color = "ER")) +
+  geom_ribbon(aes(x = date, ymin = -ER.lower, ymax = -ER.upper, 
+                  fill = "ER"), alpha = 0.5)
 
+# Create dataframe of dates based on S3 modeled dates
+#dateSeq <- tibble(date = seq(ymd('2018-01-31'), ymd('2018-05-31'), by='1 day'))
+# Merge data
+modelfit.S1S2 <-full_join(tsout_a$pred.metab, tsout_b$pred.metab)
+modelfit.S1S2$ER <- -modelfit.S1S2$ER
+modelfit.S1S2$ER.lower <- -modelfit.S1S2$ER.lower
+modelfit.S1S2$ER.upper <- -modelfit.S1S2$ER.upper
 
-
-```
-
-
-```{r depth.check}
-# Check StreamMetabolizer calculated depth against USGS stream gauging data
-# at DeSoto gauge
-
-# Pull calculated depth data from stream metabolism model
-eric_calcZ <- modelfit.eric[["fit"]]@data
-steve_calcZ <- modelfit.steve[["fit"]]@data
-desoto_calcZ <- modelfit.desoto[["fit"]]@data
-
-# Load in gage height data from USGS sensor at Desoto (06892350)
-desoto_gage <- read.csv("./Data/USGSDesoto_GageHeight.csv")
-# Convert ft to m
-desoto_gage$GageHeight_m <- desoto_gage$GageHeight_ft * 0.3048
-# Format DateTime
-desoto_gage$DateTime <- lubridate::mdy_hm(desoto_gage$DateTime, 
-                                          tz = "America/Chicago")
-# Take daily mean of Gage heights
-desoto_gage <- 
-  desoto_gage %>%
-  group_by(date = as.Date(DateTime)) %>%
-  summarise(GageHeight_m = mean(GageHeight_m))
-
-# Take daily mean of calculated depth
-desoto_calcZ <- 
-  desoto_calcZ %>%
-  group_by(date) %>%
-  summarise(calcdepth_m = mean(depth))
-
-# Merge
-desoto_calcZ <- dplyr::full_join(desoto_calcZ, desoto_gage, by = "date")
-# Plot
-ggpubr::ggscatter(desoto_calcZ, x = "GageHeight_m", y = "calcdepth_m", 
-                  add = "reg.line", 
-                  add.params = list(color = "red", fill = "lightgray"), 
-                  conf.int = TRUE) +
-  xlab("Gage height, USGS at DeSoto (m)") +
-  ylab("Modeled mean depth at S3, StreamMetabolizer (m)") +
-  ggpubr::stat_cor(aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~")))
-# Linear regression
-model <- lm(calcdepth_m ~ GageHeight_m, data = desoto_calcZ)
-summary(model)
+# Save joined data
+saveRDS(modelfit.S1S2, file = "./Outputs/MetabResults_TwoStation.RData")
 ```
 
 ```{r NEP.calculate}
@@ -950,106 +973,8 @@ NEP_calcs <- function(model_output){
 }
 
 # NEP calculations
-NEP.eric <- NEP_calcs(modelfit.eric$predictions)
-NEP.steve <- NEP_calcs(modelfit.steve$predictions)
+NEP.S1S2 <- NEP_calcs(modelfit.S1S2)
 NEP.desoto <- NEP_calcs(modelfit.desoto$predictions)
-```
-
-```{r areal.extent}
-# Compute gas exchange distance
-# From Stream Ecosystems in a Changing Environment: 
-#   "One-station techniques measure a reach of stream that scales with the 
-#   transport distance of oxygen; a proposed distance is about three times 
-#   the transport distance of O2 (ie. 3V/K, Chapra and Di Toro 1991), which 
-#   corresponds to 95% O2 turnover in the reach. Spatial variability at the 
-#   spatial scale of this distance will bias estimates of one-station 
-#   metabolism. For example, a sonde placed in a tailwater below a dam may 
-#   measure oxygen processes both in the tailwater and in the upstream lake."
-
-# L = 3 v / K600
-# Where L = distance along river at which 95% of oxygen has turned over [m]
-#       v = average flow velocity [m / day]
-#       K600 = gas exchange coefficient predicted by model [day^-1]
-# Citations: Chapra & Del Toro 1991
-#            Hall et al. 2012
-#            Jones & Stanley Stream Ecosystems in a Changing... pg 158
-
-# Grab K600 values from the metabolism modeling data -------------------------
-# StreamMetabolizer uses the 50% condfidence interval (not the mean) GPP and 
-# ER measurements, which is why I'm grabbing the 50% confidence interval K600
-# measurements
-K600.eric <- 
-  modelfit.eric[["fit"]]@fit[["daily"]] %>%
-  select(date, K600_daily_50pct) %>%
-  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01"))
-K600.steve <- 
-  modelfit.steve[["fit"]]@fit[["daily"]] %>%
-  select(date, K600_daily_50pct) %>%
-  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01"))
-K600.desoto <- 
-  modelfit.desoto[["fit"]]@fit[["daily"]] %>%
-  select(date, K600_daily_50pct) %>%
-  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) 
-
-# Interpolate for velocity using v = Q/A -------------------------------------
-# Approximate river cross sectional A using interpolated depth and aerial w
-# Grab river width - this is from google maps data, same values used in 
-# uptake analysis
-w.Eric <- 210.9
-w.Steve <- 113.4
-w.Desoto <- 138.07
-# Calculate water velocity based on modeled depth and discharge
-v.eric <- 
-  modelfit.eric[["fit"]]@data %>%
-  select(date, solar.time, depth, discharge) %>%
-  group_by(date) %>%
-  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
-  summarise(depth_m = mean(depth), Q_m3s = mean(discharge), 
-            A_m2 = w.Eric*depth_m, v_ms = Q_m3s/A_m2,
-            v_mday = v_ms*86400)
-v.steve <- 
-  modelfit.steve[["fit"]]@data %>%
-  select(date, solar.time, depth, discharge) %>%
-  group_by(date) %>%
-  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
-  summarise(depth_m = mean(depth), Q_m3s = mean(discharge), 
-            A_m2 = w.Steve*depth_m, v_ms = Q_m3s/A_m2,
-            v_mday = v_ms*86400)
-v.desoto <- 
-  modelfit.desoto[["fit"]]@data %>%
-  select(date, solar.time, depth, discharge) %>%
-  group_by(date) %>%
-  filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
-  summarise(depth_m = mean(depth), Q_m3s = mean(discharge), 
-            A_m2 = w.Desoto*depth_m, v_ms = Q_m3s/A_m2,
-            v_mday = v_ms*86400)
-# Run oxygen turnover distance calculation
-K600.eric <- 
-  full_join(K600.eric, v.eric) %>%
-  mutate(O2TurnL_m = 3*v_mday/K600_daily_50pct, O2TurnL_km = O2TurnL_m/1000)
-K600.steve <- 
-  full_join(K600.steve, v.steve) %>%
-  mutate(O2TurnL_m = 3*v_mday/K600_daily_50pct, O2TurnL_km = O2TurnL_m/1000)
-K600.desoto <- 
-  full_join(K600.desoto, v.desoto) %>%
-  mutate(O2TurnL_m = 3*v_mday/K600_daily_50pct, O2TurnL_km = O2TurnL_m/1000)
-
-# Summary stats --------------------------------------------------------------
-K600.eric %>% summarise_all(mean, na.rm = T) # 28.0 km
-K600.steve %>% summarise_all(mean, na.rm = T) # 16.1 km
-K600.desoto %>% summarise_all(mean, na.rm = T) # 21.1 km
-
-# Save as CSV files ----------------------------------------------------------
-saveRDS(K600.eric, file = "./Outputs/OxygenTurnover_Eric.RData")
-write.csv(K600.eric, file = "./Outputs/OxygenTurnover_Eric.CSV", row.names = F)
-
-saveRDS(K600.steve, file = "./Outputs/OxygenTurnover_Steve.RData")
-write.csv(K600.steve, file = "./Outputs/OxygenTurnover_Steve.CSV", 
-          row.names = F)
-
-saveRDS(K600.desoto, file = "./Outputs/OxygenTurnover_Desoto.RData")
-write.csv(K600.desoto, file = "./Outputs/OxygenTurnover_Desoto.CSV", 
-          row.names = F)
 ```
 
 ```{r stoich.scaling}
@@ -1094,16 +1019,8 @@ ra.med <- 0.5
 ra.low <- 0.2
 
 # Run calculation
-stoich.eric <- 
-  modelfit.eric$predictions %>%
-  select(date, GPP, ER) %>%
-  mutate(ER = abs(ER),
-         Uaut_gNm2day = GPP * RespQuot * AutoRespCoeff / CNscale,
-         HR = ER - ra.low * GPP,
-         Uhet_gNm2day = HR / CNscale,
-         U_gNm2day = Uaut_gNm2day + Uhet_gNm2day)
-stoich.steve <- 
-  modelfit.steve$predictions %>%
+stoich.S1S2 <- 
+  modelfit.S1S2 %>%
   select(date, GPP, ER) %>%
   mutate(ER = abs(ER),
          Uaut_gNm2day = GPP * RespQuot * AutoRespCoeff / CNscale,
@@ -1119,13 +1036,50 @@ stoich.desoto <-
          Uhet_gNm2day = HR / CNscale,
          U_gNm2day = Uaut_gNm2day + Uhet_gNm2day)
 
-
 # Save to RData and CSV
-saveRDS(stoich.eric, file = "./Outputs/StoichUptake_Eric.RData")
-write.csv(stoich.eric, file ="./Outputs/StoichUptake_Eric.CSV", row.names = F)
-saveRDS(stoich.steve, file = "./Outputs/StoichUptake_Steve.RData")
-write.csv(stoich.steve, file ="./Outputs/StoichUptake_Steve.CSV", row.names = F)
+saveRDS(stoich.S1S2, file = "./Outputs/StoichUptake_S1S2.RData")
+write.csv(stoich.S1S2, file ="./Outputs/StoichUptake_S1S2.CSV", row.names = F)
 saveRDS(stoich.desoto, file = "./Outputs/StoichUptake_Desoto.RData")
 write.csv(stoich.desoto, file ="./Outputs/StoichUptake_Desoto.CSV", row.names = F)
 ```
 
+```{r depth.check}
+# Check StreamMetabolizer calculated depth against USGS stream gauging data
+# at DeSoto gauge
+
+# Pull calculated depth data from stream metabolism model
+desoto_calcZ <- modelfit.desoto[["fit"]]@data
+
+# Load in gage height data from USGS sensor at Desoto (06892350)
+desoto_gage <- read.csv("./Data/USGSDesoto_GageHeight.csv")
+# Convert ft to m
+desoto_gage$GageHeight_m <- desoto_gage$GageHeight_ft * 0.3048
+# Format DateTime
+desoto_gage$DateTime <- lubridate::mdy_hm(desoto_gage$DateTime, 
+                                          tz = "America/Chicago")
+# Take daily mean of Gage heights
+desoto_gage <- 
+  desoto_gage %>%
+  group_by(date = as.Date(DateTime)) %>%
+  summarise(GageHeight_m = mean(GageHeight_m))
+
+# Take daily mean of calculated depth
+desoto_calcZ <- 
+  desoto_calcZ %>%
+  group_by(date) %>%
+  summarise(calcdepth_m = mean(depth))
+
+# Merge
+desoto_calcZ <- dplyr::full_join(desoto_calcZ, desoto_gage, by = "date")
+# Plot
+ggpubr::ggscatter(desoto_calcZ, x = "GageHeight_m", y = "calcdepth_m", 
+                  add = "reg.line", 
+                  add.params = list(color = "red", fill = "lightgray"), 
+                  conf.int = TRUE) +
+  xlab("Gage height, USGS at DeSoto (m)") +
+  ylab("Modeled mean depth at S3, StreamMetabolizer (m)") +
+  ggpubr::stat_cor(aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~")))
+# Linear regression
+model <- lm(calcdepth_m ~ GageHeight_m, data = desoto_calcZ)
+summary(model)
+```

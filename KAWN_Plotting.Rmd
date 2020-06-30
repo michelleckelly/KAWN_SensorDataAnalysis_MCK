@@ -94,18 +94,24 @@ massbal$Nitrate.steve_mgNL[massbal$date >= ymd("2018-03-10") &
                              massbal$date <= ymd("2018-03-26")] <- NA
 
 # Metabolism results ---------------------------------------------------------
-metab_eric <- readRDS("./Outputs/MetabResults_Eric.RData")$predictions
-metab_steve <- readRDS("./Outputs/MetabResults_Steve.RData")$predictions
+metab_S1S2 <- readRDS("./Outputs/MetabResults_TwoStation.RData")
 metab_desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")$predictions
-names(metab_desoto)[2:10] <- paste0(names(metab_desoto)[2:10], ".desoto")
+
+#metab_eric <- readRDS("./Outputs/MetabResults_Eric.RData")$predictions
+#metab_steve <- readRDS("./Outputs/MetabResults_Steve.RData")$predictions
+#(metab_desoto)[2:10] <- paste0(names(metab_desoto)[2:10], ".desoto")
+#metab <- dplyr::full_join(metab_eric, metab_steve, by = "date", 
+#                          suffix = c(".eric", ".steve")) %>%
+#  dplyr::full_join(., metab_desoto, by = "date")
+
 # Merge into one dataframe
-metab <- dplyr::full_join(metab_eric, metab_steve, by = "date", 
-                          suffix = c(".eric", ".steve")) %>%
-  dplyr::full_join(., metab_desoto, by = "date")
+metab <- dplyr::full_join(metab_S1S2, metab_desoto, by = "date", 
+                          suffix = c(".S1S2", ".S3"))
+
 # Join with sensor data
-sensor_eric <- dplyr::full_join(sensor_eric, metab_eric, by = "date")
-sensor_steve <- dplyr::full_join(sensor_steve, metab_steve, by = "date")
-sensor_desoto <- dplyr::full_join(sensor_desoto, metab_desoto, by = "date")
+#sensor_eric <- dplyr::full_join(sensor_eric, metab_eric, by = "date")
+#sensor_steve <- dplyr::full_join(sensor_steve, metab_steve, by = "date")
+#sensor_desoto <- dplyr::full_join(sensor_desoto, metab_desoto, by = "date")
 
 # Edits that need to happen: taking out dates that have bad data
 # For eric:
@@ -126,32 +132,32 @@ metab$ReleaseStatus[metab$date >= ymd("2018-04-01")] <- "After"
 metab$ReleaseStatus <- factor(metab$ReleaseStatus, 
                               levels = c("During", "After"))
 # Adjust from wide to long format
-metab.long <- tidyr::gather(metab[c(-3:-4,-6:-10, -12:-13, -15:-19, -21:-22, 
-                                    -24:-28)], key = site, value = value,
-                            GPP.eric:ER.desoto)
+metab.long <- tidyr::gather(metab[c(-3:-4, -6:-13, -15:-16, -18:-22)], key = site, value = value,
+                            GPP.S1S2:ER.S3)
+#metab.long <- tidyr::gather(metab[c(-3:-4,-6:-10, -12:-13, -15:-19, -21:-22, 
+#                                    -24:-28)], key = site, value = value,
+#                            GPP.eric:ER.desoto)
 # Factorize site and change labels
 metab.long$site <- factor(metab.long$site)
 # Initialize column to store metab model type (GPP or ER)
 metab.long$model <- metab.long$site
 # Rename factor levels
-levels(metab.long$model)[levels(metab.long$site)=="GPP.eric"] <- "GPP"
-levels(metab.long$site)[levels(metab.long$site)=="GPP.eric"] <- "S1"
-levels(metab.long$model)[levels(metab.long$site)=="GPP.steve"] <- "GPP"
-levels(metab.long$site)[levels(metab.long$site)=="GPP.steve"] <- "S2"
+levels(metab.long$model)[levels(metab.long$site)=="GPP.S1S2"] <- "GPP"
+levels(metab.long$site)[levels(metab.long$site)=="GPP.S1S2"] <- "S1S2"
 levels(metab.long$model)[levels(metab.long$site)=="GPP.desoto"] <- "GPP"
 levels(metab.long$site)[levels(metab.long$site)=="GPP.desoto"] <- "S3"
-levels(metab.long$model)[levels(metab.long$site)=="ER.eric"] <- "ER"
-levels(metab.long$site)[levels(metab.long$site)=="ER.eric"] <- "S1"
-levels(metab.long$model)[levels(metab.long$site)=="ER.steve"] <- "ER"
-levels(metab.long$site)[levels(metab.long$site)=="ER.steve"] <- "S2"
+levels(metab.long$model)[levels(metab.long$site)=="ER.S1S2"] <- "ER"
+levels(metab.long$site)[levels(metab.long$site)=="ER.S1S2"] <- "S1S2"
 levels(metab.long$model)[levels(metab.long$site)=="ER.desoto"] <- "ER"
 levels(metab.long$site)[levels(metab.long$site)=="ER.desoto"] <- "S3"
 metab.long$model <- factor(metab.long$model, levels = c("GPP", "ER")) # Reorder
 metab.long$site <- factor(metab.long$site, levels = c("S1", "S2", "S3"))
 
 # Predicted uptake from metabolism results
-stoich.eric <- readRDS(file = "./Outputs/StoichUptake_Eric.RData")
-stoich.steve <- readRDS(file = "./Outputs/StoichUptake_Steve.RData")
+
+#stoich.eric <- readRDS(file = "./Outputs/StoichUptake_Eric.RData")
+#stoich.steve <- readRDS(file = "./Outputs/StoichUptake_Steve.RData")
+stoich.S1S2 <- readRDS(file = "./Outputs/StoichUptake_S1S2.RData")
 stoich.desoto <- readRDS(file = "./Outputs/StoichUptake_Desoto.RData")
 
 # Nitrate uptake results -----------------------------------------------------
@@ -988,17 +994,17 @@ ggplot(data = massbal, aes(x = date)) +
 ```
 
 ```{r Fig 3. Metabolism}
-# GPP, Eric
-a <- 
+# GPP, S1S2
+#a <- 
   ggplot(data = metab, aes(x = date)) +
   # Add vertical line at release stop date
   geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # Dots
-  geom_ribbon(aes(ymin = GPP.lower.eric, ymax = GPP.upper.eric), fill = "lightgrey") +
-  geom_point(aes(y = GPP.eric, fill = "S1"), size = 2, shape = 21) +
+  geom_ribbon(aes(ymin = GPP.lower.S1S2, ymax = GPP.upper.S1S2), fill = "lightgrey") +
+  geom_point(aes(y = GPP.S1S2, fill = "S1"), size = 2, shape = 21) +
   # Axis limits
   scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01"))) +
-  scale_y_continuous(limits = c(-5, 25)) +
+  #scale_y_continuous(limits = c(-5, 20)) +
   # Axis labels
   labs(x = NULL, tag = "a",
        y = bquote("GPP (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
@@ -1011,17 +1017,18 @@ a <-
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"),
         text = element_text(size = 8))
-# GPP, Steve
-b <- 
+
+# GPP, DeSoto
+#b <- 
   ggplot(data = metab, aes(x = date)) +
   # Add vertical line at release stop date
   geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # Dots
-  geom_ribbon(aes(ymin = GPP.lower.steve, ymax = GPP.upper.steve), fill = "lightgrey") +
-  geom_point(aes(y = GPP.steve, fill = "S2"), size = 2, shape = 21) +
+  geom_ribbon(aes(ymin = GPP.lower.S3, ymax = GPP.upper.S3), fill = "lightgrey") +
+  geom_point(aes(y = GPP.S3, fill = "S3"), size = 2, shape = 21) +
   # Axis limits
   scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01"))) +
-  scale_y_continuous(limits = c(-5, 25)) +
+  #scale_y_continuous(limits = c(-5, 20)) +
   # Axis labels
   labs(x = NULL, tag = "b",
        y = bquote("GPP (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
@@ -1034,20 +1041,21 @@ b <-
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"),
         text = element_text(size = 8))
-# GPP, DeSoto
-c <- 
+
+# ER, two station S1 S2
+#c <- 
   ggplot(data = metab, aes(x = date)) +
   # Add vertical line at release stop date
   geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # Dots
-  geom_ribbon(aes(ymin = GPP.lower.desoto, ymax = GPP.upper.desoto), fill = "lightgrey") +
-  geom_point(aes(y = GPP.desoto, fill = "S3"), size = 2, shape = 21) +
+  geom_ribbon(aes(ymin = ER.lower.S1S2, ymax = ER.upper.S1S2), fill = "lightgrey") +
+  geom_point(aes(y = ER.S1S2, fill = "S1"), size = 2, shape = 21) +
   # Axis limits
   scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01"))) +
-  scale_y_continuous(limits = c(-5, 25)) +
+  #scale_y_continuous(limits = c(-15, 5)) +
   # Axis labels
   labs(x = NULL, tag = "c",
-       y = bquote("GPP (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
+       y = bquote("ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
   # Theme adjustments
   theme_classic() +
   scale_fill_manual(values = c("S1" = "#FF0000", 
@@ -1057,17 +1065,18 @@ c <-
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"),
         text = element_text(size = 8))
-# ER, eric
-d <- 
+
+# ER, S3
+#d <- 
   ggplot(data = metab, aes(x = date)) +
   # Add vertical line at release stop date
   geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # Dots
-  geom_ribbon(aes(ymin = ER.lower.eric, ymax = ER.upper.eric), fill = "lightgrey") +
-  geom_point(aes(y = ER.eric, fill = "S1"), size = 2, shape = 21) +
+  geom_ribbon(aes(ymin = ER.lower.S3, ymax = ER.upper.S3), fill = "lightgrey") +
+  geom_point(aes(y = ER.S3, fill = "S3"), size = 2, shape = 21) +
   # Axis limits
   scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01"))) +
-  scale_y_continuous(limits = c(-30, 5)) +
+  #scale_y_continuous(limits = c(-15, 5)) +
   # Axis labels
   labs(x = NULL, tag = "d",
        y = bquote("ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
@@ -1080,69 +1089,34 @@ d <-
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"),
         text = element_text(size = 8))
-e <- 
-  ggplot(data = metab, aes(x = date)) +
-  # Add vertical line at release stop date
-  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
-  # Dots
-  geom_ribbon(aes(ymin = ER.lower.steve, ymax = ER.upper.steve), fill = "lightgrey") +
-  geom_point(aes(y = ER.steve, fill = "S2"), size = 2, shape = 21) +
-  # Axis limits
-  scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01"))) +
-  scale_y_continuous(limits = c(-30, 5)) +
-  # Axis labels
-  labs(x = NULL, tag = "e",
-       y = bquote("ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
-  # Theme adjustments
-  theme_classic() +
-  scale_fill_manual(values = c("S1" = "#FF0000", 
-                               "S2" = "#23baaf", "S3" = "#F2AD00"),
-                     breaks = c("S1", "S2", "S3")) +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"),
-        text = element_text(size = 8))
-f <- 
-  ggplot(data = metab, aes(x = date)) +
-  # Add vertical line at release stop date
-  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
-  # Dots
-  geom_ribbon(aes(ymin = ER.lower.desoto, ymax = ER.upper.desoto), fill = "lightgrey") +
-  geom_point(aes(y = ER.desoto, fill = "S3"), size = 2, shape = 21) +
-  # Axis limits
-  scale_x_date(limits = c(as.Date("2018-02-01"), as.Date("2018-05-01"))) +
-  scale_y_continuous(limits = c(-30, 5)) +
-  # Axis labels
-  labs(x = NULL, tag = "f",
-       y = bquote("ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
-  # Theme adjustments
-  theme_classic() +
-  scale_fill_manual(values = c("S1" = "#FF0000", 
-                               "S2" = "#23baaf", "S3" = "#F2AD00"),
-                     breaks = c("S1", "S2", "S3")) +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"),
-        text = element_text(size = 8))
 
-grob <- grid.arrange(a,b,c,d,e,f, ncol = 3, nrow = 2)
-ggsave("./Plots/MetabPlot.png", grob, height = 115, width = 190, units = "mm",
+grob <- grid.arrange(a,b,c,d, ncol = 2, nrow = 2)
+ggsave("./Plots/MetabPlot_2.png", grob, height = 95, width = 115, units = "mm", 
        dpi = 600)
 
-ggpubr::compare_means(data = metab.long, value~site, 
-                      group.by = c("model", "Month"))
 # Average stats
-mean(subset(metab_eric, date >= "2018-02-01" & date < "2018-05-01")$GPP, 
+mean(subset(metab_S1S2, date >= "2018-02-01" & date < "2018-05-01")$GPP, 
             na.rm = TRUE)
-mean(subset(metab_steve, date >= "2018-02-01" & date < "2018-05-01")$GPP, 
+sd(subset(metab_S1S2, date >= "2018-02-01" & date < "2018-05-01")$GPP, 
             na.rm = TRUE)
-mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$GPP.desoto, 
+mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$GPP, 
             na.rm = TRUE)
-mean(subset(metab_eric, date >= "2018-02-01" & date < "2018-05-01")$ER, 
+sd(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$GPP, 
             na.rm = TRUE)
-mean(subset(metab_steve, date >= "2018-02-01" & date < "2018-05-01")$ER, 
+mean(subset(metab_S1S2, date >= "2018-02-01" & date < "2018-05-01")$ER, 
             na.rm = TRUE)
-mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER.desoto, 
+sd(subset(metab_S1S2, date >= "2018-02-01" & date < "2018-05-01")$ER, 
+            na.rm = TRUE)
+mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER, 
+            na.rm = TRUE)
+sd(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER, 
+            na.rm = TRUE)
+
+mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$GPP / 
+       subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER, 
+            na.rm = TRUE)
+sd(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$GPP / 
+       subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER, 
             na.rm = TRUE)
 ```
 
@@ -1283,47 +1257,44 @@ ggsave("./Plots/Supply_boxplot.png", height = 3, width = 7, units = "in")
 
 ```{r Fig 5: Predicted uptake fig}
 # Select columns you want
-stoich.eric <- 
-  stoich.eric %>%
-  dplyr::select(Date = date, Ua_gNm2day.eric = Uaut_gNm2day, 
-                Uhet_gNm2day.eric = Uhet_gNm2day, 
-                Ustoic_gNm2day.eric = U_gNm2day)
-stoich.steve <- 
-  stoich.steve %>%
-  dplyr::select(Date = date, Ua_gNm2day.steve = Uaut_gNm2day, 
-                Uhet_gNm2day.steve = Uhet_gNm2day, 
-                Ustoic_gNm2day.steve = U_gNm2day)
+stoich.S1S2 <- 
+  stoich.S1S2 %>%
+  dplyr::select(Date = date, 
+                Ua_gNm2day.S1S2 = Uaut_gNm2day, 
+                Uhet_gNm2day.S1S2 = Uhet_gNm2day, 
+                Ustoic_gNm2day.S1S2 = U_gNm2day)
+
 stoich.desoto <- 
   stoich.desoto %>%
-  dplyr::select(Date = date, Ua_gNm2day.desoto = Uaut_gNm2day, 
+  dplyr::select(Date = date, 
+                Ua_gNm2day.desoto = Uaut_gNm2day, 
                 Uhet_gNm2day.desoto = Uhet_gNm2day, 
                 Ustoic_gNm2day.desoto = U_gNm2day)
 # Merge with uptake
 stoich <- 
   uptake%>%
-  dplyr::full_join(stoich.eric) %>% 
-  dplyr::full_join(stoich.steve) %>%
+  dplyr::full_join(stoich.S1S2) %>% 
   dplyr::full_join(stoich.desoto)
 
 ## Correlation testing
 # Full time series
-cor.test(~UaNO3_gNm2day.eric+Ustoic_gNm2day.eric, 
+cor.test(~UaNO3_gNm2day.eric+Ustoic_gNm2day.S1S2, 
          data = stoich)
-cor.test(~UaNO3_gNm2day.steve+Ustoic_gNm2day.steve, 
+cor.test(~UaNO3_gNm2day.steve+Ustoic_gNm2day.S1S2, 
          data = stoich)
 cor.test(~UaNO3_gNm2day.desoto+Ustoic_gNm2day.desoto, 
          data = stoich)
 # During
-cor.test(~UaNO3_gNm2day.eric+Ustoic_gNm2day.eric, 
+cor.test(~UaNO3_gNm2day.eric+Ustoic_gNm2day.S1S2, 
          data = subset(stoich, ReleaseStatus == "During"))
-cor.test(~UaNO3_gNm2day.steve+Ustoic_gNm2day.steve, 
+cor.test(~UaNO3_gNm2day.steve+Ustoic_gNm2day.S1S2, 
          data = subset(stoich, ReleaseStatus == "During"))
 cor.test(~UaNO3_gNm2day.desoto+Ustoic_gNm2day.desoto, 
          data = subset(stoich, ReleaseStatus == "During"))
 # After
-cor.test(~UaNO3_gNm2day.eric+Ustoic_gNm2day.eric, 
+cor.test(~UaNO3_gNm2day.eric+Ustoic_gNm2day.S1S2, 
          data = subset(stoich, ReleaseStatus == "After"))
-cor.test(~UaNO3_gNm2day.steve+Ustoic_gNm2day.steve, 
+cor.test(~UaNO3_gNm2day.steve+Ustoic_gNm2day.S1S2, 
          data = subset(stoich, ReleaseStatus == "After"))
 cor.test(~UaNO3_gNm2day.desoto+Ustoic_gNm2day.desoto, 
          data = subset(stoich, ReleaseStatus == "After"))
@@ -1332,7 +1303,7 @@ cor.test(~UaNO3_gNm2day.desoto+Ustoic_gNm2day.desoto,
 # Black points: After (April), White points: during (Feb, March)
 # Eric
 a <- 
-  ggplot(data = stoich, aes(x = Ustoic_gNm2day.eric, 
+  ggplot(data = stoich, aes(x = Ustoic_gNm2day.S1S2, 
                           y = UaNO3_gNm2day.eric, 
                           shape = ReleaseStatus)) +
   # 1:1 line
@@ -1344,12 +1315,6 @@ a <-
   #                 aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
-  #scale_color_manual(values = c("During" = "black", "After" = "green", 
-   #                             "S1" = "#FF0000", "S2" = "#23baaf", 
-    #                            "S3" = "#F2AD00")) +
-  #scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-   #                             "S3" = "#F2AD00"),
-    #                 limits = c("S1", "S2", "S3")) +
   # Axis labels
   xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
@@ -1362,7 +1327,7 @@ a <-
         text = element_text(size = 8))
 # Steve
 b <- 
-  ggplot(data = stoich, aes(x = Ustoic_gNm2day.steve, 
+  ggplot(data = stoich, aes(x = Ustoic_gNm2day.S1S2, 
                           y = UaNO3_gNm2day.steve, 
                           shape = ReleaseStatus)) +
   # 1:1 line
@@ -1374,12 +1339,6 @@ b <-
   #                 aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
-  #scale_color_manual(values = c("During" = "black", "After" = "green", 
-  #                              "S1" = "#FF0000", "S2" = "#23baaf", 
-  #                              "S3" = "#F2AD00")) +
-  #scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-  #                              "S3" = "#F2AD00"),
-  #                   limits = c("S1", "S2", "S3")) +
   # Axis labels
   xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
@@ -1404,12 +1363,6 @@ c <-
   #                 aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
-  #scale_color_manual(values = c("During" = "black", "After" = "green", 
-  #                              "S1" = "#FF0000", "S2" = "#23baaf", 
-  #                              "S3" = "#F2AD00")) +
-  #scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
-  #                              "S3" = "#F2AD00"),
-  #                   limits = c("S1", "S2", "S3")) +
   # Axis labels
   xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
