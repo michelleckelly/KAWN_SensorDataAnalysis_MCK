@@ -113,17 +113,6 @@ metab <- dplyr::full_join(metab_S1S2, metab_desoto, by = "date",
 #sensor_steve <- dplyr::full_join(sensor_steve, metab_steve, by = "date")
 #sensor_desoto <- dplyr::full_join(sensor_desoto, metab_desoto, by = "date")
 
-# Edits that need to happen: taking out dates that have bad data
-# For eric:
-# 2018-02-20 thru 2018-02-23 sensor burial
-# 2018-03-06 thru 2018-03-12 sensor burial
-# 2018-04-01 thru 2018-04-04 sensor burial
-# 2018-04-14 thru 2018-04-17 sensor burial
-# 2018-04-25 thru 2018-04-27 sensor burial
-# Steve:
-# 2018-02-01 thru 2018-02-10 N sensor not yet deployed
-# 2018-03-10 thru 2018-03-22 N sensor burial
-
 # Reshape metabolism dataframe -----------------------------------------------
 # Factorize release status
 metab$ReleaseStatus <- NA
@@ -134,9 +123,6 @@ metab$ReleaseStatus <- factor(metab$ReleaseStatus,
 # Adjust from wide to long format
 metab.long <- tidyr::gather(metab[c(-3:-4, -6:-13, -15:-16, -18:-22)], key = site, value = value,
                             GPP.S1S2:ER.S3)
-#metab.long <- tidyr::gather(metab[c(-3:-4,-6:-10, -12:-13, -15:-19, -21:-22, 
-#                                    -24:-28)], key = site, value = value,
-#                            GPP.eric:ER.desoto)
 # Factorize site and change labels
 metab.long$site <- factor(metab.long$site)
 # Initialize column to store metab model type (GPP or ER)
@@ -154,15 +140,11 @@ metab.long$model <- factor(metab.long$model, levels = c("GPP", "ER")) # Reorder
 metab.long$site <- factor(metab.long$site, levels = c("S1", "S2", "S3"))
 
 # Predicted uptake from metabolism results
-
-#stoich.eric <- readRDS(file = "./Outputs/StoichUptake_Eric.RData")
-#stoich.steve <- readRDS(file = "./Outputs/StoichUptake_Steve.RData")
 stoich.S1S2 <- readRDS(file = "./Outputs/StoichUptake_S1S2.RData")
 stoich.desoto <- readRDS(file = "./Outputs/StoichUptake_Desoto.RData")
 
 # Nitrate uptake results -----------------------------------------------------
-# HAVE bad dates removed
-uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1.rds")
+uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1_twostation.rds")
 uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-01"] <- NA # affected by 
 # rapid discharge change, U calculation overestimate
 uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-09"] <- NA # affected by 
@@ -170,12 +152,6 @@ uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-09"] <- NA # affected by
 # Section date
 uptake <- uptake[uptake$Date >= ymd("2018-02-01") & 
                    uptake$Date < ymd("2018-05-01"),]
-# Set values of U below 0 (from days when SumNitrateDiff was negative, which 
-# indicates that biologic activity (may have been present) but was not observed
-# in a diel swing of NO3 (could have been caused by disturbance, increase in Q, etc)
-uptake$UaNO3_gNm2day.eric[uptake$UaNO3_gNm2day.eric < 0] <- NA
-uptake$UaNO3_gNm2day.steve[uptake$UaNO3_gNm2day.steve < 0] <- NA
-uptake$UaNO3_gNm2day.desoto[uptake$UaNO3_gNm2day.desoto < 0] <- NA
 
 # Adjust from wide to long format
 uptake.long <- 
@@ -248,24 +224,20 @@ uptake$vf_mmmin.steve <-
 uptake$vf_mmmin.desoto <- 
   uptake$UaNO3_gNm2day.desoto / uptake$Mean.Nitrate_mgL.desoto / 1440 * 1000
 # Adjust data frame structure
-vf <- tidyr::gather(uptake, key = site, value = vf_mmmin, 
+vf <- tidyr::gather(uptake[c("Date", "vf_mmmin.eric", "vf_mmmin.steve", "vf_mmmin.desoto")], 
+                    key = site, value = vf_mmmin, 
                     vf_mmmin.eric:vf_mmmin.desoto)
 vf$site <- factor(vf$site, levels = c("vf_mmmin.eric", "vf_mmmin.steve", 
                                       "vf_mmmin.desoto"))
 levels(vf$site)[levels(vf$site)=="vf_mmmin.eric"] <- "S1"
 levels(vf$site)[levels(vf$site)=="vf_mmmin.steve"] <- "S2"
 levels(vf$site)[levels(vf$site)=="vf_mmmin.desoto"] <- "S3"
-vf <- vf[-c(2:16)]
 vf <- subset(vf, Date < "2018-05-01")
 vf$Month <- lubridate::month(vf$Date, label = TRUE, abbr = TRUE)
-# Set values of vf below 0 (from below 0 U measurements, from days when biologic 
-# activity in the diel swing can't be detected/ no measureable dip in diel swing
-# of NO3, could be caused by disturbance, increase in Q, etc)
-vf$vf_mmmin[vf$vf_mmmin < 0] <- NA
 
 # Join with metabolism data
-vf.metab <- dplyr::full_join(metab.long, vf, by = c("Date", "site", "ReleaseStatus"))
-vf.metab$date <- NULL
+#vf.metab <- dplyr::full_join(metab.long, vf, by = c("Date", "site"))
+#vf.metab$date <- NULL
 ```
 
 ```{r Calculation: P/R}
@@ -995,7 +967,7 @@ ggplot(data = massbal, aes(x = date)) +
 
 ```{r Fig 3. Metabolism}
 # GPP, S1S2
-#a <- 
+a <- 
   ggplot(data = metab, aes(x = date)) +
   # Add vertical line at release stop date
   geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
@@ -1019,7 +991,7 @@ ggplot(data = massbal, aes(x = date)) +
         text = element_text(size = 8))
 
 # GPP, DeSoto
-#b <- 
+b <- 
   ggplot(data = metab, aes(x = date)) +
   # Add vertical line at release stop date
   geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
@@ -1043,7 +1015,7 @@ ggplot(data = massbal, aes(x = date)) +
         text = element_text(size = 8))
 
 # ER, two station S1 S2
-#c <- 
+c <- 
   ggplot(data = metab, aes(x = date)) +
   # Add vertical line at release stop date
   geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
@@ -1067,7 +1039,7 @@ ggplot(data = massbal, aes(x = date)) +
         text = element_text(size = 8))
 
 # ER, S3
-#d <- 
+d <- 
   ggplot(data = metab, aes(x = date)) +
   # Add vertical line at release stop date
   geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
@@ -1112,6 +1084,10 @@ mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER,
 sd(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER, 
             na.rm = TRUE)
 
+mean(subset(metab_S1S2, date >= "2018-02-01" & date < "2018-05-01")$GPP / 
+       subset(metab_S1S2, date >= "2018-02-01" & date < "2018-05-01")$ER, 
+            na.rm = TRUE)
+
 mean(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$GPP / 
        subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$ER, 
             na.rm = TRUE)
@@ -1121,6 +1097,9 @@ sd(subset(metab_desoto, date >= "2018-02-01" & date < "2018-05-01")$GPP /
 ```
 
 ```{r Fig 4: Uptake and Vf}
+# Change penalty for sci notation
+options(scipen = 10000)
+
 # U ############################################################################
 a <- 
   ggplot(data = uptake.long, aes(x = Date, y = UaNO3_gNm2day, fill = site)) +
@@ -1128,13 +1107,16 @@ a <-
   # Add vertical line at release stop date
   geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # Add regression line to S3
+  geom_smooth(data = subset(uptake.long, site == "S2"), method = lm, 
+              color = "black", fill = "grey") +
+  # Add regression line to S3
   geom_smooth(data = subset(uptake.long, site == "S3"), method = lm, 
               color = "black", fill = "grey") +
   # Add points
   geom_point(shape = 21) +
   # Add R2 and p value labels to plot
-  #ggpubr::stat_cor(label.y.npc = 0.2, digits = 2,
-  #                 aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~"))) +
+  ggpubr::stat_cor(label.y.npc = 0.2, digits = 2, size = 2,
+                   aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~"))) +
   scale_y_log10() +
   # Color scales
   scale_fill_manual(values = c("S1" = "#FF0000", "S1_scaled" = "#FF0000",
@@ -1160,14 +1142,11 @@ b <-
   facet_grid(~site) +
   # Add vertical line at release stop date
   geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
-  # Add regression line to S2
-  geom_smooth(data = subset(vf, site == "S2"), method = lm, 
-              color = "black", fill = "grey") +
   # Add points
   geom_point(shape = 21) +
   # Add R2 and p value labels to plot
-  #ggpubr::stat_cor(label.y.npc = 0.9, digits = 2,
-  #                 aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~"))) +
+  ggpubr::stat_cor(label.y.npc = 0.9, digits = 2, size = 2,
+                   aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~"))) +
   # Labels
   labs(tag = "b") +
   xlab(NULL) +
@@ -1187,53 +1166,27 @@ ggsave("./Plots/Vf_boxplot.png", b, height = 57.5, width = 122, units = "mm",
 
 
 grob <- grid.arrange(a,b)
+ggsave("./Plots/U_Vf_v2.png", grob, height = 57.5*2, width = 127, units = "mm", 
+       dpi = 600)
 
-
-# Merge uptake.long with supply.long
-SU.long <- 
-  left_join(supply.long, uptake.long, by = c("Date", "Month", 
-                                             "site", "WeekGroup"))
-# Gather for plotting
-plotdata <- gather(SU.long, type, value, Supply_gNm2day, UaNO3_gNm2day)
-plotdata$type <- factor(plotdata$type, 
-                        levels = c("Supply_gNm2day", "UaNO3_gNm2day"),
-                        labels = c("Supply", "Uptake"))
-
-ggplot(data = subset(plotdata, Date < "2018-05-01"), 
-       aes(x = Month, y = value)) +
+# Just S2 and S3
+c <- 
+  ggplot(data = subset(uptake.long, site == c("S2", "S3")), 
+       aes(x = Date, y = UaNO3_gNm2day, fill = site)) +
   facet_wrap(~site, nrow = 1) +
-  # Boxplots
-  geom_boxplot(aes(fill = type), position = position_dodge(1), 
-               outlier.shape = NA) +
-  # Points
-  geom_point(aes(group = type, fill = type), 
-             position = position_jitterdodge(jitter.width = 0.2, 
-                                             dodge.width = 1), shape = 21) +
-  # axis labels
-  xlab(NULL) + 
-  ylab(expression("Supply or Uptake (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  # plot theme
-  theme_classic() +
-  theme(legend.title = element_blank(), legend.position = "bottom",
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-
-## Plot supply
-ggplot(data = subset(supply.long, Date < "2018-05-01"), 
-       aes(x = Month, y = Supply_gNm2day, fill = site)) +
-  facet_wrap(~site, nrow = 1) +
-  # Error bars
-  stat_boxplot(geom = "errorbar", width = 0.5, 
-               position = position_dodge(width = 0.75)) +
-  # Add text for significance
-  ggpubr::stat_compare_means(aes(group = Month), label = "p.format", 
-                             label.y.npc = "bottom") +
-  # Boxplots
-  geom_boxplot(outlier.shape = NA) +
-  # Jitter points
-  geom_point(position = position_jitterdodge(dodge.width = 1, 
-                                             jitter.width = 1), 
-             shape = 1, size = 2) +
+  # Add vertical line at release stop date
+  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
+  # Add regression line to S3
+  geom_smooth(data = subset(uptake.long, site == "S2"), method = lm, 
+              color = "black", fill = "grey") +
+  # Add regression line to S3
+  geom_smooth(data = subset(uptake.long, site == "S3"), method = lm, 
+              color = "black", fill = "grey") +
+  # Add points
+  geom_point(shape = 21) +
+  # Add R2 and p value labels to plot
+  ggpubr::stat_cor(label.y.npc = 0.2, digits = 2,
+                   aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~"))) +
   scale_y_log10() +
   # Color scales
   scale_fill_manual(values = c("S1" = "#FF0000", "S1_scaled" = "#FF0000",
@@ -1241,18 +1194,41 @@ ggplot(data = subset(supply.long, Date < "2018-05-01"),
                                "S3" = "#F2AD00"),
                      limits = c("S1", "S1_scaled", "S2", "S3")) +
   # axis labels
-  #labs(tag = "A") +
+  labs(tag = "a") +
   xlab(NULL) + 
-  ylab(expression("Supply (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
+  ylab(expression(U[Diel]*" (g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
   # plot theme
   theme_classic() +
   theme(legend.position = "none", legend.title = element_blank(),
         panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"))
-ggsave("./Plots/Supply_boxplot.png", height = 3, width = 7, units = "in")
+        axis.text = element_text(color = "black"),
+        text = element_text(size = 8))
 
-
-
+d <- 
+  ggplot(data = subset(vf, site == c("S2", "S3")), 
+         aes(x = Date, y = vf_mmmin, fill = site)) +
+  facet_grid(~site) +
+  # Add vertical line at release stop date
+  geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
+  # Add points
+  geom_point(shape = 21) +
+  # Add R2 and p value labels to plot
+  ggpubr::stat_cor(label.y.npc = 0.9, digits = 2,
+                   aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~"))) +
+  # Labels
+  labs(tag = "b") +
+  xlab(NULL) +
+  ylab(expression(V[f] ~~ "(mm" ~ min^{-1} * ")")) +
+  # Color scales
+  scale_fill_manual(values = c("S1" = "#FF0000", "S2" = "#23baaf", 
+                                "S3" = "#F2AD00"),
+                     limits = c("S1", "S2", "S3")) +
+  # plot theme
+  theme_classic() +
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.border = element_rect(fill = NA), 
+        axis.text = element_text(color = "black"),
+        text = element_text(size = 8))
 ```
 
 ```{r Fig 5: Predicted uptake fig}
@@ -1335,8 +1311,8 @@ b <-
   # Data points
   geom_point(fill = "#23baaf", size = 2) +
   # Add correlation coeff
-  #ggpubr::stat_cor(method = "pearson", label.y.npc = "top", label.x = c(0.46),
-  #                 aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
+  ggpubr::stat_cor(method = "pearson", label.y.npc = "top", label.x = c(0.46),
+                   aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
   # Axis labels
@@ -1359,8 +1335,8 @@ c <-
   # Data points
   geom_point(fill = "#F2AD00", size = 2) +
   # Add correlation coeff
-  #ggpubr::stat_cor(method = "pearson", label.y.npc = "top", label.x = c(0.3),
-  #                 aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
+  ggpubr::stat_cor(method = "pearson", label.y.npc = "top", label.x = c(0.3),
+                   aes(label = paste(..rr.label.., ..p.label.., sep = "*`,`~"))) +
   # Color scales
   scale_shape_manual(values = c("During" = 1, "After" = 21)) +
   # Axis labels
