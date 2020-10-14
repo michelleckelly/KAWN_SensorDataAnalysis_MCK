@@ -167,238 +167,20 @@ write.csv(K600.desoto, file = "./Outputs/OxygenTurnover_Desoto.CSV",
 ```
 
 ```{r twoStation}
+# Significant portions of the below script are adapted/sourced from Hall et al 
+# 2016 supplemental material
+
 ########### Load libraries ####################################################
 library(mcmc)
-
-########### 1. Load raw data from StreamPulse #################################
-## Define time range
-start <- "2018-02-01"
-end <- "2018-05-01"
-
-## S1 ("Eric")
-site_code <- "KS_KANSASREASTLAWRENCE"
-S1 <- request_data(site_code, startdate = start, enddate = end)
-## S2 ("Steve")
-site_code <- "KS_KANSASRFALLLEAF"
-S2 <- request_data(site_code, startdate = start, enddate = end)
-
-########### 2. Preprocess data using StreamPULSE functions ####################
-# Format data for modeling
-S1_preproc <- prep_metabolism(S1, rm_flagged = "Bad Data", 
-                                fillgaps = "interpolation",
-                                estimate_areal_depth = TRUE)
-S2_preproc <- prep_metabolism(S2, rm_flagged = "Bad Data", 
-                                fillgaps = "interpolation",
-                                estimate_areal_depth = TRUE)
-
-########## 3. Rename columns to match script format ###########################
-# First actual DO log for S1 is at 2018-02-25 02:55:16
-S1_preproc <- 
-  S1_preproc$data %>%
-  as_tibble() %>%
-  rename(datetime = solar.time, temp = temp.water, oxy = DO.obs) %>%
-  filter(datetime >= ymd_hms("2018-02-25 02:55:16", tz = "UTC") &
-                             datetime < ymd_hms("2018-04-20 14:40:00", tz = "UTC"))
-S2_preproc <- 
-  S2_preproc$data %>%
-  as_tibble() %>%
-  rename(datetime = solar.time, temp = temp.water, oxy = DO.obs) %>%
-  filter(datetime >= ymd_hms("2018-02-25 02:55:16", tz = "UTC") &
-           datetime < ymd_hms("2018-04-20 14:40:00", tz = "UTC"))
-
-# Remove seconds in time, this way datetimes will be equal
-second(S1_preproc$datetime) <- 0
-second(S2_preproc$datetime) <- 0
-# Add column for site
-S1_preproc$`river station` <- "S1"
-S2_preproc$`river station` <- "S2"
-# Merge dataframes
-TS_S1S2 <- full_join(S1_preproc, S2_preproc)
-
-# For identifying time periods with overlapping data
-#ggplot(data = TS_S1S2, aes(x = datetime, y = oxy, color = `river station`)) +
-#  geom_line() +
-#  scale_x_datetime(breaks = "1 week")
-
-# Data availability at both S1 and S2 during times:
-# 2018-02-25 02:55:00 to 2018-03-05 05:40:00
-# 2018-03-12 16:55:00 to 2018-03-28 00:40:00
-# 2018-03-29 00:10:00 to 2018-03-30 10:40:00
-
-# Section data
-TS_S1S2_a <- 
-  TS_S1S2 %>%
-  filter(datetime >= ymd_hms("2018-02-25 02:55:00", tz = "UTC") &
-           datetime <= ymd_hms("2018-03-05 05:40:00", tz = "UTC"))
-TS_S1S2_b <- 
-  TS_S1S2 %>%
-  filter(datetime >= ymd_hms("2018-03-12 16:55:00", tz = "UTC") &
-           datetime <= ymd_hms("2018-03-28 00:40:00", tz = "UTC"))
-TS_S1S2_c <- 
-  TS_S1S2 %>%
-  filter(datetime >= ymd_hms("2018-03-29 00:10:00", tz = "UTC") &
-           datetime <= ymd_hms("2018-03-30 10:40:00", tz = "UTC"))
-
-# Any remaining NA gaps?
-sum(is.na(TS_S1S2_a))
-sum(is.na(TS_S1S2_b))
-sum(is.na(TS_S1S2_c))
-
-############# 4. Estimate Travel time #########################################
-# Travel time = time for a parcel of H2O to travel from S1 to S2
-
-# Variables needed:
-# Mean H2O velocity at S1 (where v = Q/A, see equations in areal.extent chunk) 
-# Mean H2O velocity at S2
-# Distance between S1 and S2 = 5.13 km = 5130 m
-
-# Load in calculated water velocity, area
-S1_v <- readRDS(file = "./Outputs/Velocity_S1.RData")
-S2_v <- readRDS(file = "./Outputs/Velocity_S2.RData")
-
-# Filter for dates of interest, join dataframes, at each date compute the mean 
-# of velocity at S1 and S2
-v_S1S2 <- 
-  left_join(S1_v %>% filter(date >= date("2018-02-25")),
-          S2_v %>% filter(date >= date("2018-02-25")), 
-          by = "date", suffix = c(".S1", ".S2")) %>%
-  select(date, v_ms.S1, v_ms.S2)
-# Compute the mean v of S1 and S2 on each date
-v_S1S2$v_ms.mean <- apply(v_S1S2[c("v_ms.S1","v_ms.S2")], MARGIN = 1, 
-                          FUN = mean)
-
-# Section into time blocks
-# 2018-02-25 02:55:00 to 2018-03-05 05:40:00
-# 2018-03-12 16:55:00 to 2018-03-28 00:40:00
-v_S1S2_a <- 
-  v_S1S2 %>%
-  filter(date >= date("2018-02-25") & date <= date("2018-03-05"))
-v_S1S2_b <- 
-  v_S1S2 %>%
-  filter(date >= date("2018-03-12") & date <= date("2018-03-28"))
-
-# Compute overall mean velocity at S1 and S2, and the mean of the daily means
-v_S1S2_a.mean <-
-  v_S1S2_a %>%
-  summarise(mean(v_ms.S1, na.rm = T), 
-            mean(v_ms.S2, na.rm = T), 
-            mean(v_ms.mean, na.rm = T),
-            sd(v_ms.S1, na.rm = T), 
-            sd(v_ms.S2, na.rm = T), 
-            sd(v_ms.mean, na.rm = T))
-
-v_S1S2_b.mean <-
-  v_S1S2_b %>%
-  summarise(mean(v_ms.S1, na.rm = T), 
-            mean(v_ms.S2, na.rm = T), 
-            mean(v_ms.mean, na.rm = T),
-            sd(v_ms.S1, na.rm = T), 
-            sd(v_ms.S2, na.rm = T), 
-            sd(v_ms.mean, na.rm = T))
-
-# Travel time [s] = distance [m] / velocity [m/s]
-# Convert from sec to hrs
-# Convert from sec to days
-tt_S1S2_a <- tibble(date = v_S1S2_a$date,
-                    tt_sec = 5130 / v_S1S2_a$v_ms.mean,
-                    tt_hours = tt_sec / 3600,
-                    tt_days = tt_sec / 86400)
-tt_S1S2_b <- tibble(date = v_S1S2_b$date,
-                    tt_sec = 5130 / v_S1S2_b$v_ms.mean,
-                    tt_hours = tt_sec / 3600,
-                    tt_days = tt_sec / 86400)
-
-# Compute mean and standard deviation
-tt_S1S2_a.mean <- 
-  tt_S1S2_a %>%
-  summarise(mean(tt_days, na.rm = T),
-            sd(tt_days, na.rm = T))
-tt_S1S2_b.mean <- 
-  tt_S1S2_b %>%
-  summarise(mean(tt_days, na.rm = T),
-            sd(tt_days, na.rm = T))
-
-# overall mean tt, for normalizing U
-tt_S1S1_overall.mean <- 
-  v_S1S2 %>%
-  filter(date >= date("2018-02-25") & date <= date("2018-03-28")) %>%
-  summarise(v_ms.mean = mean(v_ms.mean, na.rm = T)) %>%
-  mutate(tt_sec.mean = 5130 / v_ms.mean,
-         tt_hours.mean = tt_sec.mean / 3600,
-         tt_days.mean = tt_sec.mean / 86400)
-
-############# 5. Pull z #########################################
-z_S1S2 <- 
-  left_join(S1_v %>% filter(date >= date("2018-02-25")),
-          S2_v %>% filter(date >= date("2018-02-25")), 
-          by = "date", suffix = c(".S1", ".S2")) %>%
-  select(date, depth_m.S1, depth_m.S2)
-
-# Section into time blocks
-# 2018-02-25 02:55:00 to 2018-03-05 05:40:00
-# 2018-03-12 16:55:00 to 2018-03-28 00:40:00
-z_S1S2_a <- 
-  z_S1S2 %>%
-  filter(date >= date("2018-02-25") & date <= date("2018-03-05"))
-z_S1S2_b <- 
-  z_S1S2 %>%
-  filter(date >= date("2018-03-12") & date <= date("2018-03-28"))
-
-# Compute the mean of S1 and S2 on each date
-z_S1S2_a$z.mean <- apply(z_S1S2_a[c("depth_m.S1","depth_m.S2")], 
-                       MARGIN = 1, FUN = mean)
-z_S1S2_b$z.mean <- apply(z_S1S2_b[c("depth_m.S1","depth_m.S2")], 
-                       MARGIN = 1, FUN = mean)
-
-# Compute overall mean at S1 and S2, and the mean of the daily means
-z_S1S2_a.mean <- 
-  z_S1S2_a %>% 
-  summarise(mean(depth_m.S1, na.rm = T), 
-            mean(depth_m.S2, na.rm = T), 
-            mean(z.mean, na.rm = T),
-            sd(depth_m.S1, na.rm = T), 
-            sd(depth_m.S2, na.rm = T), 
-            sd(z.mean, na.rm = T))
-z_S1S2_b.mean <- 
-  z_S1S2_b %>% 
-  summarise(mean(depth_m.S1, na.rm = T), 
-            mean(depth_m.S2, na.rm = T), 
-            mean(z.mean, na.rm = T),
-            sd(depth_m.S1, na.rm = T), 
-            sd(depth_m.S2, na.rm = T), 
-            sd(z.mean, na.rm = T))
-
-############## The below script is adapted from Hall et al 2016 ###############
-# Load chron package
 library(chron)
 
-# Function to convert time column to chron object
-timeConvert <- function(data){
-  # Mutate time column
-  data <- 
-    data %>%
-    mutate(date = date(datetime), 
-           time = paste(hour(datetime), minute(datetime), second(datetime), 
-                        sep = ":"))
-  # Convert to chron object
-  dtime <- chron(dates = as.character(data$date), 
-               times = as.character(data$time),
-               format = c(dates = "y-m-d", times = "h:m:s"))
-  return(dtime)
-}
-
-TS_S1S2$dtime <- timeConvert(TS_S1S2)
-TS_S1S2_a$dtime <- timeConvert(TS_S1S2_a)
-TS_S1S2_b$dtime <- timeConvert(TS_S1S2_b)
-TS_S1S2_c$dtime <- timeConvert(TS_S1S2_c)
-
-############################ Internal Functions ###############################
+########### Internal Functions for Two Station Modeling #######################
 # Function to estimate K at temperature 'temp'from K600.  Wanninkhof 1992.
 Kcor <- function (temp, K600) {
 	K600 / (600/(1800.6-(temp*120.1)+(3.7818*temp^2)-(0.047608*temp^3)))^-0.5
 }
 
-########### tspost FUNCTION: Calculate posterior probablility of model ########
+# tspost FUNCTION: Calculate posterior probablility of model
 # This function calculates the posterior probability of the model given 
 # parameters
 # Called within twostationpostsum
@@ -413,7 +195,8 @@ Kcor <- function (temp, K600) {
 # tt            travel time [days]
 # Kmean   
 # Ksd
-tspost <- function(MET, tempup, tempdown, oxyup, oxydown, light, tt, z, osat, Kmean, Ksd){
+tspost <- function(MET, tempup, tempdown, oxyup, oxydown, light, tt, z, osat, 
+                   Kmean, Ksd){
 	# Assign the paramters we solve for to easy to understand values
 	GPP <- MET[1]
 	ER <- MET[2]
@@ -450,8 +233,8 @@ tspost <- function(MET, tempup, tempdown, oxyup, oxydown, light, tt, z, osat, Km
 	loglik + prior 
 }
 
-##### O2TimeSeries FUNCTION: Return modeled oxygen time series from ##########
-###################### median GPP, ER estimates ##############################
+# O2TimeSeries FUNCTION: Return modeled oxygen time series from median GPP, 
+# ER estimates
 # ARGUMENTS:
 # GPP
 # ER
@@ -510,8 +293,7 @@ O2TimeSeries <- function(GPP, ER, O2data, Kmean, z, tt, upName, downName) {
   return(oxymodel)
 }
 
-################# Two station modeling function ###############################
-########### twostationpostsum FUNCTION: Calculate MCMC for data ###############
+# Two station modeling function: Calculate MCMC for data 
 # This function prepares the data for any given river, runs the MCMC and 
 # returns posterior distributions
 # ARGUMENTS:
@@ -525,7 +307,6 @@ O2TimeSeries <- function(GPP, ER, O2data, Kmean, z, tt, upName, downName) {
 # Ksd           standard deviation of K
 # nbatch        number of MCMC trials
 # scale         
-
 twostationpostsum <- function(O2data, upName, downName, start, z, tt, Kmean, Ksd, 
                               nbatch, scale) {
   # Add date column
@@ -632,10 +413,11 @@ twostationpostsum <- function(O2data, upName, downName, start, z, tt, Kmean, Ksd
   return(output)
 }
 
-##function for nighttime regression.  Reports K600, units of 1/d.  Make sure you
-# set the times approprately, i.e. just after dark to whenever deltaO2 reaches 0
+# nightreg function for nighttime regression.  Reports K600, units of 1/d.
+# Make sure you set the times approprately, i.e. just after dark to whenever 
+# deltaO2 reaches 0
 
-##Convert KO2 to K600
+# Convert KO2 to K600
 K600fromO2 <- function(temp, KO2) {
   ((600/(1800.6-(120.1*temp)+(3.7818*temp^2)-(0.047608*temp^3)))^-0.5)*KO2
 }
@@ -675,6 +457,7 @@ nightreg <- function(o2file, nightStart, nightEnd, downName) {
   regIntercept <- vector(mode = "numeric", length = length(nightList))
   regSlope <- vector(mode = "numeric", length = length(nightList))
   K600 <- vector(mode = "numeric", length = length(nightList))
+  r2fit <- vector(mode = "numeric", length = length(nightList))
   #satdeficit <- vector(mode = "numeric", length = nrow(o2night))
   #deltaoxy <- vector(mode = "numeric", length = nrow(o2night))
   
@@ -701,8 +484,11 @@ nightreg <- function(o2file, nightStart, nightEnd, downName) {
     satdef <- oxysattrim - oxyf2[-1]
     
     # Calculate regression
-    nreg <- lm(deltaO2 ~ satdef)
+    # # currently set to exclude NA data from the regression
+    nreg <- lm(deltaO2 ~ satdef, na.action = na.exclude)
     coeff <- coef(nreg)
+    # Get the R2 of the regression
+    r2 <- summary(nreg)$r.squared
     # Convert the slope of the regression to K600 value
     calcK600 <- as.numeric(K600fromO2(mean(temp), coeff[2]))
     
@@ -710,107 +496,324 @@ nightreg <- function(o2file, nightStart, nightEnd, downName) {
     regIntercept[i] <- as.numeric(coeff[1])
     regSlope[i] <- as.numeric(coeff[2])
     K600[i] <- calcK600
+    r2fit[i] <- r2
     plot(satdef,deltaO2, main = nightList[i])
     abline(nreg)
   }
   # Create dataframe of daily estimates
   dailyEstimates <- data.frame(date = nightList, intercept = regIntercept, 
-                               slope = regSlope, K600 = K600)
+                               slope = regSlope, K600 = K600, r2fit = r2fit)
   
   # Return daily estimates and mean K600 for period
   out <- list(dailyEstimates = dailyEstimates, meanK600 = mean(dailyEstimates$K600))
   return(out)
 }
 
-# Run function
+########### 1. Load raw data from StreamPulse #################################
+## Define time range
+start <- "2018-02-01"
+end <- "2018-05-01"
+
+## S1 ("Eric")
+site_code <- "KS_KANSASREASTLAWRENCE"
+S1 <- request_data(site_code, startdate = start, enddate = end)
+## S2 ("Steve")
+site_code <- "KS_KANSASRFALLLEAF"
+S2 <- request_data(site_code, startdate = start, enddate = end)
+
+########### 2. Preprocess data using StreamPULSE functions ####################
+# Format data for modeling
+S1_preproc <- prep_metabolism(S1, rm_flagged = "Bad Data", 
+                                fillgaps = "interpolation",
+                                estimate_areal_depth = TRUE)
+S2_preproc <- prep_metabolism(S2, rm_flagged = "Bad Data", 
+                                fillgaps = "interpolation",
+                                estimate_areal_depth = TRUE)
+
+########## 3. Rename columns to match script format ###########################
+# First actual DO log for S1 is at 2018-02-25 02:55:16
+S1_preproc <- 
+  S1_preproc$data %>%
+  as_tibble() %>%
+  rename(datetime = solar.time, temp = temp.water, oxy = DO.obs) %>%
+  filter(datetime >= ymd_hms("2018-02-25 02:55:16", tz = "UTC") &
+                             datetime < ymd_hms("2018-04-20 14:40:00", tz = "UTC"))
+S2_preproc <- 
+  S2_preproc$data %>%
+  as_tibble() %>%
+  rename(datetime = solar.time, temp = temp.water, oxy = DO.obs) %>%
+  filter(datetime >= ymd_hms("2018-02-25 02:55:16", tz = "UTC") &
+           datetime < ymd_hms("2018-04-20 14:40:00", tz = "UTC"))
+
+# Remove seconds in time, this way datetimes will be equal
+second(S1_preproc$datetime) <- 0
+second(S2_preproc$datetime) <- 0
+# Add column for site
+S1_preproc$`river station` <- "S1"
+S2_preproc$`river station` <- "S2"
+# Merge dataframes
+TS_S1S2 <- full_join(S1_preproc, S2_preproc)
+
+# Function to convert time column to chron object
+timeConvert <- function(data){
+  # Mutate time column
+  data <- 
+    data %>%
+    mutate(date = date(datetime), 
+           time = paste(hour(datetime), minute(datetime), second(datetime), 
+                        sep = ":"))
+  # Convert to chron object
+  dtime <- chron(dates = as.character(data$date), 
+               times = as.character(data$time),
+               format = c(dates = "y-m-d", times = "h:m:s"))
+  return(dtime)
+}
+# Convert datetime to chron
+TS_S1S2$dtime <- timeConvert(TS_S1S2)
+
+# Load in calculated water velocity, area for travel time calculations
+S1_v <- readRDS(file = "./Outputs/Velocity_S1.RData")
+S2_v <- readRDS(file = "./Outputs/Velocity_S2.RData")
+
+# Filter for dates of interest, join dataframes, at each date compute the mean 
+# of velocity at S1 and S2
+v_S1S2 <- 
+  left_join(S1_v %>% filter(date >= date("2018-02-25")),
+          S2_v %>% filter(date >= date("2018-02-25")), 
+          by = "date", suffix = c(".S1", ".S2")) %>%
+  select(date, v_ms.S1, v_ms.S2)
+# Compute the mean v of S1 and S2 on each date
+v_S1S2$v_ms.mean <- apply(v_S1S2[c("v_ms.S1","v_ms.S2")], MARGIN = 1, 
+                          FUN = mean)
+
+# Join depth data
+z_S1S2 <- 
+  left_join(S1_v %>% filter(date >= date("2018-02-25")),
+          S2_v %>% filter(date >= date("2018-02-25")), 
+          by = "date", suffix = c(".S1", ".S2")) %>%
+  select(date, depth_m.S1, depth_m.S2)
+# Compute the mean z of S1 and S2 on each date
+z_S1S2$z.mean <- apply(z_S1S2[c("depth_m.S1","depth_m.S2")], 
+                       MARGIN = 1, FUN = mean)
+
+########### Inspect nighttime regression for K600 estimates ###################
+
+# Section time series into the time chunks when both sites have data
+TS_S1S2_a <- 
+  TS_S1S2 %>%
+  filter(datetime < ymd_hms("2018-03-05 05:40:00"))
+TS_S1S2_b <- 
+  TS_S1S2 %>%
+  filter(datetime > ymd_hms("2018-03-12 16:40:00") & 
+           datetime < ymd_hms("2018-03-28 00:55:00"))
+TS_S1S2_c <- 
+  TS_S1S2 %>%
+  filter(datetime > ymd_hms("2018-03-28 23:55:00") &
+           datetime < ymd_hms("2018-03-30 10:55:00"))
+TS_S1S2_d <- 
+  TS_S1S2 %>%
+  filter(datetime > ymd_hms("2018-04-09 08:55:00") &
+           datetime < ymd_hms("2018-04-14 08:25:00"))
+TS_S1S2_e <- 
+  TS_S1S2 %>%
+  filter(datetime > ymd_hms("2018-04-17 18:10:00"))
+
 k600_a <- nightreg(o2file = TS_S1S2_a, nightStart = "17:45:00", 
-                   nightEnd = "06:30:00", downName = "S2")
-# Check through the plots to make sure none of them look weird
-# 2018-02-24 looks weird, probably because there's just data starting at 3AM onwards 
-# for this date
-# Therefore, compute mean K600 without 2018-02-24:
-mean(k600_a$dailyEstimates$K600[-1])
-
+                     nightEnd = "06:30:00", downName = "S2")
 k600_b <- nightreg(o2file = TS_S1S2_b, nightStart = "17:45:00", 
-                   nightEnd = "06:30:00", downName = "S2")
-mean(k600_b$dailyEstimates$K600[-1])
-
+                     nightEnd = "06:30:00", downName = "S2")
 k600_c <- nightreg(o2file = TS_S1S2_c, nightStart = "17:45:00", 
-                   nightEnd = "06:30:00", downName = "S2")
-k600_c$dailyEstimates$K600[2] # Only 2 days of data here
+                     nightEnd = "06:30:00", downName = "S2")
+k600_d <- nightreg(o2file = TS_S1S2_d, nightStart = "17:45:00", 
+                     nightEnd = "06:30:00", downName = "S2")
+k600_e <- nightreg(o2file = TS_S1S2_e, nightStart = "17:45:00", 
+                     nightEnd = "06:30:00", downName = "S2")
 
-########### Run 2-station metabolism modeling function #######################
-# Using K estimates from nighttime regression
+k600 <-
+  bind_rows(k600_a$dailyEstimates, k600_b$dailyEstimates, 
+            k600_c$dailyEstimates, k600_d$dailyEstimates, 
+            k600_e$dailyEstimates)
 
-# Time block a, 2018-02-25 thru 2018-03-05
-tsout_a <- twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
-                             O2data = TS_S1S2_a, 
-                             z = as.numeric(z_S1S2_a.mean[3]), 
-                             tt = as.numeric(tt_S1S2_a.mean$`mean(tt_days, na.rm = T)`), 
-                             Kmean = mean(k600_a$dailyEstimates$K600[-1]), 
-                             Ksd = sd(k600_a$dailyEstimates$K600[-1]), 
-                             upName = "S1", downName = "S2", 
-                             nbatch = 200000, scale = 0.3)
-# Scale needs to be tuned so that acceptance rate is around 25%
-tsout_a[["accept"]]
+#write_csv(k600, path = "KawN_K600_NighttimeO2Regression.csv")
 
-tsout_b <-twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
-                            O2data = TS_S1S2_b, 
-                            z = as.numeric(z_S1S2_b.mean[3]), 
-                            tt = as.numeric(tt_S1S2_b.mean$`mean(tt_days, na.rm = T)`), 
-                             Kmean = mean(k600_b$dailyEstimates$K600[-1]), 
-                             Ksd = sd(k600_b$dailyEstimates$K600[-1]),
-                            upName = "S1", downName = "S2", 
-                            nbatch = 200000, scale = 0.3)
-tsout_b[["accept"]]
+# After reviewing k600 models, decide to cut out models with fit (R2) of 
+# 1 standard deviation below the mean (or lower)
 
-# Not enough time steps to run group C
-tsout_c <-twostationpostsum(start = c(2.75, -4.75, 2.2, -2.6), 
-                            O2data = TS_S1S2_c, 
-                            z = as.numeric(z_S1S2.mean[3]), 
-                            tt = as.numeric(tt_S1S2[3]), 
-                             Kmean = mean(k600_c$dailyEstimates$K600[-1]), 
-                             Ksd = sd(k600_c$dailyEstimates$K600[-1]),
-                            upName = "S1", downName = "S2", 
-                            nbatch = 200000, scale = 0.3)
-tsout_c[["accept"]]
+# Display which estimates will be removed under this criteria
+#k600[k600$r2fit < mean(k600$r2fit) - sd(k600$r2fit),]
+# Return dates which are to be removed
+#k600$date[k600$r2fit < mean(k600$r2fit) - sd(k600$r2fit)]
 
-#tsout_a <- readRDS(file = "./Outputs/MetabResults_TwoStation_a_nighttimeK.RData")
-#tsout_b <- readRDS(file = "./Outputs/MetabResults_TwoStation_b_nighttimeK.RData")
+# Create new column denoting if the r2 value is kept or discarded,
+# if discarded, NA the K600 value and fill with 
+k600 <- 
+  k600 %>%
+  mutate(fitCriteria = ifelse(r2fit < mean(r2fit) - sd(r2fit), "DISCARD", 
+                              "KEEP"),
+         K600_adj = ifelse(fitCriteria == "DISCARD", NA, K600))
+# Fill NA in adjusted K600 column with mean of remaining K600 values
+k600$K600_adj[is.na(k600$K600_adj)] <- mean(k600$K600_adj, na.rm = TRUE)
 
-## Merge into one dataframe
+unique(date(TS_S1S2_a$datetime))
+sum(date(TS_S1S2$datetime) == ymd("2018-04-17", tz = "America/Chicago"))
+
+########### Run Function ######################################################
+### Create S1S2model function to reduce amt of temporary data saved to environment ##
+S1S2model <- function(metabdata, vdata, zdata, kdata, nbatch){
+  # Initiate empty lists
+  dates <- list()
+  traveltime_d <- list()
+  depth_m <- list()
+  k600_mean <- list()
+  k600_sd <- list()
+  velocity <- list()
+  model_accept <- list()
+  model_metab <- list()
+  model_O2 <- list()
+  
+  for (i in seq_along(unique(date(metabdata$datetime)))){
+    # Return date
+    modelDate <- unique(date(metabdata$datetime))[i]
+    
+    # Return data for selected date
+    metabd_select <- metabdata[date(metabdata$datetime) == modelDate,]
+    vdata_select <- vdata[vdata$date == modelDate,]
+    zdata_select <- zdata[zdata$date == modelDate,]
+    kdata_select <- kdata[kdata$date == modelDate,]
+    
+    # If not a full day of data, skip
+    # Readings every 15 min = 96 readings / day * 2 stations = 192 rows
+    if(sum(date(metabd_select$datetime) == modelDate) < 192) {
+      message("NOTE: Date ", modelDate," contains less than a full day of obervations and was skipped")
+      next
+    }
+    
+    ## 4. Estimate travel time during each date period ########################
+    # Travel time = time for a parcel of H2O to travel from S1 to S2
+  
+    # Variables needed:
+    # Mean H2O velocity at S1 (where v = Q/A, see equations in areal.extent chunk) 
+    # Mean H2O velocity at S2
+    # Distance between S1 and S2 = 5.13 km = 5130 m
+    
+    # Travel time [s] = distance [m] / velocity [m/s]
+    # Convert from sec to hrs
+    # Convert from sec to days
+    vdata_select$tt_sec <- 5130 / vdata_select$v_ms.mean
+    vdata_select$tt_hours <- vdata_select$tt_sec / 3600
+    vdata_select$tt_days <- vdata_select$tt_sec / 86400
+    # Save travel time as seperate variable
+    tt_days <- vdata_select$tt_days
+    
+    ## 5. Get depth for date ##################################################
+    z_m <- zdata_select$z.mean
+    
+    ## 6. Grab K600 from previously run nighttime regression ##################
+    k <- kdata_select$K600_adj
+    # Use SD of all K600 estimates
+    k_sd <- sd(kdata$K600_adj)
+    
+    ## 7. Run 2-station metabolism modeling function ##########################
+    metabout <- twostationpostsum(start = c(4.8, -7.2, 5, -2.2), 
+                                  O2data = metabd_select, z = z_m, 
+                                  tt = tt_days, Kmean = k, Ksd = k_sd, 
+                                  upName = "S1", downName = "S2", 
+                                  nbatch = nbatch, scale = 0.3)
+    
+    ## 8. Output data
+    dates[[i]] <- modelDate
+    traveltime_d[[i]] <- tt_days
+    depth_m[[i]] <- z_m
+    k600_mean[[i]] <- k
+    k600_sd[[i]] <- k_sd
+    
+    velocity[[i]] <- vdata_select
+    model_accept[[i]] <- metabout$accept
+    model_metab[[i]] <- metabout$pred.metab
+    model_O2[[i]] <- metabout$oxymodel
+  }
+  # Return model inputs
+  modelinputs_k600 <- kdata
+  modelinputs_v <- vdata
+  # Combine metabolism results dataframe
+  results <- 
+    model_metab %>%
+    bind_rows()
+  results$accept <- unlist(model_accept)
+  # Combine modeled O2 vs actual O2 dataframe
+  modeledO2 <-
+    model_O2 %>% 
+    bind_rows()
+  
+  # Return to user
+  return(list(results = results,
+              modeledO2 = modeledO2,
+              modelinputs_v = modelinputs_v,
+              modelinputs_k600 = modelinputs_k600))
+}
+
+# Run function
+metabmodel_a <- S1S2model(metabdata = TS_S1S2_a, vdata = v_S1S2, 
+                          zdata = z_S1S2, kdata = k600, nbatch = 20000)
+metabmodel_b <- S1S2model(metabdata = TS_S1S2_b, vdata = v_S1S2, 
+                          zdata = z_S1S2, kdata = k600, nbatch = 20000)
+metabmodel_c <- S1S2model(metabdata = TS_S1S2_c, vdata = v_S1S2, 
+                          zdata = z_S1S2, kdata = k600, nbatch = 20000)
+metabmodel_d <- S1S2model(metabdata = TS_S1S2_d, vdata = v_S1S2, 
+                          zdata = z_S1S2, kdata = k600, nbatch = 20000)
+metabmodel_e <- S1S2model(metabdata = TS_S1S2_e, vdata = v_S1S2, 
+                          zdata = z_S1S2, kdata = k600, nbatch = 20000)
+
+k600
 
 # Check modeled oxygen
-ggplot(data = tsout_a$oxymodel) +
+ggplot(data = metabmodel_a$modeledO2) +
   geom_line(aes(x = timeup, y = oxyup, color = "S1")) +
   geom_line(aes(x = timedown, y = oxydown, color = "S2")) +
   geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2"))
+
 # Check modeled GPP and ER
-ggplot(data = tsout_a$pred.metab) +
+ggplot(data = metabmodel_a$results) +
   geom_ribbon(aes(x = date, ymin = GPP.lower, ymax = GPP.upper, 
                   fill = "GPP"), alpha = 0.5) +
-  geom_line(aes(x = date, y = GPP, color = "GPP")) +
-  geom_line(aes(x = date, y = -ER, color = "ER")) +
-  geom_ribbon(aes(x = date, ymin = -ER.lower, ymax = -ER.upper, 
-                  fill = "ER"), alpha = 0.5)
+  geom_point(aes(x = date, y = GPP, color = "GPP")) +
+  geom_point(aes(x = date, y = ER, color = "ER")) +
+  geom_ribbon(aes(x = date, ymin = ER.lower, ymax = ER.upper, 
+                  fill = "ER"), alpha = 0.5) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  labs(y = "GPP or ER") +
+  theme_classic()
 
-ggplot(data = tsout_b$pred.metab) +
+a <- metabmodel_a$results %>%
+  full_join(., metabmodel_b$results) %>%
+  full_join(., metabmodel_c$results) %>%
+  full_join(., metabmodel_d$results) %>%
+  full_join(., metabmodel_e$results)
+
+b <- metabmodel_a$modeledO2 %>%
+  full_join(., metabmodel_b$modeledO2) %>%
+  full_join(., metabmodel_c$modeledO2) %>%
+  full_join(., metabmodel_d$modeledO2) %>%
+  full_join(., metabmodel_e$modeledO2)
+
+ggplot(data = b) +
+  geom_line(aes(x = timeup, y = oxyup, color = "S1")) +
+  geom_line(aes(x = timedown, y = oxydown, color = "S2")) +
+  geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2")) +
+  labs(x = "date", y = "O2") +
+  theme_classic()
+
+ggplot(data = a) +
   geom_ribbon(aes(x = date, ymin = GPP.lower, ymax = GPP.upper, 
                   fill = "GPP"), alpha = 0.5) +
-  geom_line(aes(x = date, y = GPP, color = "GPP")) +
-  geom_line(aes(x = date, y = -ER, color = "ER")) +
-  geom_ribbon(aes(x = date, ymin = -ER.lower, ymax = -ER.upper, 
-                  fill = "ER"), alpha = 0.5)
+  geom_po(aes(x = date, y = GPP, color = "GPP")) +
+  geom_point(aes(x = date, y = ER, color = "ER")) +
+  geom_ribbon(aes(x = date, ymin = ER.lower, ymax = ER.upper, 
+                  fill = "ER"), alpha = 0.5) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  labs(y = "GPP or ER") +
+  theme_classic()
 
-full_join(tsout_a$pred.metab, tsout_b$pred.metab)
-
-ggplot(data = full_join(tsout_a$pred.metab, tsout_b$pred.metab)) +
-  geom_ribbon(aes(x = date, ymin = GPP.lower, ymax = GPP.upper, 
-                  fill = "GPP"), alpha = 0.5) +
-  geom_line(aes(x = date, y = GPP, color = "GPP")) +
-  geom_line(aes(x = date, y = -ER, color = "ER")) +
-  geom_ribbon(aes(x = date, ymin = -ER.lower, ymax = -ER.upper, 
-                  fill = "ER"), alpha = 0.5)
 
 # Create dataframe of dates based on S3 modeled dates
 #dateSeq <- tibble(date = seq(ymd('2018-01-31'), ymd('2018-05-31'), by='1 day'))
@@ -826,7 +829,7 @@ modelfit.S1S2[2:13][modelfit.S1S2$date == "2018-03-12",] <- NA
 modelfit.S1S2[2:13][modelfit.S1S2$date == "2018-03-28",] <- NA
 
 # Save joined data
-saveRDS(modelfit.S1S2, file = "./Outputs/MetabResults_TwoStation.RData")
+saveRDS(metabmodel, file = "./Outputs/MetabResults_TwoStation.RData")
 ```
 
 ```{r NEP.calculate}
