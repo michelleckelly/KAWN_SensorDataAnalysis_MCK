@@ -54,6 +54,8 @@ fitdata.desoto <- prep_metabolism(desoto_data, type = model_type,
                                   estimate_areal_depth = TRUE)
 modelfit.desoto <- fit_metabolism(fitdata.desoto)
 
+
+
 # Inspect model output
 # We have 10 days where ER estimate is positive
 # Positive ER estimates range from near 0 to ~5.5, some of these days also
@@ -173,6 +175,7 @@ write.csv(K600.desoto, file = "./Outputs/OxygenTurnover_Desoto.CSV",
 ########### Load libraries ####################################################
 library(mcmc)
 library(chron)
+set.seed(1) # for reproducability
 
 ########### Internal Functions for Two Station Modeling #######################
 # Function to estimate K at temperature 'temp'from K600.  Wanninkhof 1992.
@@ -196,7 +199,7 @@ Kcor <- function (temp, K600) {
 # Kmean   
 # Ksd
 tspost <- function(MET, tempup, tempdown, oxyup, oxydown, light, tt, z, osat, 
-                   Kmean, Ksd){
+                   Kmean, Ksd, ...){
 	# Assign the paramters we solve for to easy to understand values
 	GPP <- MET[1]
 	ER <- MET[2]
@@ -209,8 +212,8 @@ tspost <- function(MET, tempup, tempdown, oxyup, oxydown, light, tt, z, osat,
 	
 	metab <- vector(mode = "numeric", length = length(oxyup)) #create empty vector
 
-  # Below is equation 4 in the paper, solving for downstream O2 at at each 5 
-	# min interval. It references other functions:  Kcor converts K600 to KO2 
+  # Below is equation 4 in the paper, solving for downstream O2 at each
+	# interval. It references other functions:  Kcor converts K600 to KO2 
 	# for a given temperature. 
   for (i in 1:length(oxyup)){
     metab[i] <- (oxyup[i] + ((GPP/z)*(sum(light[i:(i+lag)])/sum(light))) + 
@@ -226,11 +229,11 @@ tspost <- function(MET, tempup, tempdown, oxyup, oxydown, light, tt, z, osat,
 	loglik <- sum(dnorm(oxydown, metab, sigma, log=TRUE))
 	
 	# Priors, note wide distributions for GPP and ER
-	prior <- (dnorm(GPP, mean=5, sd=10, log=TRUE)) + 
-	  (dnorm(ER, mean=-5, sd=10, log=TRUE)) + 
+	prior <- (dnorm(GPP, mean=10, sd=10, log=TRUE)) + 
+	  (dnorm(ER, mean=-10, sd=10, log=TRUE)) + 
 	  (dnorm(K, mean=Kmean, sd=Ksd, log=TRUE))
 	
-	loglik + prior 
+	return(loglik + prior)
 }
 
 # O2TimeSeries FUNCTION: Return modeled oxygen time series from median GPP, 
@@ -374,11 +377,14 @@ twostationpostsum <- function(O2data, upName, downName, start, z, tt, Kmean, Ksd
     	                   oxydown = oxydown,  z = z, light = light, tt = tt, 
     	                   Kmean = Kmean, Ksd = Ksd, debug = TRUE)
     	
+    	# trying to troubleshoot here
+      print(plot(ts(met.post$batch), main = dateList[i]))
+    	
     	# Calculate overall estimates for each day
-      gppr <- quantile(met.post$batch[(950:nbatch),1], c(0.025, 0.5, 0.975))
-      err <- quantile(met.post$batch[(950:nbatch),2], c(0.025, 0.5, 0.975))
-      Kr <- quantile(met.post$batch[(950:nbatch),3], c(0.025, 0.5, 0.975))
-      sr <- quantile(met.post$batch[(950:nbatch),4], c(0.025, 0.5, 0.975))
+      gppr <- quantile(met.post$batch[(2000:nbatch),1], c(0.025, 0.5, 0.975))
+      err <- quantile(met.post$batch[(2000:nbatch),2], c(0.025, 0.5, 0.975))
+      Kr <- quantile(met.post$batch[(2000:nbatch),3], c(0.025, 0.5, 0.975))
+      sr <- quantile(met.post$batch[(2000:nbatch),4], c(0.025, 0.5, 0.975))
       
       # Add results to vectors
       #date[i] <- ymd(unique(data$date)[i])
@@ -396,6 +402,7 @@ twostationpostsum <- function(O2data, upName, downName, start, z, tt, Kmean, Ksd
       s.upper[i] <- sr[3]
       accept[i] <- met.post$accept # log likelihood plus priors, should be about 0.2
     }
+    i <- i+1
   }
   # Create dataframe of predicted metabolism values
   pred.metab <- data.frame(date = dateList, GPP, GPP.lower, GPP.upper, ER, ER.lower, 
@@ -714,7 +721,7 @@ S1S2model <- function(metabdata, vdata, zdata, kdata, nbatch){
     k_sd <- sd(kdata$K600_adj)
     
     ## 7. Run 2-station metabolism modeling function ##########################
-    metabout <- twostationpostsum(start = c(4.8, -7.2, 5, -2.2), 
+    metabout <- twostationpostsum(start = c(10, -10, 7, -2.2), 
                                   O2data = metabd_select, z = z_m, 
                                   tt = tt_days, Kmean = k, Ksd = k_sd, 
                                   upName = "S1", downName = "S2", 
@@ -754,17 +761,15 @@ S1S2model <- function(metabdata, vdata, zdata, kdata, nbatch){
 
 # Run function
 metabmodel_a <- S1S2model(metabdata = TS_S1S2_a, vdata = v_S1S2, 
-                          zdata = z_S1S2, kdata = k600, nbatch = 20000)
+                          zdata = z_S1S2, kdata = k600, nbatch = 1e5)
 metabmodel_b <- S1S2model(metabdata = TS_S1S2_b, vdata = v_S1S2, 
-                          zdata = z_S1S2, kdata = k600, nbatch = 20000)
+                          zdata = z_S1S2, kdata = k600, nbatch = 1e5)
 metabmodel_c <- S1S2model(metabdata = TS_S1S2_c, vdata = v_S1S2, 
-                          zdata = z_S1S2, kdata = k600, nbatch = 20000)
+                          zdata = z_S1S2, kdata = k600, nbatch = 1e5)
 metabmodel_d <- S1S2model(metabdata = TS_S1S2_d, vdata = v_S1S2, 
-                          zdata = z_S1S2, kdata = k600, nbatch = 20000)
+                          zdata = z_S1S2, kdata = k600, nbatch = 1e5)
 metabmodel_e <- S1S2model(metabdata = TS_S1S2_e, vdata = v_S1S2, 
-                          zdata = z_S1S2, kdata = k600, nbatch = 20000)
-
-k600
+                          zdata = z_S1S2, kdata = k600, nbatch = 1e5)
 
 # Check modeled oxygen
 ggplot(data = metabmodel_a$modeledO2) +
@@ -773,7 +778,7 @@ ggplot(data = metabmodel_a$modeledO2) +
   geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2"))
 
 # Check modeled GPP and ER
-ggplot(data = metabmodel_a$results) +
+ggplot(data = metabmodel_b$results) +
   geom_ribbon(aes(x = date, ymin = GPP.lower, ymax = GPP.upper, 
                   fill = "GPP"), alpha = 0.5) +
   geom_point(aes(x = date, y = GPP, color = "GPP")) +
@@ -784,7 +789,7 @@ ggplot(data = metabmodel_a$results) +
   labs(y = "GPP or ER") +
   theme_classic()
 
-a <- metabmodel_a$results %>%
+metabmodel <- metabmodel_a$results %>%
   full_join(., metabmodel_b$results) %>%
   full_join(., metabmodel_c$results) %>%
   full_join(., metabmodel_d$results) %>%
@@ -803,10 +808,10 @@ ggplot(data = b) +
   labs(x = "date", y = "O2") +
   theme_classic()
 
-ggplot(data = a) +
+ggplot(data = metabmodel) +
   geom_ribbon(aes(x = date, ymin = GPP.lower, ymax = GPP.upper, 
                   fill = "GPP"), alpha = 0.5) +
-  geom_po(aes(x = date, y = GPP, color = "GPP")) +
+  geom_point(aes(x = date, y = GPP, color = "GPP")) +
   geom_point(aes(x = date, y = ER, color = "ER")) +
   geom_ribbon(aes(x = date, ymin = ER.lower, ymax = ER.upper, 
                   fill = "ER"), alpha = 0.5) +
