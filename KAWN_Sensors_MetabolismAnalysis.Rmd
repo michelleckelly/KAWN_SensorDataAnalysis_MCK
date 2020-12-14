@@ -26,6 +26,7 @@ library(StreamPULSE)
 library(streamMetabolizer)
 library(tidyverse)
 library(lubridate)
+library(rstan)
 ```
 
 ```{r metabolism.load}
@@ -47,14 +48,25 @@ model_name <-  "streamMetabolizer"
 
 # Desoto ------------------------------------------------------
 site_code.desoto <- "KS_KANSASR"
-desoto_data <- request_data(site_code.desoto)
+desoto_data <- request_data(site_code.desoto, 
+                            variables = c('DO_mgL', 'DOsat_pct','satDO_mgL',
+                                          'WaterPres_kPa', 'WaterTemp_C',
+                                          'Light_PAR','AirPres_kPa',
+                                          'Discharge_m3s'))
 fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, 
                                   model = model_name, rm_flagged = "Bad Data", 
                                   fillgaps = "interpolation",
                                   estimate_areal_depth = TRUE)
 modelfit.desoto <- fit_metabolism(fitdata.desoto)
 
-
+# Inspecting the model output
+# Pull out a random sample of the K600_daily stan models
+# Doing this because we can't display all stan models at once for inspection
+matchstr <- names(fit2)[grep("^K600_daily\\[\\d+\\]$", names(fit2))]
+# Plot the K600 batch model runs
+traceplot(fit2,
+          pars = sample(matchstr, size = 12),
+          inc_warmup=TRUE, ncol = 4)
 
 # Inspect model output
 # We have 10 days where ER estimate is positive
@@ -231,7 +243,8 @@ tspost <- function(MET, tempup, tempdown, oxyup, oxydown, light, tt, z, osat,
 	# Priors, note wide distributions for GPP and ER
 	prior <- (dnorm(GPP, mean=10, sd=10, log=TRUE)) + 
 	  (dnorm(ER, mean=-10, sd=10, log=TRUE)) + 
-	  (dnorm(K, mean=Kmean, sd=Ksd, log=TRUE))
+	  #(dnorm(K, mean=Kmean, sd=Ksd, log=TRUE)) +
+	  (dnorm(K, mean=7, sd=10, log=TRUE)) # from downstream model
 	
 	return(loglik + prior)
 }
