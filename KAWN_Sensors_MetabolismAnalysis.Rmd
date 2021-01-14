@@ -27,14 +27,7 @@ library(streamMetabolizer)
 library(tidyverse)
 library(lubridate)
 library(rstan)
-```
-
-```{r metabolism.load}
-# Load in cleaned metabolism data from file
-# Skip this block if you haven't run the metabolism model, or if you want 
-# to re-compute the model
-modelfit.S1S2 <- readRDS("./Outputs/MetabResults_TwoStation.RData")
-modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
+#CmdStan works with catalina
 ```
 
 ```{r singleStation}
@@ -48,6 +41,9 @@ model_name <-  "streamMetabolizer"
 
 # Desoto ------------------------------------------------------
 site_code.desoto <- "KS_KANSASR"
+
+ptm <- proc.time() # Time model run
+
 desoto_data <- request_data(site_code.desoto, 
                             variables = c('DO_mgL', 'DOsat_pct','satDO_mgL',
                                           'WaterPres_kPa', 'WaterTemp_C',
@@ -58,6 +54,8 @@ fitdata.desoto <- prep_metabolism(desoto_data, type = model_type,
                                   fillgaps = "interpolation",
                                   estimate_areal_depth = TRUE)
 modelfit.desoto <- fit_metabolism(fitdata.desoto)
+
+proc.time() - ptm
 
 # Inspecting the model output
 # Pull out a random sample of the K600_daily stan models
@@ -244,7 +242,7 @@ tspost <- function(MET, tempup, tempdown, oxyup, oxydown, light, tt, z, osat,
 	prior <- (dnorm(GPP, mean=10, sd=10, log=TRUE)) + 
 	  (dnorm(ER, mean=-10, sd=10, log=TRUE)) + 
 	  #(dnorm(K, mean=Kmean, sd=Ksd, log=TRUE)) +
-	  (dnorm(K, mean=7, sd=10, log=TRUE)) # from downstream model
+	  (dnorm(K, mean=Kprior_mean, sd=Kprior_sd, log=TRUE))
 	
 	return(loglik + prior)
 }
@@ -679,7 +677,7 @@ sum(date(TS_S1S2$datetime) == ymd("2018-04-17", tz = "America/Chicago"))
 
 ########### Run Function ######################################################
 ### Create S1S2model function to reduce amt of temporary data saved to environment ##
-S1S2model <- function(metabdata, vdata, zdata, kdata, nbatch){
+S1S2model <- function(metabdata, vdata, zdata, Kmean, Ksd, nbatch){
   # Initiate empty lists
   dates <- list()
   traveltime_d <- list()
@@ -699,7 +697,7 @@ S1S2model <- function(metabdata, vdata, zdata, kdata, nbatch){
     metabd_select <- metabdata[date(metabdata$datetime) == modelDate,]
     vdata_select <- vdata[vdata$date == modelDate,]
     zdata_select <- zdata[zdata$date == modelDate,]
-    kdata_select <- kdata[kdata$date == modelDate,]
+    #kdata_select <- kdata[kdata$date == modelDate,]
     
     # If not a full day of data, skip
     # Readings every 15 min = 96 readings / day * 2 stations = 192 rows
@@ -729,14 +727,15 @@ S1S2model <- function(metabdata, vdata, zdata, kdata, nbatch){
     z_m <- zdata_select$z.mean
     
     ## 6. Grab K600 from previously run nighttime regression ##################
-    k <- kdata_select$K600_adj
+    #k <- kdata_select$K600_adj
     # Use SD of all K600 estimates
-    k_sd <- sd(kdata$K600_adj)
+    #k_sd <- sd(kdata$K600_adj)
     
     ## 7. Run 2-station metabolism modeling function ##########################
     metabout <- twostationpostsum(start = c(10, -10, 7, -2.2), 
                                   O2data = metabd_select, z = z_m, 
-                                  tt = tt_days, Kmean = k, Ksd = k_sd, 
+                                  tt = tt_days, Kmean = Kprior_mean, 
+                                  Ksd = Kprior_sd, 
                                   upName = "S1", downName = "S2", 
                                   nbatch = nbatch, scale = 0.3)
     
@@ -744,8 +743,8 @@ S1S2model <- function(metabdata, vdata, zdata, kdata, nbatch){
     dates[[i]] <- modelDate
     traveltime_d[[i]] <- tt_days
     depth_m[[i]] <- z_m
-    k600_mean[[i]] <- k
-    k600_sd[[i]] <- k_sd
+    k600_mean[[i]] <- Kprior_mean
+    k600_sd[[i]] <- Kprior_sd
     
     velocity[[i]] <- vdata_select
     model_accept[[i]] <- metabout$accept
@@ -753,7 +752,7 @@ S1S2model <- function(metabdata, vdata, zdata, kdata, nbatch){
     model_O2[[i]] <- metabout$oxymodel
   }
   # Return model inputs
-  modelinputs_k600 <- kdata
+  #modelinputs_k600 <- kdata
   modelinputs_v <- vdata
   # Combine metabolism results dataframe
   results <- 
@@ -768,24 +767,37 @@ S1S2model <- function(metabdata, vdata, zdata, kdata, nbatch){
   # Return to user
   return(list(results = results,
               modeledO2 = modeledO2,
-              modelinputs_v = modelinputs_v,
-              modelinputs_k600 = modelinputs_k600))
+              modelinputs_v = modelinputs_v#,
+              #modelinputs_k600 = modelinputs_k600
+              ))
 }
+
+# Set priors for K
+# From MIMS modeling - Burgin results
+# March, Upstream: K = 3.4793, K SD = 0.1286
+# April, Upstream: K = 3.31236, K SD = 0.1294
+Kprior_mean <- mean(c(3.4793, 3.31236))
+Kprior_sd <- 0.1294
 
 # Run function
 metabmodel_a <- S1S2model(metabdata = TS_S1S2_a, vdata = v_S1S2, 
-                          zdata = z_S1S2, kdata = k600, nbatch = 1e5)
+                          zdata = z_S1S2, Kmean = Kprior_mean, 
+                          Ksd = Kprior_sd, nbatch = 1e5)
 metabmodel_b <- S1S2model(metabdata = TS_S1S2_b, vdata = v_S1S2, 
-                          zdata = z_S1S2, kdata = k600, nbatch = 1e5)
+                          zdata = z_S1S2, Kmean = Kprior_mean, 
+                          Ksd = Kprior_sd, nbatch = 1e5)
 metabmodel_c <- S1S2model(metabdata = TS_S1S2_c, vdata = v_S1S2, 
-                          zdata = z_S1S2, kdata = k600, nbatch = 1e5)
+                          zdata = z_S1S2, Kmean = Kprior_mean, 
+                          Ksd = Kprior_sd, nbatch = 1e5)
 metabmodel_d <- S1S2model(metabdata = TS_S1S2_d, vdata = v_S1S2, 
-                          zdata = z_S1S2, kdata = k600, nbatch = 1e5)
+                          zdata = z_S1S2, Kmean = Kprior_mean, 
+                          Ksd = Kprior_sd, nbatch = 1e5)
 metabmodel_e <- S1S2model(metabdata = TS_S1S2_e, vdata = v_S1S2, 
-                          zdata = z_S1S2, kdata = k600, nbatch = 1e5)
+                          zdata = z_S1S2, Kmean = Kprior_mean, 
+                          Ksd = Kprior_sd, nbatch = 1e5)
 
 # Check modeled oxygen
-ggplot(data = metabmodel_a$modeledO2) +
+ggplot(data = metabmodel_b$modeledO2) +
   geom_line(aes(x = timeup, y = oxyup, color = "S1")) +
   geom_line(aes(x = timedown, y = oxydown, color = "S2")) +
   geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2"))
@@ -831,20 +843,6 @@ ggplot(data = metabmodel) +
   geom_hline(yintercept = 0, linetype = 2) +
   labs(y = "GPP or ER") +
   theme_classic()
-
-
-# Create dataframe of dates based on S3 modeled dates
-#dateSeq <- tibble(date = seq(ymd('2018-01-31'), ymd('2018-05-31'), by='1 day'))
-# Merge data
-modelfit.S1S2 <-full_join(tsout_a$pred.metab, tsout_b$pred.metab)
-
-# Remove dates containing partial data
-# 2018-03-05
-# 2018-03-12
-# 2018-03-28
-modelfit.S1S2[2:13][modelfit.S1S2$date == "2018-03-05",] <- NA
-modelfit.S1S2[2:13][modelfit.S1S2$date == "2018-03-12",] <- NA
-modelfit.S1S2[2:13][modelfit.S1S2$date == "2018-03-28",] <- NA
 
 # Save joined data
 saveRDS(metabmodel, file = "./Outputs/MetabResults_TwoStation.RData")
