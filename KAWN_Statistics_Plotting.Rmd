@@ -80,8 +80,6 @@ sensor_eric <- dailyavg(sensor_eric, avgs = TRUE)
 sensor_steve <- dailyavg(sensor_steve, avgs = TRUE)
 sensor_desoto <- dailyavg(sensor_desoto, avgs = TRUE)
 
-
-
 # Mass balance data ----------------------------------------------------------
 massbal <- readRDS("./Outputs/NMassBalance.rds")
 # bowersock load gets down to 0 which doesnt show up well on a log10 scaled 
@@ -143,7 +141,11 @@ metab.long$site <- factor(metab.long$site, levels = c("S1S2", "S3"))
 
 # Predicted uptake from metabolism results
 stoich.S1S2 <- readRDS(file = "./Outputs/StoichUptake_S1S2.RData")
+stoich.S1S2 <- stoich.S1S2[stoich.S1S2$date >= ymd("2018-02-01") & 
+                   stoich.S1S2$date < ymd("2018-05-01"),]
 stoich.desoto <- readRDS(file = "./Outputs/StoichUptake_Desoto.RData")
+stoich.desoto <- stoich.desoto[stoich.desoto$date >= ymd("2018-02-01") & 
+                   stoich.desoto$date < ymd("2018-05-01"),]
 
 # Nitrate uptake results -----------------------------------------------------
 uptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1_twostation.rds")
@@ -154,6 +156,28 @@ uptake$UaNO3_gNm2day.steve[uptake$Date == "2018-03-09"] <- NA # affected by
 # Section date
 uptake <- uptake[uptake$Date >= ymd("2018-02-01") & 
                    uptake$Date < ymd("2018-05-01"),]
+
+## Calculate uptake velocity ###################################################
+
+# vf = U [g-N / m2 day] / NO3 [mg-N / L] * 1000 [mg-N / g-N] / 1000 [m3 / L] 
+#    = vf [m / day] / 1440 [day / min] * 1000 [mm/m] = vf [mm/min]
+uptake$vf_mmmin.eric <- 
+  uptake$UaNO3_gNm2day.eric / uptake$Mean.Nitrate_mgL.eric / 1440 * 1000
+uptake$vf_mmmin.steve <- 
+  uptake$UaNO3_gNm2day.steve / uptake$Mean.Nitrate_mgL.steve / 1440 * 1000
+uptake$vf_mmmin.desoto <- 
+  uptake$UaNO3_gNm2day.desoto / uptake$Mean.Nitrate_mgL.desoto / 1440 * 1000
+# Adjust data frame structure
+vf <- tidyr::gather(uptake[c("Date", "vf_mmmin.eric", "vf_mmmin.steve", "vf_mmmin.desoto")], 
+                    key = site, value = vf_mmmin, 
+                    vf_mmmin.eric:vf_mmmin.desoto)
+vf$site <- factor(vf$site, levels = c("vf_mmmin.eric", "vf_mmmin.steve", 
+                                      "vf_mmmin.desoto"))
+levels(vf$site)[levels(vf$site)=="vf_mmmin.eric"] <- "S1"
+levels(vf$site)[levels(vf$site)=="vf_mmmin.steve"] <- "S2"
+levels(vf$site)[levels(vf$site)=="vf_mmmin.desoto"] <- "S3"
+vf <- subset(vf, Date < "2018-05-01")
+vf$Month <- lubridate::month(vf$Date, label = TRUE, abbr = TRUE)
 
 # Adjust from wide to long format
 uptake.long <- 
@@ -179,6 +203,15 @@ supply.long$site[supply.long$site == "Supply_gNm2day.desoto"] <- "S3"
 uptake.long$site <- factor(uptake.long$site)
 supply.long$site <- factor(supply.long$site)
 
+# Select stoich
+stoich.S1S2 <- stoich.S1S2 %>%
+  select(Date = date, GPP.S1S2 = GPP, ER.S1S2 = ER, Ustoic_gNm2day.S1S2 = U_gNm2day)
+stoich.desoto <- stoich.desoto %>%
+  select(Date = date, GPP.S3 = GPP, ER.S3 = ER, Ustoic_gNm2day.S3 = U_gNm2day)
+# Merge stoich with uptake
+stoich <- uptake %>%
+  dplyr::full_join(stoich.S1S2) %>% 
+  dplyr::full_join(stoich.desoto)
 
 # DOC data -------------------------------------------------------------------
 DOC <- read.csv("./Data/KAW_RAPID_DOC.csv", header = TRUE, 
@@ -198,34 +231,6 @@ hall <- read.csv("./Data/Meta-analysis/Hall_2016_metabolismdata.csv",
 hall$q_m3s <- hall$q_Ls/1000
 ```
 
-```{r Calculation: Vf}
-## Calculate uptake velocity ###################################################
-
-# vf = U [g-N / m2 day] / NO3 [mg-N / L] * 1000 [mg-N / g-N] / 1000 [m3 / L] 
-#    = vf [m / day] / 1440 [day / min] * 1000 [mm/m] = vf [mm/min]
-uptake$vf_mmmin.eric <- 
-  uptake$UaNO3_gNm2day.eric / uptake$Mean.Nitrate_mgL.eric / 1440 * 1000
-uptake$vf_mmmin.steve <- 
-  uptake$UaNO3_gNm2day.steve / uptake$Mean.Nitrate_mgL.steve / 1440 * 1000
-uptake$vf_mmmin.desoto <- 
-  uptake$UaNO3_gNm2day.desoto / uptake$Mean.Nitrate_mgL.desoto / 1440 * 1000
-# Adjust data frame structure
-vf <- tidyr::gather(uptake[c("Date", "vf_mmmin.eric", "vf_mmmin.steve", "vf_mmmin.desoto")], 
-                    key = site, value = vf_mmmin, 
-                    vf_mmmin.eric:vf_mmmin.desoto)
-vf$site <- factor(vf$site, levels = c("vf_mmmin.eric", "vf_mmmin.steve", 
-                                      "vf_mmmin.desoto"))
-levels(vf$site)[levels(vf$site)=="vf_mmmin.eric"] <- "S1"
-levels(vf$site)[levels(vf$site)=="vf_mmmin.steve"] <- "S2"
-levels(vf$site)[levels(vf$site)=="vf_mmmin.desoto"] <- "S3"
-vf <- subset(vf, Date < "2018-05-01")
-vf$Month <- lubridate::month(vf$Date, label = TRUE, abbr = TRUE)
-
-# Join with metabolism data
-#vf.metab <- dplyr::full_join(metab.long, vf, by = c("Date", "site"))
-#vf.metab$date <- NULL
-```
-
 ```{r Calculation: P/R}
 PR <- 
   metab.long %>%
@@ -235,11 +240,11 @@ PR <-
 ```
 
 ```{r Stats}
-metab.long$Month <- lubridate::month(metab.long$Date)
+#metab.long$Month <- lubridate::month(metab.long$Date)
 # Correct date spans
 metab.long <- 
   metab.long[metab.long$Date < "2018-05-01" & metab.long$Date >= "2018-02-01",]
-PR <- PR[PR$date < "2018-05-01" & PR$date >= "2018-02-01",]
+#PR <- PR[PR$date < "2018-05-01" & PR$date >= "2018-02-01",]
 vf.metab <- vf.metab[vf.metab$Date < "2018-05-01" & vf.metab$Date >="2018-02-01",]
 # Factorize release status
 uptake.long$ReleaseStatus <- NA
@@ -249,104 +254,129 @@ uptake.long$ReleaseStatus <- factor(uptake.long$ReleaseStatus,
                               levels = c("During", "After"))
 
 ## Metabolism ##################################################################
-# Test whether GPP was significanly different between sites using non-parametric 
-# ANOVA (Kruskal-wallace test)
-ggpubr::compare_means(value~site, data = subset(metab.long, model == "GPP"),
-                      method = "kruskal.test") 
-# Test whether GPP significantly changed through time
-ggpubr::compare_means(value~Month, data = subset(metab.long, model == "GPP"),
-                      group.by = c("site"), method = "kruskal.test") 
-# Test ER between sites
-ggpubr::compare_means(value~site, data = subset(metab.long, model == "ER"),
-                      method = "kruskal.test") 
-# ER through time
-ggpubr::compare_means(value~Month, data = subset(metab.long, model == "ER"),
-                      group.by = c("site"), method = "kruskal.test") 
+# Test whether GPP was different between S1-S2 and S3
+# Need to compare the means of paired samples: Paired sample T-test
+mean(metab$GPP.S1S2, na.rm = T) # Mean of GPP at S1S2
+mean(metab[na.omit(metab$GPP.S1S2),]$GPP.S3) # Mean of GPP at S3 during S1S2 data
+t.test(metab$GPP.S1S2, metab$GPP.S3, paired = TRUE, alternative = "two.sided")
 
-#P/R difference between sites
-ggpubr::compare_means(PR~site, data = PR, method = "kruskal.test")
-#P/R difference within a site through time
+# Test whether ER was different between S1-S2 and S3
+mean(metab$ER.S1S2,na.rm = T) # Mean of ER at S1S2
+mean(metab[na.omit(metab$ER.S1S2),]$ER.S3, na.rm = T) # Mean of ER at S3 during S1S2 data
+t.test(abs(metab$ER.S1S2), abs(metab$ER.S3), paired = TRUE, alternative = "two.sided")
 
 ## Uptake ######################################################################
 # Test whether mean U was different between sites
-ggpubr::compare_means(UaNO3_gNm2day~site, data = uptake.long, 
-                      method = "kruskal.test")
-# Test uptake during vs after
-ggpubr::compare_means(UaNO3_gNm2day~Month, data = uptake.long, 
-                      method = "kruskal.test", group.by = c("site"))
+mean(uptake$UaNO3_gNm2day.eric, na.rm = T) # Mean of Udiel at S1
+uptake.long %>% 
+  filter(site == "S1") %>% 
+  summarise(mean(UaNO3_gNm2day, na.rm = T)) # Just double checking
+mean(uptake$UaNO3_gNm2day.steve, na.rm = T) # Mean of Udiel at S2
+mean(uptake$UaNO3_gNm2day.desoto, na.rm = T) # Mean of Udiel at S3
+# One-way ANOVA to assess differences between sites
+# ANOVA for only days where we have data for all 3 sites
+UANOVA_data <- na.omit(uptake %>% select(Date, UaNO3_gNm2day.eric, 
+                                        UaNO3_gNm2day.steve, 
+                                        UaNO3_gNm2day.desoto)) %>%
+  tidyr::pivot_longer(cols = 2:4, names_to = "site", 
+                      values_to = "UaNO3_gNm2day")
+UANOVA <- aov(UaNO3_gNm2day ~ site, data = UANOVA_data)
+summary(UANOVA)
+# Posthoc testing
+TukeyHSD(UANOVA)
+
+# Linear model
+forecast::tslm(UaNO3_gNm2day.eric ~ Date, data = uptake) # We can use regular lm even though this is time series data because the data does not have seasonality
+cor.test(x = zoo::as.zoo(uptake$Date), y = uptake$UaNO3_gNm2day.eric, 
+         method = "pearson", use = "complete.obs")
+lmmodel <- lm(uptake$UaNO3_gNm2day.eric ~ zoo::as.zoo(uptake$Date)) # S1
+summary(lmmodel) # S1
+lmmodel <- lm(uptake$UaNO3_gNm2day.steve ~ zoo::as.zoo(uptake$Date)) # S2
+summary(lmmodel) # S2
+lmmodel <- lm(uptake$UaNO3_gNm2day.desoto ~ zoo::as.zoo(uptake$Date)) # S3
+summary(lmmodel) # S3
+
 ## Uptake velocity #############################################################
 # Test whether mean Vf was different between sites
-ggpubr::compare_means(vf_mmmin~site, data = vf, method = "kruskal.test")
-# Test Vf during vs after
-ggpubr::compare_means(vf_mmmin~Month, data = vf, method = "kruskal.test", group.by = c("site"))
+mean(uptake$vf_mmmin.eric, na.rm = T) # S1
+vf %>% 
+  filter(site == "S1") %>% 
+  summarise(mean(vf_mmmin, na.rm = T)) # Just double checking
+mean(uptake$vf_mmmin.steve, na.rm = T) # S2
+mean(uptake$vf_mmmin.desoto, na.rm = T) # S3
+# One-way ANOVA to assess differences between sites
+# ANOVA for only days where we have data for all 3 sites
+VfANOVA_data <- na.omit(uptake %>% select(Date, vf_mmmin.eric, 
+                                        vf_mmmin.steve, 
+                                        vf_mmmin.desoto)) %>%
+  tidyr::pivot_longer(cols = 2:4, names_to = "site", 
+                      values_to = "vf_mmmin")
+VfANOVA <- aov(vf_mmmin ~ site, data = VfANOVA_data)
+summary(VfANOVA)
+# Posthoc testing
+TukeyHSD(VfANOVA)
 
-## Uptake vs GPP & ER ##########################################################
-# U
-cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.long, model == "GPP"))
-cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.long, model == "ER"))
+# Linear model
+forecast::tslm(vf_mmmin.eric ~ Date, data = uptake) # We can use regular lm even though this is time series data because the data does not have seasonality
+cor.test(x = zoo::as.zoo(uptake$Date), y = uptake$vf_mmmin.eric, 
+         method = "pearson", use = "complete.obs")
+lmmodel <- lm(uptake$vf_mmmin.eric ~ zoo::as.zoo(uptake$Date)) # S1
+summary(lmmodel) # S1
+lmmodel <- lm(uptake$vf_mmmin.steve ~ zoo::as.zoo(uptake$Date)) # S2
+summary(lmmodel) # S2
+lmmodel <- lm(uptake$vf_mmmin.desoto ~ zoo::as.zoo(uptake$Date)) # S3
+summary(lmmodel) # S3
 
+## Udiel vs Upred  ############################################################
+# Means
+mean(stoich$Ustoic_gNm2day.S1S2, na.rm = T) # S1-S2 U pred
+mean(stoich[-which(is.na(stoich$Ustoic_gNm2day.S1S2)),]$UaNO3_gNm2day.steve,
+     na.rm = T) # U diel mean at S2 during S1S2 data
+mean(stoich$Ustoic_gNm2day.desoto, na.rm = T) # S3 U pred
+mean(stoich[-which(is.na(stoich$Ustoic_gNm2day.desoto)),]$UaNO3_gNm2day.desoto,
+     na.rm = T) # U diel mean at S3 during S3 data
 
-cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.long, model == "GPP" & 
-                         ReleaseStatus == "During"),
-         method = c("pearson"))
-cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.long, model == "GPP" & 
-                         ReleaseStatus == "After"),
-         method = c("pearson"))
-# These correlations are different numbers than what's on the R plots because
-# The R plots are broken down into during and after
-# Also on the R plots the stats for "during" appear on top
-# S1
-cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.long, model == "GPP" & 
-                         site == "S1"),
-         method = c("pearson"))
-cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.long, model == "ER" & 
-                         site == "S1"),
-         method = c("pearson"))
-# S2
-cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.long, model == "GPP" & 
-                         site == "S2"),
-         method = c("pearson"))
-cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.long, model == "ER" & 
-                         site == "S2"),
-         method = c("pearson"))
-# S3
-cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.long, model == "GPP" & 
-                         site == "S3"),
-         method = c("pearson"))
-cor.test(~UaNO3_gNm2day+value, 
-         data = subset(uptake.metab.long, model == "ER" & 
-                         site == "S3"),
-         method = c("pearson"))
+# Linear model
+lmmodel <- lm(stoich$Ustoic_gNm2day.S1S2 ~ stoich$UaNO3_gNm2day.eric) # S1S2 vs S1
+summary(lmmodel) # S1S2 vs S1
+lmmodel <- lm(stoich$Ustoic_gNm2day.S1S2 ~ stoich$UaNO3_gNm2day.steve) # S1S2 vs S2
+summary(lmmodel) # S1S2 vs S2
+lmmodel <- lm(stoich$Ustoic_gNm2day.desoto ~ stoich$UaNO3_gNm2day.desoto) # S3
+summary(lmmodel) # S3
+# During waste release
+lmmodel <- lm(Ustoic_gNm2day.desoto ~ UaNO3_gNm2day.desoto,
+              data = subset(stoich, ReleaseStatus == "During")) # S3
+summary(lmmodel) # S3
+lmmodel <- lm(Ustoic_gNm2day.desoto ~ UaNO3_gNm2day.desoto,
+              data = subset(stoich, ReleaseStatus == "After")) # S3
+summary(lmmodel) # S3
+
+## Udiel & Vf vs GPP ################################################
+# Linear model
+# Udiel 
+lmmodel <- lm(UaNO3_gNm2day.steve ~ GPP.S1S2, data = stoich) # S1S2
+summary(lmmodel) # S1S2
+lmmodel <- lm(UaNO3_gNm2day.desoto ~ GPP.S3, data = stoich) # S3
+summary(lmmodel) # S3
 # Vf
-cor.test(~vf_mmmin+value, 
-         data = subset(vf.metab, model == "GPP"), 
-         method = c("pearson"))
-cor.test(~vf_mmmin+value, 
-         data = subset(vf.metab, model == "ER"), 
-         method = c("pearson"))
-cor.test(~vf_mmmin+value, 
-         data = subset(vf.metab, model == "GPP" & site == "S2"), 
-         method = c("pearson"))
-cor.test(~vf_mmmin+value, 
-         data = subset(vf.metab, model == "ER" & site == "S2"), 
-         method = c("pearson"))
-cor.test(~vf_mmmin+value, 
-         data = subset(vf.metab, model == "GPP" & site == "S3"), 
-         method = c("pearson"))
-cor.test(~vf_mmmin+value, 
-         data = subset(vf.metab, model == "ER" & site == "S3"), 
-         method = c("pearson"))
+lmmodel <- lm(vf_mmmin.steve ~ GPP.S1S2, data = stoich) # S1S2
+summary(lmmodel) # S1S2
+lmmodel <- lm(vf_mmmin.desoto ~ GPP.S3, data = stoich) # S3
+summary(lmmodel) # S3
 
+## Udiel & Vf vs ER ################################################
+# Linear model
+# Udiel 
+lmmodel <- lm(UaNO3_gNm2day.steve ~ ER.S1S2, data = stoich) # S1S2
+summary(lmmodel) # S1S2
+lmmodel <- lm(UaNO3_gNm2day.desoto ~ ER.S3, data = stoich) # S3
+summary(lmmodel) # S3
 
+# Vf
+lmmodel <- lm(vf_mmmin.steve ~ ER.S1S2, data = stoich) # S1S2
+summary(lmmodel) # S1S2
+lmmodel <- lm(vf_mmmin.desoto ~ ER.S3, data = stoich) # S3
+summary(lmmodel) # S3
 ```
 
 ```{r Calculation: Mean data}
@@ -386,7 +416,6 @@ mean(massbal$Ammonium.desoto_mgNL[massbal$date >= "2018-02-01" &
 sd(massbal$Ammonium.desoto_mgNL[massbal$date >= "2018-02-01" &
                                       massbal$date <= "2018-05-01"], 
    na.rm = TRUE)
-
 
 # Nitrate
 mean(massbal$Nitrate.bowersock_mgNL[massbal$date >= "2018-02-01" &
@@ -1014,7 +1043,7 @@ a <-
   # Add points
   geom_point(shape = 21) +
   # Add R2 and p value labels to plot
-  ggpubr::stat_cor(label.y.npc = 0.2, digits = 2, size = 2,
+  ggpubr::stat_cor(label.y.npc = 0.2, digits = 2, size = 2, method = "pearson",
                    aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~"))) +
   # y-axis limits
   scale_y_log10(breaks = c(0.01, 0.1, 1, 10, 100)) +
@@ -1071,31 +1100,9 @@ ggsave("./Plots/U_Vf_v2.png", grob, height = 57.5*2, width = 127, units = "mm",
 ```
 
 ```{r Fig 5: Predicted uptake fig}
-# Select columns you want
-stoich.S1S2 <- stoich.S1S2 %>%
-  dplyr::select(Date = date, 
-                Ua_gNm2day.S1S2 = Uaut_gNm2day, 
-                Uhet_gNm2day.S1S2 = Uhet_gNm2day, 
-                Ustoic_gNm2day.S1S2 = U_gNm2day)
-
-stoich.desoto <- stoich.desoto %>%
-  dplyr::select(Date = date, 
-                Ua_gNm2day.desoto = Uaut_gNm2day, 
-                Uhet_gNm2day.desoto = Uhet_gNm2day, 
-                Ustoic_gNm2day.desoto = U_gNm2day)
-# Merge with uptake
-stoich <- uptake %>%
-  dplyr::full_join(stoich.S1S2) %>% 
-  dplyr::full_join(stoich.desoto)
-
-## Correlation testing
-# Full time series
-cor.test(~UaNO3_gNm2day.steve+Ustoic_gNm2day.S1S2, data = stoich) # S2
-cor.test(~UaNO3_gNm2day.desoto+Ustoic_gNm2day.desoto, data = stoich) # S3
-
 # Black points: After (April), White points: during (Feb, March)
 # S2
-b <- 
+a <- 
   ggplot(data = stoich, aes(x = Ustoic_gNm2day.S1S2, y = UaNO3_gNm2day.steve)) +
   # 1:1 line
   geom_abline(slope = 1, intercept = 0, linetype = 2) +
@@ -1109,7 +1116,7 @@ b <-
   # Axis labels
   xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  labs(tag = "b") +
+  labs(tag = "a") +
   # Plot theme
   theme_classic() +
   theme(legend.position = "none", legend.title = element_blank(),
@@ -1117,8 +1124,8 @@ b <-
         axis.text = element_text(color = "black"),
         text = element_text(size = 8))
 # S3
-c <- 
-  ggplot(data = stoich, aes(x = Ustoic_gNm2day.desoto, y = UaNO3_gNm2day.desoto)) +
+b <- 
+  ggplot(data = stoich, aes(x = Ustoic_gNm2day.S3, y = UaNO3_gNm2day.desoto)) +
   # 1:1 line
   geom_abline(slope = 1, intercept = 0, linetype = 2) +
   # Add regression line
@@ -1132,7 +1139,7 @@ c <-
   # Axis labels
   xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  labs(tag = "c") +
+  labs(tag = "b") +
   # Plot theme
   theme_classic() +
   theme(legend.position = "none", legend.title = element_blank(),
@@ -1140,36 +1147,19 @@ c <-
         axis.text = element_text(color = "black"),
         text = element_text(size = 8))
 
-grob <- grid.arrange(b,c, ncol = 2, nrow = 1)
+grob <- grid.arrange(a, b, ncol = 2, nrow = 1)
 ggsave(grob, file = "./Plots/U_Upred.png", width = 190, height = 115, 
        units = "mm", dpi = 600)
 ```
 
 ```{r Fig 6. GPP vs U & GPP vs Vf}
-# Assemble joined dataframes
-uptakemetab_S1S2 <- uptake %>% 
-  select(Date, UaNO3_gNm2day.steve, vf_mmmin.steve) %>%
-  dplyr::full_join(metab %>% 
-                     select(Date = date, GPP.S1S2, ER.S1S2, ReleaseStatus))
-uptakemetab_S3 <- uptake %>% 
-  select(Date, UaNO3_gNm2day.desoto, vf_mmmin.desoto) %>%
-  dplyr::full_join(metab %>% 
-                     select(Date = date, GPP.S3, ER.S3, ReleaseStatus))
-
-# Correlation testing, full time series
-cor.test(~UaNO3_gNm2day.steve+GPP.S1S2, data = uptakemetab_S1S2) # a
-cor.test(~UaNO3_gNm2day.desoto+GPP.S3, data = uptakemetab_S3) # b Sig
-
-cor.test(~vf_mmmin.steve+GPP.S1S2, data = uptakemetab_S1S2) # c
-cor.test(~vf_mmmin.desoto+GPP.S3, data = uptakemetab_S3) # d
-
 # Plot
 a <- 
   ggplot(data = NULL, aes(x = GPP.S1S2, y = UaNO3_gNm2day.steve)) +
   # Data points
-  geom_point(data = subset(uptakemetab_S1S2, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(uptakemetab_S1S2, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "After"),
              fill = "#23baaf", size = 2, shape = 21) +
   # Axis limits
   scale_x_continuous(limits = c(-0.5, 15.5), breaks = c(0, 5, 10, 15)) +
@@ -1188,16 +1178,16 @@ a <-
 b <- 
   ggplot(data = NULL, aes(x = GPP.S3, y = UaNO3_gNm2day.desoto)) +
   # Add regression line
-  geom_smooth(data = uptakemetab_S3, method = lm, color = "black", 
+  geom_smooth(data = stoich, method = lm, color = "black", 
               fill = "grey") +
   # Data points
-  geom_point(data = subset(uptakemetab_S3, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(uptakemetab_S3, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "After"), 
              fill = "#F2AD00", size = 2, shape = 21) +
   # Axis limits
   scale_x_continuous(limits = c(-0.5, 15.5), breaks = c(0, 5, 10, 15)) +
-  scale_y_continuous(limits = c(-1, 4.5), breaks = c(0, 2, 4)) +
+  scale_y_continuous(limits = c(-0.5, 4.5), breaks = c(0, 2, 4)) +
   # Axis labels
   xlab(bquote("GPP (g" ~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab(expression(U[Diel] ~ "(g N" ~~ m^{-2} ~ d^{-1} * ")")) +
@@ -1211,10 +1201,13 @@ b <-
 
 c <- 
   ggplot(data = NULL, aes(x = GPP.S1S2, y = vf_mmmin.steve)) +
+  # Add regression line
+  geom_smooth(data = stoich, method = lm, color = "black", 
+              fill = "grey") +
   # Data points
-  geom_point(data = subset(uptakemetab_S1S2, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(uptakemetab_S1S2, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "After"), 
              fill = "#23baaf", size = 2, shape = 21) +
   # Axis limits
   scale_x_continuous(limits = c(-0.5, 15.5), breaks = c(0, 5, 10, 15)) +
@@ -1233,9 +1226,9 @@ c <-
 d <-
   ggplot(data = NULL, aes(x = GPP.S3, y = vf_mmmin.desoto)) +
   # Data points
-  geom_point(data = subset(uptakemetab_S3, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(uptakemetab_S3, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "After"), 
              fill = "#F2AD00", size = 2, shape = 21) +
   # Axis limits
   scale_x_continuous(limits = c(-0.5, 15.5), breaks = c(0, 5, 10, 15)) +
@@ -1258,26 +1251,21 @@ ggsave("./Plots/GPP_U_Vf.png", grob, height = 95, width = 115,
 ```
 
 ```{r Supplemental. ER vs U & ER vs Vf}
-# Correlation testing, full time series
-cor.test(~UaNO3_gNm2day.steve+ER.S1S2, data = uptakemetab_S1S2) # a
-cor.test(~UaNO3_gNm2day.desoto+ER.S3, data = uptakemetab_S3) # b Sig
-
-cor.test(~vf_mmmin.steve+ER.S1S2, data = uptakemetab_S1S2) # c
-cor.test(~vf_mmmin.desoto+ER.S3, data = uptakemetab_S3) # d
-
 # Plot
-a <- 
-  ggplot(data = NULL, aes(x = ER.S1S2, y = UaNO3_gNm2day.steve)) +
+a <- ggplot(data = NULL, aes(x = ER.S1S2, y = UaNO3_gNm2day.steve)) +
+  # Add regression line
+  geom_smooth(data = stoich, method = lm, color = "black", 
+              fill = "grey") +
   # Data points
-  geom_point(data = subset(uptakemetab_S1S2, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(uptakemetab_S1S2, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "After"),
              fill = "#23baaf", size = 2, shape = 21) +
   # Axis limits
-  scale_x_reverse(limits = c(0.5, -8), breaks = c(0, -2, -4, -6, -8)) +
-  scale_y_continuous(limits = c(-1, 4.5), breaks = c(0, 2, 4)) +
+  #scale_x_continuous(limits = c(-0.5, 15.5), breaks = c(0, 5, 10, 15)) +
+  #scale_y_continuous(limits = c(-1, 4.5), breaks = c(0, 2, 4)) +
   # Axis labels
-  xlab(bquote("ER (g" ~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  xlab(bquote("|ER| (g" ~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab(expression(U[Diel] ~ "(g N" ~~ m^{-2} ~ d^{-1} * ")")) +
   labs(tag = "a") +
   # Plot theme
@@ -1290,18 +1278,18 @@ a <-
 b <- 
   ggplot(data = NULL, aes(x = ER.S3, y = UaNO3_gNm2day.desoto)) +
   # Add regression line
-  geom_smooth(data = uptakemetab_S3, method = lm, color = "black", 
+  geom_smooth(data = stoich, method = lm, color = "black", 
               fill = "grey") +
   # Data points
-  geom_point(data = subset(uptakemetab_S3, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(uptakemetab_S3, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "After"), 
              fill = "#F2AD00", size = 2, shape = 21) +
   # Axis limits
-  scale_x_reverse(limits = c(0.5, -6), breaks = c(0, -2, -4, -6)) +
-  scale_y_continuous(limits = c(-1, 4.5), breaks = c(0, 2, 4)) +
+  #scale_x_continuous(limits = c(-0.5, 15.5), breaks = c(0, 5, 10, 15)) +
+  #scale_y_continuous(limits = c(-0.5, 4.5), breaks = c(0, 2, 4)) +
   # Axis labels
-  xlab(bquote("ER (g" ~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  xlab(bquote("|ER| (g" ~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab(expression(U[Diel] ~ "(g N" ~~ m^{-2} ~ d^{-1} * ")")) +
   labs(tag = "b") +
   # Plot theme
@@ -1311,18 +1299,20 @@ b <-
         axis.text = element_text(color = "black"),
         text = element_text(size = 8))
 
-c <- 
-  ggplot(data = NULL, aes(x = ER.S1S2, y = vf_mmmin.steve)) +
+c <- ggplot(data = NULL, aes(x = ER.S1S2, y = vf_mmmin.steve)) +
+  # Add regression line
+  geom_smooth(data = stoich, method = lm, color = "black", 
+              fill = "grey") +
   # Data points
-  geom_point(data = subset(uptakemetab_S1S2, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(uptakemetab_S1S2, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "After"), 
              fill = "#23baaf", size = 2, shape = 21) +
   # Axis limits
-  scale_x_reverse(limits = c(0.5, -8), breaks = c(0, -2, -4, -6, -8)) +
-  scale_y_continuous(limits = c(-0.5, 9.5), breaks = c(0, 3, 6, 9)) +
+  #scale_x_continuous(limits = c(-0.5, 15.5), breaks = c(0, 5, 10, 15)) +
+  #scale_y_continuous(limits = c(-0.5, 9.5), breaks = c(0, 3, 6, 9)) +
   # Axis labels
-  xlab(bquote("ER (g" ~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  xlab(bquote("|ER| (g" ~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab(expression(V[f] ~ "(mm" ~~ min^{-1}* ")")) +
   labs(tag = "c") +
   # Plot theme
@@ -1335,15 +1325,15 @@ c <-
 d <-
   ggplot(data = NULL, aes(x = ER.S3, y = vf_mmmin.desoto)) +
   # Data points
-  geom_point(data = subset(uptakemetab_S3, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(uptakemetab_S3, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich, ReleaseStatus == "After"), 
              fill = "#F2AD00", size = 2, shape = 21) +
   # Axis limits
-  scale_x_reverse(limits = c(0.5, -6), breaks = c(0, -2, -4, -6)) +
-  scale_y_continuous(limits = c(-0.5, 9.5), breaks = c(0, 3, 6, 9)) +
+  #scale_x_continuous(limits = c(-0.5, 15.5), breaks = c(0, 5, 10, 15)) +
+  #scale_y_continuous(limits = c(-0.5, 9.5), breaks = c(0, 3, 6, 9)) +
   # Axis labels
-  xlab(bquote("ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
+  xlab(bquote("|ER| (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab(expression(V[f] ~ "(mm" ~~ min^{-1}* ")")) +
   labs(tag = "d") +
   # Plot theme
@@ -1390,7 +1380,7 @@ a <-
 ggsave("./Plots/Meta_Q.GPP.png", height = 3, width = 3.25, units = "in")
 
 ### Meta-analysis Discharge vs ER, Hall et al 2016 Data #######################
-b <- 
+c <- 
   ggplot() +
   # Meta-analysis data
   geom_point(data = hall, aes(x = q_m3s, y = er_gm2d), shape = 21, 
@@ -1404,7 +1394,7 @@ b <-
   # Axis scales
   scale_x_log10(labels = scales::number_format(accuracy=1, scale=1)) +
   scale_y_log10(labels = scales::number_format(accuracy=1, scale=1)) +
-  labs(tag = "b") +
+  labs(tag = "c") +
   # Axis labels
   xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
   ylab(expression("|ER| (g" ~ O[2] ~ m^{-2} ~ d^{-1}*")")) +
@@ -1426,7 +1416,7 @@ ggsave("./Plots/Meta_Q.ER.png", height = 3.5, width = 4.25, units = "in")
 tank$U_gNm2day <- tank$NO3_Vf_mmmin*(tank$NO3_Cb_mgNL/1000)*1440
 
 ### Discharge v. total uptake, tank et al 2008 ################################
-c <- 
+b <- 
   ggplot() +
   # Meta-analysis data
   geom_point(data = tank, aes(x = Discharge_Ls/1000, 
@@ -1434,8 +1424,7 @@ c <-
              shape = 21, color = "darkgrey") +
   geom_smooth(data = tank, aes(x = Discharge_Ls/1000, 
                               y = NO3_Vf_mmmin*(NO3_Cb_mgNL/1000)*1440), 
-              method = "lm", fullrange = TRUE, 
-              fill = "lightgrey", alpha = 0.2, color = "darkgrey") +
+              method = "lm", fullrange = TRUE, color = "black") +
   # Rode et al 2016 and Hensley et al 2014 data
   geom_point(data = rode.hensley, aes(x = Discharge_m3s,
                                       y = U_mgNm2day/1000),
@@ -1449,7 +1438,7 @@ c <-
                 limits = c(NA, 105)) +
   scale_y_log10(labels = scales::number_format(accuracy=1, scale=1)) +
   # Axis labels
-  labs(tag = "c") +
+  labs(tag = "b") +
   xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
   ylab(expression("U (g-N" ~~ m^{-2} ~ d^{-1} * ")")) +
   # Color scales
@@ -1471,8 +1460,7 @@ d <-
              shape = 21, color = "darkgrey") +
   geom_smooth(data = tank, aes(x = Discharge_Ls/1000, 
                               y = NO3_Vf_mmmin), 
-              method = "lm", fullrange = TRUE, color = "darkgrey",
-              fill = "lightgrey", alpha = 0.2) +
+              method = "lm", fullrange = TRUE, color = "black") +
   # Rode et al 2016 and Hensley et al 2014 data
   geom_point(data = rode.hensley, aes(x = Discharge_m3s,
                                       y = Vf_mmmin),
@@ -1500,7 +1488,7 @@ d <-
         axis.text = element_text(color = "black"),
         text = element_text(size = 8))
 
-arrange <- grid.arrange(a,c,b,d, nrow = 2, ncol = 2)
+arrange <- grid.arrange(a,b,c,d, nrow = 2, ncol = 2)
 ggsave("./Plots/Meta_Q.png", arrange, height = 95, width = 115, units = "mm", 
        dpi = 600)
 ```
