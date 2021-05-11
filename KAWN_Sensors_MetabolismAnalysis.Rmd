@@ -66,31 +66,50 @@ traceplot(fit2,
           pars = sample(matchstr, size = 12),
           inc_warmup=TRUE, ncol = 4)
 
-# Inspect model output
-# We have 10 days where ER estimate is positive
-# Positive ER estimates range from near 0 to ~5.5, some of these days also
-# correspond to negative/near 0 GPP estimates
-# Conclude that modeling is wonky for these days, exclude them from analysis
+# For days when ER is modeled as positive, remove day from
+# dataframe - this is the approach used in Hall et al 2016
+sum(modelfit.desoto$predictions$ER > 0, na.rm = T) # Count of days when ER is positive = 10
+sum(modelfit.desoto$predictions$ER > 0, na.rm = T) / 
+  length(modelfit.desoto$predictions$ER) * 100 # Percentage of data removed = 9.7%
 
-# 2018-02-25
-modelfit.desoto$predictions[modelfit.desoto$predictions$date == "2018-02-25",][2:7] <- NA
-# 2018-02-26
-modelfit.desoto$predictions[modelfit.desoto$predictions$date == "2018-02-26",][2:7] <- NA
-# 2018-02-27
-modelfit.desoto$predictions[modelfit.desoto$predictions$date == "2018-02-27",][2:7] <- NA
-# 2018-02-28
-modelfit.desoto$predictions[modelfit.desoto$predictions$date == "2018-02-28",][2:7] <- NA
-# 2018-03-01
-modelfit.desoto$predictions[modelfit.desoto$predictions$date == "2018-03-01",][2:7] <- NA
-# 2018-03-02
-modelfit.desoto$predictions[modelfit.desoto$predictions$date == "2018-03-02",][2:7] <- NA
-# 2018-03-03
-modelfit.desoto$predictions[modelfit.desoto$predictions$date == "2018-03-03",][2:7] <- NA
-# 2018-03-10
-modelfit.desoto$predictions[modelfit.desoto$predictions$date == "2018-03-10",][2:7] <- NA
-# 2018-03-11
-modelfit.desoto$predictions[modelfit.desoto$predictions$date == "2018-03-11",][2:7] <- NA
+# For days when GPP is modeled as positive, remove day from
+# dataframe - assume data is innaccurately modeled on this day
+sum(modelfit.desoto$predictions$GPP < 0) # Count of days when GPP is positive = 6
+sum(modelfit.desoto$predictions$GPP < 0) / 
+  length(modelfit.desoto$predictions$GPP) * 100 # Percentage of data removed = 5.5%
 
+# Inspect GPP:ER
+modelfit.desoto$predictions$PR <- modelfit.desoto$predictions$GPP / 
+  abs(modelfit.desoto$predictions$ER)
+
+# Filter data
+modelfit.desoto$predictions <- modelfit.desoto$predictions %>% 
+  filter(modelfit.desoto$predictions$ER < 0,
+         modelfit.desoto$predictions$GPP > 0,
+         # 2018-03-04 to 2018-03-07 occurs just after a large dam release, DO 
+         # data for 03-05 and 03-06 spikes, and P:R ratios on these days are 
+         # biologically impossible - modeled data on these dates is unreliable
+         modelfit.desoto$predictions$date < "2018-03-04" |
+           modelfit.desoto$predictions$date > "2018-03-07",
+         # 03-13 small Q bump (dam release)
+         modelfit.desoto$predictions$date != "2018-03-13",
+         # 03-20 to 03-22 large dam release
+         modelfit.desoto$predictions$date < "2018-03-20" |
+           modelfit.desoto$predictions$date > "2018-03-22",
+         # 03-27 to 03-29 large dam release
+         modelfit.desoto$predictions$date < "2018-03-27" |
+           modelfit.desoto$predictions$date > "2018-03-29",
+         # 03-31 small Q bump (potential dam release) 
+         modelfit.desoto$predictions$date != "2018-03-31",
+         # 04-14 to 04-20 large dam release
+         modelfit.desoto$predictions$date < "2018-04-14" |
+           modelfit.desoto$predictions$date > "2018-04-20",
+         # 05-3 to 05-7 large dam release
+         modelfit.desoto$predictions$date < "2018-05-03" |
+           modelfit.desoto$predictions$date > "2018-05-07",
+         ) 
+
+#modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
 saveRDS(modelfit.desoto, file = "./Outputs/MetabResults_Desoto.RData") 
 write.csv(modelfit.desoto$predictions, file = "./Outputs/MetabResults_Desoto.csv")
 ```
@@ -874,72 +893,6 @@ NEP_calcs <- function(model_output){
 # NEP calculations
 NEP.S1S2 <- NEP_calcs(modelfit.S1S2)
 NEP.desoto <- NEP_calcs(modelfit.desoto$predictions)
-```
-
-```{r stoich.scaling}
-# Predict areal N uptake rate based on metabolism
-# Assumptions: (Hall & Tank 2003)
-# 1. C production will drive autotrophic & heterotrophic demand for N (AKA, 
-#    assume a respiratory quotient = 1)
-# 2. Molar C:N scaling ratio = 20 [g C / g N] (Hall & Tank 2003) OR 
-#    Molar C:N scaling ratio = 12 [g C / g N] (Covino et al 2018, citing 
-#    steltzer & lamberti 2001)
-# 3. Net autotrophic production is 0.5*GPP (Odum 1957, Webster & Myer 1997)
-# 4. Heterotrophic respiration can be estimated from ecosystem respiration
-#    using the equation HR = ER - ra*GPP where HR is herotrophic respiration, 
-#    and ra is a growth efficiency term. Hall & Tank select a moderate growth 
-#    efficiency = 0.2 and low growth efficiency = 0.05 to bound their estimate
-# 5. Heterotrophic N assimilation can be calculated assuming a respiratory 
-#    quotient of 1 and a C:N scaling ratio of 20:1 (both Hall & Tank 2003 and
-#    Covino et al 2018 use 20 as ratio)
-
-# Equations -----------------------------------------------------------------
-
-# Autotrophic N assimilation = GPP [gO2/m2d] * Respiratory quotient [g C/g O2] 
-#                                  * Autotrophic respiration coefficient 
-#                                  * C:N scaling ratio [g N / g C]
-# Ua [g N / m2 day ] = GPP * 1 * 0.5 * 1/20 or 1/12
-
-# Heterotrophic respiration = ER - ra * GPP
-# HR [g O2 / m2 day] = ER - 0.5 or 0.2 * GPP
-
-# Heterotrophic N assimilation = HR [g O2 / m2 day] 
-#                                * Respiratory quotient [g C / g O2]
-#                                * C:N scaling ratio [g N / g C]
-# Heterotrophic N assimilation = HR * 1 * 1/20
-
-# Assumed constants ----------------------------------------------------------
-
-RespQuot <- 1
-AutoRespCoeff <- 0.5
-CNscale <- 20
-
-ra.med <- 0.5
-ra.low <- 0.2
-
-# Run calculation
-stoich.S1S2 <- 
-  modelfit.S1S2 %>%
-  select(date, GPP, ER) %>%
-  mutate(ER = abs(ER),
-         Uaut_gNm2day = GPP * RespQuot * AutoRespCoeff / CNscale,
-         HR = ER - ra.low * GPP,
-         Uhet_gNm2day = HR / CNscale,
-         U_gNm2day = Uaut_gNm2day + Uhet_gNm2day)
-stoich.desoto <- 
-  modelfit.desoto$predictions %>%
-  select(date, GPP, ER) %>%
-  mutate(ER = abs(ER),
-         Uaut_gNm2day = GPP * RespQuot * AutoRespCoeff / CNscale,
-         HR = ER - ra.low * GPP,
-         Uhet_gNm2day = HR / CNscale,
-         U_gNm2day = Uaut_gNm2day + Uhet_gNm2day)
-
-# Save to RData and CSV
-saveRDS(stoich.S1S2, file = "./Outputs/StoichUptake_S1S2.RData")
-write.csv(stoich.S1S2, file ="./Outputs/StoichUptake_S1S2.CSV", row.names = F)
-saveRDS(stoich.desoto, file = "./Outputs/StoichUptake_Desoto.RData")
-write.csv(stoich.desoto, file ="./Outputs/StoichUptake_Desoto.CSV", row.names = F)
 ```
 
 ```{r depth.check}
