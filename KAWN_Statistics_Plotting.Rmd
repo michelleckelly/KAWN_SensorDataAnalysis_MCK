@@ -299,16 +299,6 @@ hall <- read.csv("./Data/Meta-analysis/Hall_2016_metabolismdata.csv",
 hall$q_m3s <- hall$q_Ls/1000
 ```
 
-```{r Calculation:stoichiometric scaling}
-
-
-# Save to RData and CSV
-saveRDS(stoich.S1S2, file = "./Outputs/StoichUptake_S1S2.RData")
-write.csv(stoich.S1S2, file ="./Outputs/StoichUptake_S1S2.CSV", row.names = F)
-saveRDS(stoich.desoto, file = "./Outputs/StoichUptake_Desoto.RData")
-write.csv(stoich.desoto, file ="./Outputs/StoichUptake_Desoto.CSV", row.names = F)
-```
-
 ```{r Stats}
 #metab.long$Month <- lubridate::month(metab.long$Date)
 # Correct date spans
@@ -769,7 +759,7 @@ a <-
   geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # S0
   geom_point(data = massbal[massbal$date < as.Date("2018-02-26"),], 
-             aes(x = date, y = Nitrate.bowersock_mgNL, fill = "white"), 
+             aes(x = date, y = Nitrate.bowersock_mgNL, fill = "S0"), 
              size = 2, shape = 21) +
   # S0 BDL
   geom_segment(aes(x = as.Date("2018-02-26"), xend = as.Date("2018-05-01"),
@@ -784,19 +774,21 @@ a <-
   scale_x_date(limits = c(as_date("2018-02-01"), as_date("2018-05-01")),
                date_breaks = "2 weeks", date_labels = "%b %e" ) + 
   scale_y_log10()+
-  scale_fill_manual(values = c("S0" = "#000000", "S1" = "#FF0000", 
+  scale_fill_manual(values = c("S0" = "#ffffff", "S1" = "#FF0000", 
                                  "S2" = "#23baaf", "S3" = "#F2AD00"),
                      breaks = c("S0", "S1", "S2", "S3")) +
   # axis labels
-  labs(tag = "a") +
+  labs(tag = "a", fill = "Site") +
   xlab(NULL) + 
   ylab(expression(NO[3]^{"-"} ~~ "(mg-N" ~~ L^{-1} * ")"))+
   # plot theme
   theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
+  theme(legend.position = c(0.15,0.13), #legend.title = element_blank(),
+        legend.box.background = element_rect(color = "black"),
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"),
-        text = element_text(size = 8))
+        text = element_text(size = 8)) +
+  guides(fill = guide_legend(keyheight = 0.5, ncol = 2))
 ggsave("./Plots/Fig2_a_Nitrate_time.png", a, height = 77, width = 120, 
        units = "mm", dpi = 600)
 
@@ -1184,13 +1176,13 @@ ggsave(grob, file = "./Plots/Revisions_UpredStoichiometry.png", width = 8, heigh
 # Black points: After (April), White points: during (Feb, March)
 # S2
 a <- 
-  ggplot(data = stoich, aes(x = Ustoic_gNm2day.S1S2, y = UaNO3_gNm2day.steve)) +
+  ggplot(data = stoich20, aes(x = Upred_gNm2day.S1S2, y = UaNO3_gNm2day.steve)) +
   # 1:1 line
   geom_abline(slope = 1, intercept = 0, linetype = 2) +
   # Data points
-  geom_point(data = subset(stoich, ReleaseStatus == "During"), fill = "white", 
+  geom_point(data = subset(stoich20, ReleaseStatus == "During"), fill = "white", 
              size = 2, shape = 21) +
-  geom_point(data = subset(stoich, ReleaseStatus == "After"), fill = "#23baaf", 
+  geom_point(data = subset(stoich20, ReleaseStatus == "After"), fill = "#23baaf", 
              size = 2, shape = 21) +
   # Axis labels
   xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
@@ -1208,16 +1200,16 @@ a <-
         text = element_text(size = 8))
 # S3
 b <- 
-  ggplot(data = stoich, aes(x = Ustoic_gNm2day.S3, y = UaNO3_gNm2day.desoto)) +
+  ggplot(data = stoich20, aes(x = Upred_gNm2day.S3, y = UaNO3_gNm2day.desoto)) +
   # 1:1 line
   geom_abline(slope = 1, intercept = 0, linetype = 2) +
   # Add regression line
   geom_smooth(method = lm, 
               color = "black", fill = "grey") +
   # Data points
-  geom_point(data = subset(stoich, ReleaseStatus == "During"), fill = "white", 
+  geom_point(data = subset(stoich20, ReleaseStatus == "During"), fill = "white", 
              size = 2, shape = 21) +
-  geom_point(data = subset(stoich, ReleaseStatus == "After"), fill = "#F2AD00", 
+  geom_point(data = subset(stoich20, ReleaseStatus == "After"), fill = "#F2AD00", 
              size = 2, shape = 21) +
   # Axis labels
   xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
@@ -1234,8 +1226,8 @@ b <-
         axis.text = element_text(color = "black"),
         text = element_text(size = 8))
 
-grob <- grid.arrange(a, b, ncol = 1, nrow = 2)
-ggsave(grob, file = "./Plots/Fig5_U_Upred.png", width = 95, height = 115*2-50, 
+grob <- grid.arrange(a, b, ncol = 2, nrow = 1)
+ggsave(grob, file = "./Plots/Fig5_U_Upred.png", height = 95, width = 115*2-50, 
        units = "mm", dpi = 600)
 ```
 
@@ -1465,7 +1457,7 @@ a <-
                  fill = c("S1", "S2", "S3")), size = 3, shape = 21) +
   # Axis scales
   scale_x_log10(labels = scales::number_format(accuracy=1, scale=1)) +
-  scale_y_log10(labels = scales::number_format(accuracy=1, scale=1)) +
+  scale_y_log10(labels = scales::number_format(accuracy=0.1, scale=1)) +
   # Axis labels
   xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
   ylab(expression("GPP (g" ~ O[2] ~ m^{-2} ~ d^{-1}*")")) +
@@ -1558,11 +1550,12 @@ d <-
   # Our data
   geom_point(data = meanData, 
              aes(x = Q.mean, y = Vf.mean, 
-                 fill = c("S1", "S2", "S3")), size = 3, shape = 21) +
+                 fill = c("S1", "S2", "S3")), size = 3, shape = 21, alpha = 0.8) +
   # Axis scales
   scale_x_log10(labels = scales::number_format(accuracy=1, scale=1), 
                 limits = c(NA, 105)) +
-  scale_y_log10(labels = scales::number_format(accuracy=1, scale=1)) +
+  scale_y_log10(labels = scales::number_format(accuracy=1, scale=1, 
+                                               big.mark = "")) +
   # Axis labels
   labs(tag = "d") +
   xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
