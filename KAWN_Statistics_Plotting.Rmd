@@ -219,13 +219,13 @@ stoich16 <-
          ER.S1S2 = abs(ER.S1S2),
          Uaut_gNm2day.S1S2 = GPP.S1S2 * RespQuot * AutoRespCoeff / 16,
          HR = ER.S1S2 - ra.low * GPP.S1S2,
-         Uhet_gNm2day.S1S2 = HR / CNscaleHet,
+         Uhet_gNm2day.S1S2 = HR / 16,
          Upred_gNm2day.S1S2 = Uaut_gNm2day.S1S2 + Uhet_gNm2day.S1S2,
          # S3
          ER.S3 = abs(ER.S3),
          Uaut_gNm2day.S3 = GPP.S3 * RespQuot * AutoRespCoeff / 16,
          HR = ER.S3 - ra.low * GPP.S3,
-         Uhet_gNm2day.S3 = HR / CNscaleHet,
+         Uhet_gNm2day.S3 = HR / 16,
          Upred_gNm2day.S3 = Uaut_gNm2day.S3 + Uhet_gNm2day.S3)
 
 # Nitrate uptake results -----------------------------------------------------
@@ -391,37 +391,44 @@ summary(lmmodel) # S3
 
 ## Udiel vs Upred  ############################################################
 # Means
-mean(stoich$Ustoic_gNm2day.S1S2, na.rm = T) # S1-S2 U pred
-mean(stoich[-which(is.na(stoich$Ustoic_gNm2day.S1S2)),]$UaNO3_gNm2day.steve,
+mean(stoich20$Upred_gNm2day.S1S2, na.rm = T) # S1-S2 U pred
+mean(stoich20[-which(is.na(stoich20$Upred_gNm2day.S1S2)),]$UaNO3_gNm2day.steve,
      na.rm = T) # U diel mean at S2 during S1S2 data
-mean(stoich$Ustoic_gNm2day.S3, na.rm = T) # S3 U pred
-mean(stoich[-which(is.na(stoich$Ustoic_gNm2day.S3)),]$UaNO3_gNm2day.desoto,
+mean(stoich20$Upred_gNm2day.S3, na.rm = T) # S3 U pred
+mean(stoich20[-which(is.na(stoich20$Upred_gNm2day.S3)),]$UaNO3_gNm2day.desoto,
      na.rm = T) # U diel mean at S3 during S3 data
 ## Compare during release vs after at S3
-stoich %>% 
+stoich20 %>% 
   filter(ReleaseStatus == "During",
-         !is.na(Ustoic_gNm2day.S3)) %>%
+         !is.na(Upred_gNm2day.S3)) %>%
   summarise(mean(UaNO3_gNm2day.desoto, na.rm = T),
-            mean(Ustoic_gNm2day.S3, na.rm = T))
-stoich %>% 
+            mean(Upred_gNm2day.S3, na.rm = T))
+stoich20 %>% 
   filter(ReleaseStatus == "After",
-         !is.na(Ustoic_gNm2day.S3)) %>%
+         !is.na(Upred_gNm2day.S3)) %>%
   summarise(mean(UaNO3_gNm2day.desoto, na.rm = T),
-            mean(Ustoic_gNm2day.S3, na.rm = T))
+            mean(Upred_gNm2day.S3, na.rm = T))
+# Revisions: compare C:N = 20 with C:N = 16
+(mean(stoich16$Upred_gNm2day.S1S2, na.rm = T) - 
+    mean(stoich20$Upred_gNm2day.S1S2, na.rm = T)) / 
+  mean(stoich20$Upred_gNm2day.S1S2, na.rm = T) # Percent change
+(mean(stoich16$Upred_gNm2day.S3, na.rm = T) - 
+  mean(stoich20$Upred_gNm2day.S3, na.rm = T)) / 
+  mean(stoich20$Upred_gNm2day.S3, na.rm = T)
 
 # Linear model
-lmmodel <- lm(stoich$Ustoic_gNm2day.S1S2 ~ stoich$UaNO3_gNm2day.eric) # S1S2 vs S1
+lmmodel <- lm(stoich20$Upred_gNm2day.S1S2 ~ stoich20$UaNO3_gNm2day.eric) # S1S2 vs S1
 summary(lmmodel) # S1S2 vs S1
-lmmodel <- lm(stoich$Ustoic_gNm2day.S1S2 ~ stoich$UaNO3_gNm2day.steve) # S1S2 vs S2
+lmmodel <- lm(stoich20$Upred_gNm2day.S1S2 ~ stoich20$UaNO3_gNm2day.steve) # S1S2 vs S2
 summary(lmmodel) # S1S2 vs S2
-lmmodel <- lm(stoich$Ustoic_gNm2day.S3 ~ stoich$UaNO3_gNm2day.desoto) # S3
+lmmodel <- lm(stoich20$Upred_gNm2day.S3 ~ stoich20$UaNO3_gNm2day.desoto) # S3
 summary(lmmodel) # S3
 # During waste release
-lmmodel <- lm(Ustoic_gNm2day.S3 ~ UaNO3_gNm2day.desoto,
-              data = subset(stoich, ReleaseStatus == "During")) # S3
+lmmodel <- lm(Upred_gNm2day.S3 ~ UaNO3_gNm2day.desoto,
+              data = subset(stoich20, ReleaseStatus == "During")) # S3
 summary(lmmodel) # S3
-lmmodel <- lm(Ustoic_gNm2day.S3 ~ UaNO3_gNm2day.desoto,
-              data = subset(stoich, ReleaseStatus == "After")) # S3
+lmmodel <- lm(Upred_gNm2day.S3 ~ UaNO3_gNm2day.desoto,
+              data = subset(stoich20, ReleaseStatus == "After")) # S3
 summary(lmmodel) # S3
 
 ## Udiel & Vf vs GPP ################################################
