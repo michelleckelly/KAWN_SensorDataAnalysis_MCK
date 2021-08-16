@@ -299,6 +299,27 @@ hall <- read.csv("./Data/Meta-analysis/Hall_2016_metabolismdata.csv",
 hall$q_m3s <- hall$q_Ls/1000
 ```
 
+```{r pull together flow and width data for admin}
+channel_S1 <- diel_eric %>% select(DateTime_UTC, Discharge_m3s)
+channel_S1 <- na.omit(channel_S1)
+channel_S1$Width_m <- 210.9
+channel_S1$EstimatedDepth_m <- 0.409*channel_S1$Discharge_m3s^0.294 # As in MS
+
+channel_S2 <- diel_steve %>% select(DateTime_UTC, Discharge_m3s)
+channel_S2 <- na.omit(channel_S2)
+channel_S2$Width_m <- 113.4
+channel_S2$EstimatedDepth_m <- 0.409*channel_S2$Discharge_m3s^0.294
+
+channel_S3 <- diel_desoto %>% select(DateTime_UTC, Discharge_m3s)
+channel_S3 <- na.omit(channel_S3)
+channel_S3$Width_m <- 138.07
+channel_S3$EstimatedDepth_m <- 0.409*channel_S3$Discharge_m3s^0.294
+
+write.csv(channel_S1, file = "SiteS1_QWidth_4Aug21.csv", row.names = FALSE)
+write.csv(channel_S2, file = "SiteS2_QWidth_4Aug21.csv", row.names = FALSE)
+write.csv(channel_S3, file = "SiteS3_QWidth_4Aug21.csv", row.names = FALSE)
+```
+
 ```{r Stats}
 #metab.long$Month <- lubridate::month(metab.long$Date)
 # Correct date spans
@@ -1243,9 +1264,9 @@ ggsave(grob, file = "./Plots/Fig5_U_Upred.png", height = 95, width = 115*2-50,
 a <- 
   ggplot(data = NULL, aes(x = GPP.S1S2, y = UaNO3_gNm2day.steve)) +
   # Data points
-  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(stoich, ReleaseStatus == "After"),
+  geom_point(data = subset(stoich20, ReleaseStatus == "After"),
              fill = "#23baaf", size = 2, shape = 21) +
   # Axis limits
   coord_cartesian(xlim = c(-0.5, 15.5), ylim = c(-1, 4.5)) +
@@ -1265,12 +1286,12 @@ a <-
 b <- 
   ggplot(data = NULL, aes(x = GPP.S3, y = UaNO3_gNm2day.desoto)) +
   # Add regression line
-  geom_smooth(data = stoich, method = lm, color = "black", 
+  geom_smooth(data = stoich20, method = lm, color = "black", 
               fill = "grey") +
   # Data points
-  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(stoich, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "After"), 
              fill = "#F2AD00", size = 2, shape = 21) +
   # Axis limits
   coord_cartesian(xlim = c(-0.5, 15.5), ylim = c(-1, 4.5)) +
@@ -1289,9 +1310,9 @@ b <-
 
 c <- ggplot(data = NULL, aes(x = ER.S1S2, y = UaNO3_gNm2day.steve)) +
   # Data points
-  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(stoich, ReleaseStatus == "After"),
+  geom_point(data = subset(stoich20, ReleaseStatus == "After"),
              fill = "#23baaf", size = 2, shape = 21) +
   # Axis limits
   scale_x_continuous(limits = c(-0.5, 8.5), breaks = c(0,2,4,6,8,10)) +
@@ -1310,12 +1331,12 @@ c <- ggplot(data = NULL, aes(x = ER.S1S2, y = UaNO3_gNm2day.steve)) +
 d <- 
   ggplot(data = NULL, aes(x = ER.S3, y = UaNO3_gNm2day.desoto)) +
   # Add regression line
-  geom_smooth(data = stoich, method = lm, color = "black", 
+  geom_smooth(data = stoich20, method = lm, color = "black", 
               fill = "grey") +
   # Data points
-  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(stoich, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "After"), 
              fill = "#F2AD00", size = 2, shape = 21) +
   # Axis limits
   coord_cartesian(xlim = c(-0.5, 8.5), ylim = c(-0.5, 4.5)) +

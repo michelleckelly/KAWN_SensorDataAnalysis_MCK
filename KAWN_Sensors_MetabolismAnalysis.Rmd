@@ -44,11 +44,13 @@ site_code.desoto <- "KS_KANSASR"
 
 ptm <- proc.time() # Time model run
 
+desoto_data$data
+
 desoto_data <- request_data(site_code.desoto, 
                             variables = c('DO_mgL', 'DOsat_pct','satDO_mgL',
                                           'WaterPres_kPa', 'WaterTemp_C',
                                           'Light_PAR','AirPres_kPa',
-                                          'Discharge_m3s'))
+                                          'Discharge_m3s', "Depth_m"))
 fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, 
                                   model = model_name, rm_flagged = "Bad Data", 
                                   fillgaps = "interpolation",
