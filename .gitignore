@@ -42,9 +42,4 @@
 # Ignore RData files of metabolism results as these are over Github's 100 MB 
 # file size limit. Metabolism results are still saved in CSV files, so script
 # is still reproducible without these
-/Outputs/MetabResults_SteveRaw.RData
-/Outputs/MetabResults_Steve.RData
-/Outputs/MetabResults_EricRaw.RData
-/Outputs/MetabResults_Eric.RData
 /Outputs/MetabResults_Desoto.RData
-/Outputs/MetabResults_DesotoRaw.RData
