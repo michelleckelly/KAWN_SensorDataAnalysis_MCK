@@ -44,76 +44,78 @@ site_code.desoto <- "KS_KANSASR"
 
 ptm <- proc.time() # Time model run
 
-desoto_data$data
-
 desoto_data <- request_data(site_code.desoto, 
                             variables = c('DO_mgL', 'DOsat_pct','satDO_mgL',
                                           'WaterPres_kPa', 'WaterTemp_C',
                                           'Light_PAR','AirPres_kPa',
-                                          'Discharge_m3s', "Depth_m"))
+                                          'Discharge_m3s', 'Depth_m'))
+
 fitdata.desoto <- prep_metabolism(desoto_data, type = model_type, 
                                   model = model_name, rm_flagged = "Bad Data", 
                                   fillgaps = "interpolation",
-                                  estimate_areal_depth = TRUE)
-modelfit.desoto <- fit_metabolism(fitdata.desoto)
+                                  estimate_areal_depth = FALSE)
+
+# Specify model parameters
+modCode <- mm_name(type = model_type, pool_K600 = "binned")
+# Specify priors for K
+speCode <- specs(modCode, K600_lnQ_nodes_meanlog = log(5), 
+                 K600_lnQ_nodes_sdlog = 0.75)
+# Fit model
+modelfit.desoto <- metab(specs = speCode, data = fitdata.desoto$data)
 
 proc.time() - ptm
 
 # Inspecting the model output
 # Pull out a random sample of the K600_daily stan models
 # Doing this because we can't display all stan models at once for inspection
-matchstr <- names(fit2)[grep("^K600_daily\\[\\d+\\]$", names(fit2))]
+#matchstr <- names(modelfit.desoto$fit)[grep("^K600_daily\\[\\d+\\]$", names(modelfit.desoto$fit))]
 # Plot the K600 batch model runs
-traceplot(fit2,
-          pars = sample(matchstr, size = 12),
-          inc_warmup=TRUE, ncol = 4)
+#traceplot(modelfit.desoto,
+#          pars = sample(matchstr, size = 12),
+#          inc_warmup=TRUE, ncol = 4)
 
 # For days when ER is modeled as positive, remove day from
 # dataframe - this is the approach used in Hall et al 2016
-sum(modelfit.desoto$predictions$ER > 0, na.rm = T) # Count of days when ER is positive = 10
-sum(modelfit.desoto$predictions$ER > 0, na.rm = T) / 
-  length(modelfit.desoto$predictions$ER) * 100 # Percentage of data removed = 9.7%
+sum(modelfit.desoto@fit[["daily"]]$ER_mean > 0, na.rm = T) # Count of days when ER is positive = 7
+sum(modelfit.desoto@fit[["daily"]]$ER_mean > 0, na.rm = T) / 
+  length(modelfit.desoto@fit[["daily"]]$ER_mean) * 100 # Percentage of data removed = 5.8%
 
 # For days when GPP is modeled as positive, remove day from
 # dataframe - assume data is innaccurately modeled on this day
-sum(modelfit.desoto$predictions$GPP < 0) # Count of days when GPP is positive = 6
-sum(modelfit.desoto$predictions$GPP < 0) / 
-  length(modelfit.desoto$predictions$GPP) * 100 # Percentage of data removed = 5.5%
-
-# Inspect GPP:ER
-modelfit.desoto$predictions$PR <- modelfit.desoto$predictions$GPP / 
-  abs(modelfit.desoto$predictions$ER)
+sum(modelfit.desoto@fit[["daily"]]$GPP_mean < 0, na.rm = T) # 6
+sum(modelfit.desoto@fit[["daily"]]$GPP_mean < 0, na.rm = T) / 
+  length(modelfit.desoto@fit[["daily"]]$GPP_mean) * 100 # 5%
 
 # Filter data
-modelfit.desoto$predictions <- modelfit.desoto$predictions %>% 
-  filter(modelfit.desoto$predictions$ER < 0,
-         modelfit.desoto$predictions$GPP > 0,
+modelfit.desoto@fit[["daily"]] <- modelfit.desoto@fit[["daily"]] %>% 
+  filter(modelfit.desoto@fit[["daily"]]$ER_mean < 0,
+         modelfit.desoto@fit[["daily"]]$GPP_mean > 0,
          # 2018-03-04 to 2018-03-07 occurs just after a large dam release, DO 
          # data for 03-05 and 03-06 spikes, and P:R ratios on these days are 
          # biologically impossible - modeled data on these dates is unreliable
-         modelfit.desoto$predictions$date < "2018-03-04" |
-           modelfit.desoto$predictions$date > "2018-03-07",
+         modelfit.desoto@fit[["daily"]]$date < "2018-03-04" |
+           modelfit.desoto@fit[["daily"]]$date > "2018-03-07",
          # 03-13 small Q bump (dam release)
-         modelfit.desoto$predictions$date != "2018-03-13",
+         modelfit.desoto@fit[["daily"]]$date != "2018-03-13",
          # 03-20 to 03-22 large dam release
-         modelfit.desoto$predictions$date < "2018-03-20" |
-           modelfit.desoto$predictions$date > "2018-03-22",
+         modelfit.desoto@fit[["daily"]]$date < "2018-03-20" |
+           modelfit.desoto@fit[["daily"]]$date > "2018-03-22",
          # 03-27 to 03-29 large dam release
-         modelfit.desoto$predictions$date < "2018-03-27" |
-           modelfit.desoto$predictions$date > "2018-03-29",
+         modelfit.desoto@fit[["daily"]]$date < "2018-03-27" |
+           modelfit.desoto@fit[["daily"]]$date > "2018-03-29",
          # 03-31 small Q bump (potential dam release) 
-         modelfit.desoto$predictions$date != "2018-03-31",
+         modelfit.desoto@fit[["daily"]]$date != "2018-03-31",
          # 04-14 to 04-20 large dam release
-         modelfit.desoto$predictions$date < "2018-04-14" |
-           modelfit.desoto$predictions$date > "2018-04-20",
+         modelfit.desoto@fit[["daily"]]$date < "2018-04-14" |
+           modelfit.desoto@fit[["daily"]]$date > "2018-04-20",
          # 05-3 to 05-7 large dam release
-         modelfit.desoto$predictions$date < "2018-05-03" |
-           modelfit.desoto$predictions$date > "2018-05-07",
+         modelfit.desoto@fit[["daily"]]$date < "2018-05-03" |
+          modelfit.desoto@fit[["daily"]]$date > "2018-05-07",
          ) 
 
 #modelfit.desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
 saveRDS(modelfit.desoto, file = "./Outputs/MetabResults_Desoto.RData") 
-write.csv(modelfit.desoto$predictions, file = "./Outputs/MetabResults_Desoto.csv")
+write.csv(modelfit.desoto@fit[["daily"]], file = "./Outputs/MetabResults_Desoto.csv")
 ```
 
 ```{r areal.extent}
@@ -139,6 +141,8 @@ write.csv(modelfit.desoto$predictions, file = "./Outputs/MetabResults_Desoto.csv
 # StreamMetabolizer uses the 50% condfidence interval (not the mean) GPP and 
 # ER measurements, which is why I'm grabbing the 50% confidence interval K600
 # measurements
+#modelfit.desoto <- readRDS(file = "./Outputs/MetabResults_Desoto.RData")
+
 K600.desoto <- 
   modelfit.desoto[["fit"]]@fit[["daily"]] %>%
   select(date, K600_daily_50pct) %>%
@@ -564,10 +568,10 @@ S2 <- request_data(site_code, startdate = start, enddate = end)
 # Format data for modeling
 S1_preproc <- prep_metabolism(S1, rm_flagged = "Bad Data", 
                                 fillgaps = "interpolation",
-                                estimate_areal_depth = TRUE)
+                                estimate_areal_depth = FALSE)
 S2_preproc <- prep_metabolism(S2, rm_flagged = "Bad Data", 
                                 fillgaps = "interpolation",
-                                estimate_areal_depth = TRUE)
+                                estimate_areal_depth = FALSE)
 
 ########## 3. Rename columns to match script format ###########################
 # First actual DO log for S1 is at 2018-02-25 02:55:16
@@ -634,67 +638,6 @@ z_S1S2 <-
 # Compute the mean z of S1 and S2 on each date
 z_S1S2$z.mean <- apply(z_S1S2[c("depth_m.S1","depth_m.S2")], 
                        MARGIN = 1, FUN = mean)
-
-########### Inspect nighttime regression for K600 estimates ###################
-
-# Section time series into the time chunks when both sites have data
-TS_S1S2_a <- 
-  TS_S1S2 %>%
-  filter(datetime < ymd_hms("2018-03-05 05:40:00"))
-TS_S1S2_b <- 
-  TS_S1S2 %>%
-  filter(datetime > ymd_hms("2018-03-12 16:40:00") & 
-           datetime < ymd_hms("2018-03-28 00:55:00"))
-TS_S1S2_c <- 
-  TS_S1S2 %>%
-  filter(datetime > ymd_hms("2018-03-28 23:55:00") &
-           datetime < ymd_hms("2018-03-30 10:55:00"))
-TS_S1S2_d <- 
-  TS_S1S2 %>%
-  filter(datetime > ymd_hms("2018-04-09 08:55:00") &
-           datetime < ymd_hms("2018-04-14 08:25:00"))
-TS_S1S2_e <- 
-  TS_S1S2 %>%
-  filter(datetime > ymd_hms("2018-04-17 18:10:00"))
-
-k600_a <- nightreg(o2file = TS_S1S2_a, nightStart = "17:45:00", 
-                     nightEnd = "06:30:00", downName = "S2")
-k600_b <- nightreg(o2file = TS_S1S2_b, nightStart = "17:45:00", 
-                     nightEnd = "06:30:00", downName = "S2")
-k600_c <- nightreg(o2file = TS_S1S2_c, nightStart = "17:45:00", 
-                     nightEnd = "06:30:00", downName = "S2")
-k600_d <- nightreg(o2file = TS_S1S2_d, nightStart = "17:45:00", 
-                     nightEnd = "06:30:00", downName = "S2")
-k600_e <- nightreg(o2file = TS_S1S2_e, nightStart = "17:45:00", 
-                     nightEnd = "06:30:00", downName = "S2")
-
-k600 <-
-  bind_rows(k600_a$dailyEstimates, k600_b$dailyEstimates, 
-            k600_c$dailyEstimates, k600_d$dailyEstimates, 
-            k600_e$dailyEstimates)
-
-#write_csv(k600, path = "KawN_K600_NighttimeO2Regression.csv")
-
-# After reviewing k600 models, decide to cut out models with fit (R2) of 
-# 1 standard deviation below the mean (or lower)
-
-# Display which estimates will be removed under this criteria
-#k600[k600$r2fit < mean(k600$r2fit) - sd(k600$r2fit),]
-# Return dates which are to be removed
-#k600$date[k600$r2fit < mean(k600$r2fit) - sd(k600$r2fit)]
-
-# Create new column denoting if the r2 value is kept or discarded,
-# if discarded, NA the K600 value and fill with 
-k600 <- 
-  k600 %>%
-  mutate(fitCriteria = ifelse(r2fit < mean(r2fit) - sd(r2fit), "DISCARD", 
-                              "KEEP"),
-         K600_adj = ifelse(fitCriteria == "DISCARD", NA, K600))
-# Fill NA in adjusted K600 column with mean of remaining K600 values
-k600$K600_adj[is.na(k600$K600_adj)] <- mean(k600$K600_adj, na.rm = TRUE)
-
-unique(date(TS_S1S2_a$datetime))
-sum(date(TS_S1S2$datetime) == ymd("2018-04-17", tz = "America/Chicago"))
 
 ########### Run Function ######################################################
 ### Create S1S2model function to reduce amt of temporary data saved to environment ##
@@ -800,6 +743,26 @@ S1S2model <- function(metabdata, vdata, zdata, Kmean, Ksd, nbatch){
 Kprior_mean <- mean(c(3.4793, 3.31236))
 Kprior_sd <- 0.1294
 
+# Section time series into the time chunks when both sites have data
+TS_S1S2_a <- 
+  TS_S1S2 %>%
+  filter(datetime < ymd_hms("2018-03-05 05:40:00"))
+TS_S1S2_b <- 
+  TS_S1S2 %>%
+  filter(datetime > ymd_hms("2018-03-12 16:40:00") & 
+           datetime < ymd_hms("2018-03-28 00:55:00"))
+TS_S1S2_c <- 
+  TS_S1S2 %>%
+  filter(datetime > ymd_hms("2018-03-28 23:55:00") &
+           datetime < ymd_hms("2018-03-30 10:55:00"))
+TS_S1S2_d <- 
+  TS_S1S2 %>%
+  filter(datetime > ymd_hms("2018-04-09 08:55:00") &
+           datetime < ymd_hms("2018-04-14 08:25:00"))
+TS_S1S2_e <- 
+  TS_S1S2 %>%
+  filter(datetime > ymd_hms("2018-04-17 18:10:00"))
+
 # Run function
 metabmodel_a <- S1S2model(metabdata = TS_S1S2_a, vdata = v_S1S2, 
                           zdata = z_S1S2, Kmean = Kprior_mean, 
@@ -818,13 +781,13 @@ metabmodel_e <- S1S2model(metabdata = TS_S1S2_e, vdata = v_S1S2,
                           Ksd = Kprior_sd, nbatch = 1e5)
 
 # Check modeled oxygen
-ggplot(data = metabmodel_b$modeledO2) +
-  geom_line(aes(x = timeup, y = oxyup, color = "S1")) +
+ggplot(data = metabmodel_a$modeledO2) +
+  geom_line(aes(x = timeup, y = oxyup, cww4color = "S1")) +
   geom_line(aes(x = timedown, y = oxydown, color = "S2")) +
   geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2"))
 
 # Check modeled GPP and ER
-ggplot(data = metabmodel_b$results) +
+ggplot(data = metabmodel_a$results) +
   geom_ribbon(aes(x = date, ymin = GPP.lower, ymax = GPP.upper, 
                   fill = "GPP"), alpha = 0.5) +
   geom_point(aes(x = date, y = GPP, color = "GPP")) +
