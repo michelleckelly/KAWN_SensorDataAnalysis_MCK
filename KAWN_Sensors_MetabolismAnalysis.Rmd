@@ -781,10 +781,10 @@ metabmodel_e <- S1S2model(metabdata = TS_S1S2_e, vdata = v_S1S2,
                           Ksd = Kprior_sd, nbatch = 1e5)
 
 # Check modeled oxygen
-ggplot(data = metabmodel_a$modeledO2) +
-  geom_line(aes(x = timeup, y = oxyup, cww4color = "S1")) +
-  geom_line(aes(x = timedown, y = oxydown, color = "S2")) +
-  geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2"))
+#ggplot(data = metabmodel_a$modeledO2) +
+#  geom_line(aes(x = timeup, y = oxyup, cww4color = "S1")) +
+# geom_line(aes(x = timedown, y = oxydown, color = "S2")) +
+#  geom_line(aes(x = timedown, y = modeledO2, color = "Modeled O2"))
 
 # Check modeled GPP and ER
 ggplot(data = metabmodel_a$results) +
@@ -800,13 +800,13 @@ ggplot(data = metabmodel_a$results) +
 
 metabmodel <- metabmodel_a$results %>%
   full_join(., metabmodel_b$results) %>%
-  full_join(., metabmodel_c$results) %>%
+  #full_join(., metabmodel_c$results) %>%
   full_join(., metabmodel_d$results) %>%
   full_join(., metabmodel_e$results)
 
 b <- metabmodel_a$modeledO2 %>%
   full_join(., metabmodel_b$modeledO2) %>%
-  full_join(., metabmodel_c$modeledO2) %>%
+  #full_join(., metabmodel_c$modeledO2) %>%
   full_join(., metabmodel_d$modeledO2) %>%
   full_join(., metabmodel_e$modeledO2)
 
