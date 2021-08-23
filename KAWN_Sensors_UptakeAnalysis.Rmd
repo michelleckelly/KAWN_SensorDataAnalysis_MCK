@@ -20,10 +20,21 @@ library(dplyr)
 library(ggplot2)
 library(ggpmisc)
 library(imputeTS)
+library(StreamPULSE)
 ```
 
 ```{r Load uptake data}
 NitrateUptake <- readRDS("./Outputs/NitrateUptakeResults_Eqn1.rds")
+```
+
+```{r Request data from StreamPULSE}
+vars <- c('DO_mgL', 'DOsat_pct','satDO_mgL','WaterPres_kPa', 'WaterTemp_C',
+          'Light_PAR','AirPres_kPa','Discharge_m3s', 'Depth_m', 'Nitrate_mgL')
+
+eric <- StreamPULSE::request_data("KS_KANSASREASTLAWRENCE", variables = vars)
+steve <- StreamPULSE::request_data("KS_KANSASRFALLLEAF", variables = vars)
+desoto <- StreamPULSE::request_data("KS_KANSASR", variables = vars)
+
 ```
 
 ```{r Prep uptake data}
