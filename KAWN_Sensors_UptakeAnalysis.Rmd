@@ -35,23 +35,13 @@ eric <- StreamPULSE::request_data("KS_KANSASREASTLAWRENCE", variables = vars)
 steve <- StreamPULSE::request_data("KS_KANSASRFALLLEAF", variables = vars)
 desoto <- StreamPULSE::request_data("KS_KANSASR", variables = vars)
 
+eric <- eric$data
+steve <- steve$data
+desoto <- desoto$data
 ```
 
 ```{r Prep uptake data}
-# Autotrophic nitrate uptake calculation (Heffernan and Cohen 2010) ############
-
-# Load in raw data #############################################################
-# These CSV files can be downloaded from the StreamPULSE database
-eric <- 
-  read.csv("./Data/StreamPULSE_Downloaded/KS_KANSASREASTLAWRENCE_sensorData.csv",
-           header = TRUE)
-steve <- 
-  read.csv("./Data/StreamPULSE_Downloaded/KS_KANSASRFALLLEAF_sensorData.csv", 
-           header = TRUE)
-desoto <- 
-  read.csv("./Data/StreamPULSE_Downloaded/KS_KANSASR_sensorData.csv", 
-           header = TRUE)
-
+####### Autotrophic nitrate uptake calculation (Heffernan and Cohen 2010) ######
 # Prep data for calculations ###################################################
 # Input: Sensor data frame
 # Output: Sensor data frame with added columns for local time, data flagged 
@@ -86,6 +76,7 @@ prepper <- function(sensor_data){
   # Return new dataframe
   return(sensor_uptake)
 }
+
 eric_uptake <- prepper(eric)
 steve_uptake <- prepper(steve)
 desoto_uptake <- prepper(desoto)
@@ -147,7 +138,6 @@ HC_Eqn1 <- function(prepped_df){
 eric_uptake_Eqn1 <- HC_Eqn1(eric_uptake)
 steve_uptake_Eqn1 <- HC_Eqn1(steve_uptake)
 desoto_uptake_Eqn1 <- HC_Eqn1(desoto_uptake)
-
 ```
 
 ```{r Scale by aerial extent}
@@ -159,29 +149,23 @@ desoto_uptake_Eqn1 <- HC_Eqn1(desoto_uptake)
 # U = Q / A * SumNitrateDiff * 1000 L/m3 * 1/1000 gN/mgN * 86400 sec/day
 # where Q = discharge, m3 / s
 #       A = riverbed area, m2
-#         & A = river width * aerial extent integrated by metabolism estimates
+#         & A = river width * length of study reach
 #       SumNitrateDiff = difference between pre-dawn max and current nitrate
 #                        summed over 24 hr block, mg-N / L
 #       U = autotrophic uptake, g-N / m2 day
 
 ## S3 ----------------------------------------------------------------------
-# Load in oxygen turnover data
-K600.desoto <- read_csv("./Outputs/OxygenTurnover_Desoto.CSV")
-# Change case of date column
-K600.desoto <- K600.desoto %>% rename(Date = date)
-
-# Merge oxygen turnover data with uptake data
-desoto_uptake_Eqn1 <- full_join(K600.desoto, desoto_uptake_Eqn1)
 # Set width of river, this value measured using google maps, located in 
 # file RiverModel_AerialWidths.xlsx
 w.Desoto <- 138.07 # m
+reachLength_m <- 31000 #m, or 31 km, this is the length of the study reach
 
-# Compute riverbed area as river width * areal mixing extent
+# Compute riverbed area as river width * length of study reach (31 km = 3100 m)
 # Compute nitrate uptake following equation, using 86400 as the conversion 
 # factor between seconds and days
 desoto_uptake_Eqn1 <- 
   desoto_uptake_Eqn1 %>%
-  mutate(A = w.Desoto * O2TurnL_m,
+  mutate(A = w.Desoto * reachLength_m,
          UaNO3_gNm2day = Mean.Discharge_m3s / A * SumDiff_mgNL * 86400) 
 
 ## S1, S2 --------------------------------------------------------------------
@@ -190,15 +174,13 @@ desoto_uptake_Eqn1 <-
 w.Eric <- 210.9 # m
 w.Steve <- 113.4 # m
 
-# Distance between two-station sites is 5.13 km or 5130 m
-
 eric_uptake_Eqn1 <- 
   eric_uptake_Eqn1 %>%
-  mutate(A = w.Eric * 5130,
+  mutate(A = w.Eric * reachLength_m,
          UaNO3_gNm2day = Mean.Discharge_m3s / A * SumDiff_mgNL * 86400) 
 steve_uptake_Eqn1 <- 
   steve_uptake_Eqn1 %>%
-  mutate(A = w.Steve * 5130,
+  mutate(A = w.Steve * reachLength_m,
          UaNO3_gNm2day = Mean.Discharge_m3s / A * SumDiff_mgNL * 86400) 
 
 ## Calculate Vf ################################################################
@@ -221,7 +203,6 @@ steve_uptake_Eqn1$UaNO3_gNm2day[steve_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
 desoto_uptake_Eqn1$Date[desoto_uptake_Eqn1$SumDiff_mgNL < 0] # "2018-02-02" "2018-02-06" "2018-02-07" "2018-02-21" "2018-03-04" "2018-03-08" "2018-03-10" "2018-03-11" "2018-03-16" "2018-03-19" "2018-03-24" "2018-03-25" "2018-03-26" "2018-04-02" "2018-04-03" "2018-04-04" "2018-04-06" "2018-04-09" "2018-04-14" "2018-04-15" "2018-04-18" "2018-04-22" "2018-04-24" "2018-04-26" "2018-04-27" "2018-04-28"
 desoto_uptake_Eqn1$UaNO3_gNm2day[desoto_uptake_Eqn1$SumDiff_mgNL < 0] <- NA
 
-
 # Merge calculations into a single dataframe
 Uptake_Eqn1 <- dplyr::full_join(eric_uptake_Eqn1, steve_uptake_Eqn1, 
                                 by = "Date", suffix = c(".eric", ".steve"))
@@ -230,14 +211,7 @@ Uptake_Eqn1 <- dplyr::full_join(Uptake_Eqn1, desoto_uptake_Eqn1,
 # Rename columns
 Uptake_Eqn1 <- 
   Uptake_Eqn1 %>% 
-  rename(K600_daily_50pct.desoto = K600_daily_50pct,
-         depth_m.desoto = depth_m,
-         Q_m3s.desoto = Q_m3s,
-         A_m2.desoto = A_m2,
-         v_ms.desoto = v_ms,
-         v_mday.desoto = v_mday,
-         O2TurnL_m.desoto = O2TurnL_m,
-         O2TurnL_km.desoto = O2TurnL_km,
+  rename(A_m2.desoto = A,
          Max.PreDawnN_mgL.desoto = Max.PreDawnN_mgL,
          Min.Nitrate_mgL.desoto = Min.Nitrate_mgL,
          NitrateChange_Perc.desoto = NitrateChange_Perc,
@@ -298,205 +272,5 @@ write.csv(Uptake_Eqn1,
           file = "./Outputs/NitrateUptakeResults_Eqn1_twostation.csv", 
           row.names = FALSE)
 saveRDS(Uptake_Eqn1, file = "./Outputs/NitrateUptakeResults_Eqn1_twostation.rds")
-
-```
-
-```{r Eqn 2 Uptake}
-# This section has not been updated, is not calculating correctly
-
-#### Calculate uptake using Equation 2 #########################################
-#using the 
-# integrated diel method (Heffernan and Cohen 
-# 2010, Eqn. 2)
-  
-  
-if (UptakeEqn == 2){
-  # Calculate NO3 uptake using the integrated diel method 
-  # (Heffernan and Cohen 2010, Eqn. 2)
-  
-  # Differences between Eqn. 1 and 2:
-  #   - Eqn 2 takes an hourly average of obervations (less
-  #     sensitive to variations in Nitrate)
-  
-  # Input: the dataframe spit out by prepper()
-  # Output: Calculated NO3 Uptake
-  
-  HC_Eqn2 <- function(prepped_df){
-    #
-    # Take an hourly average Nitrate concentration
-    prepped_df <- 
-      prepped_df %>%
-      dplyr::group_by(DateTime_CST = 
-                        lubridate::round_date(DateTime_CST, unit = "2 hours")) %>%
-      dplyr::summarise(Mean.Discharge_m3s = mean(Discharge_m3s, na.rm = TRUE),
-                       Mean.Nitrate_mgL = mean(Nitrate_mgL, na.rm = TRUE))
-    #
-    # Add date index vector
-    # (Based on CST local time)
-    # Extract date into new column
-    prepped_df$date <- 
-      lubridate::date(prepped_df$DateTime_CST)
-    # Count number of days since start
-    prepped_df$day <- numeric(length = nrow(prepped_df))
-    
-    for (i in 1:nrow(prepped_df)){
-      prepped_df$day[i] <- 
-        as.numeric(prepped_df$date[i] - prepped_df$date[1])
-    }
-    
-    # Get hour of day, as fraction of 24
-    prepped_df$hour <- lubridate::hour(prepped_df$DateTime_CST) / 24
-    #
-    # Find maximum nitrate concentration each 
-    # (local time) day
-    prepped_df <- prepped_df %>%
-      dplyr::group_by(date) %>%
-      dplyr::mutate(MaxNitrate = max(Mean.Nitrate_mgL, na.rm = TRUE))
-    #
-    #### Below is depreciated, instead using King et al 2014 approach
-    # Use a static value for river bed area (m^2)
-    # Average discharge at desoto = 61.3 m3/s
-    # USGS field measuremnents
-    # 2018-04-24    Q = 1410 ft3/s      Channel area = 811 ft2
-    #                 = 39.93 m3/s                   = 75.34 m2
-    # 2018-06-13    Q = 2330 ft3/s      Channel area = 1400 ft2
-    #                 = 65.97 m3/s                   = 130.06 m2
-    # Approximate river bed area as 130 m2 (for now)
-    #A_m2 <- 130
-    #
-    # Calculate water velocity [m/s]
-    #prepped_df$v_ms <- prepped_df$Mean.Discharge_m3s/A_m2
-    ####
-     
-    # Run loop to calculate uptake
-    prepped_df$DiffNitrate_mgL <- NA
-    # Grab the row number of the start of day 1
-    start <- which(prepped_df$day == 1)[1]
-    
-    for (i in start:nrow(prepped_df)){
-      # Get previous day: current day - 1
-      prevday <- prepped_df$day[i] - 1
-      # Get MaxNitrate during prevday
-      MaxNitrate.prev <- unique(prepped_df$MaxNitrate[prepped_df$day == 
-                                                        prevday])
-      # Get MaxNitrate during current day
-      MaxNitrate <- unique(prepped_df$MaxNitrate[prepped_df$day == 
-                                                   prepped_df$day[i]])
-      # Get Nitrate at current hour
-      Nitrate <- prepped_df$Mean.Nitrate_mgL[i]
-      # Calculate DiffNitrate for each hour
-      prepped_df$DiffNitrate_mgL[i] <- MaxNitrate.prev * (1 - prepped_df$hour[i]) + 
-                                             MaxNitrate * prepped_df$hour[i] - 
-                                             Nitrate
-      i <- i+1
-    }
-    #
-    # Sum the differences from t = 0 to t = 24 for each day
-    results <- prepped_df %>%
-      dplyr::group_by(day) %>%
-      dplyr::summarise(date = date[1],
-                       Mean.Discharge_m3s = mean(Mean.Discharge_m3s, 
-                                                 na.rm = TRUE),
-                       Mean.Nitrate_mgL = mean(Mean.Nitrate_mgL, na.rm = TRUE), 
-                       SumDiffNitrate = sum(DiffNitrate_mgL))
-    
-    # Multiply SumDiff by discharge
-    # Uptake [g-N s-1] = SumDiff [mg-N L-1] * Q [m3 s-1] * 1000 [L m-3] / 1000 [g mg-1]
-    #                  = SumDiff [mg-N L-1] * Q [m3 s-1]
-    # Uptake [g-N d-1] = SumDiff [mg-N L-1] * Q [m3 s-1] * 86400 [sec day-1]
-    results$UaNO3_gNd <- results$SumDiffNitrate * results$Mean.Discharge_m3s * 
-      86400
-    #
-    # Clean up dataframe
-    names(results)[names(results) == "date"] <- "Date"
-    results$SumDiffNitrate <- NULL
-    results$day <- NULL
-    # Return dataframe
-    return(results)
-  }
-
-  # Execute function
-  eric_uptake_Eqn2 <- HC_Eqn2(eric_smooth)
-  steve_uptake_Eqn2 <- HC_Eqn2(steve_smooth)
-  desoto_uptake_Eqn2 <- HC_Eqn2(desoto_smooth)
-  
-  # Normalize to area
-  # Uptake [g-N m-2 d-1] = Uptake [g-N d-1] / (w [m] * L [m])
-  # where 
-  #   w     aerial stream width
-  #   L     stream reach length, choosing arbitrary 100m (King et al 2014)
-
-  # Site      w (as measured using google maps, in RiverModel_AerialWidths.xlsx)
-  # Eric      210.9 m
-  # Steve     113.4 m
-  # Desoto    138.07 m
-  eric_uptake_Eqn2$UaNO3_gNm2day <- eric_uptake_Eqn2$UaNO3_gNd / (210.9 * 100)
-  steve_uptake_Eqn2$UaNO3_gNm2day <- steve_uptake_Eqn2$UaNO3_gNd / (113.4 * 100)
-  desoto_uptake_Eqn2$UaNO3_gNm2day <- desoto_uptake_Eqn2$UaNO3_gNd / 
-    (138.07 * 100)
-  
-  # Null
-  eric_uptake_Eqn2$UaNO3_gNd <- NULL
-  steve_uptake_Eqn2$UaNO3_gNd <- NULL
-  desoto_uptake_Eqn2$UaNO3_gNd <- NULL
-  
-  # Date cleanup: remove calculations for dates with bad raw data
-  # Eric:
-  # 2018-02-20 thru 2018-02-23 sensor burial
-  eric_uptake_Eqn2$UaNO3_gNm2day[eric_uptake_Eqn2$Date >= ymd("2018-02-20") &
-                                   eric_uptake_Eqn2$Date <= ymd("2018-02-23")] <- NA
-  # 2018-03-06 thru 2018-03-12 sensor burial
-  eric_uptake_Eqn2$UaNO3_gNm2day[eric_uptake_Eqn2$Date >= ymd("2018-03-06") &
-                                   eric_uptake_Eqn2$Date <= ymd("2018-03-12")] <- NA
-  # 2018-04-01 thru 2018-04-04 sensor burial
-  eric_uptake_Eqn2$UaNO3_gNm2day[eric_uptake_Eqn2$Date >= ymd("2018-04-01") &
-                                   eric_uptake_Eqn2$Date <= ymd("2018-04-04")] <- NA
-  # 2018-04-14 thru 2018-04-17 sensor burial
-  eric_uptake_Eqn2$UaNO3_gNm2day[eric_uptake_Eqn2$Date >= ymd("2018-04-14") &
-                                   eric_uptake_Eqn2$Date <= ymd("2018-04-17")] <- NA
-  # 2018-04-25 thru 2018-04-27 sensor burial
-  eric_uptake_Eqn2$UaNO3_gNm2day[eric_uptake_Eqn2$Date >= ymd("2018-04-25") &
-                                   eric_uptake_Eqn2$Date <= ymd("2018-04-27")] <- NA
-  # Steve:
-  # Sensor not deployed until Feb 10 at 15:00
-  steve_uptake_Eqn2$UaNO3_gNm2day[steve_uptake_Eqn2$Date >= ymd("2018-02-01") &
-                                    steve_uptake_Eqn2$Date <= ymd("2018-02-10")] <- NA
-  # Sensor burial 2018-03-10 thru 2018-03-22
-  steve_uptake_Eqn2$UaNO3_gNm2day[steve_uptake_Eqn2$Date >= ymd("2018-03-10") &
-                                    steve_uptake_Eqn2$Date <= ymd("2018-03-22")] <- NA
-  
-  # Merge calculations into a single dataframe and save to CSV file
-  Uptake_Eqn2 <- dplyr::full_join(eric_uptake_Eqn2, steve_uptake_Eqn2, 
-                                  by = "Date", 
-                                  suffix = c(".eric", ".steve"))
-    
-  Uptake_Eqn2 <- dplyr::full_join(Uptake_Eqn2, desoto_uptake_Eqn2, 
-                                  by = "Date")
-  
-  # Cleanup
-  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "Mean.Discharge_m3s"] <- 
-    "Mean.Discharge_m3s.desoto"
-  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "Mean.Nitrate_mgL"] <- 
-    "Mean.Nitrate_mgL.desoto"
-  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "DailyMaxNitrate_mgNL"] <- 
-    "DailyMaxNitrate_mgNL.desoto"
-  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "DiffNitrate_mgNL"] <- 
-    "DiffNitrate_mgNL.desoto"
-  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "SumDiffNitrate_mgL"] <- 
-    "SumDiffNitrate_mgNL.desoto"
-  names(Uptake_Eqn2)[names(Uptake_Eqn2) == "UaNO3_gNm2day"] <- 
-    "UaNO3_gNm2day.desoto"
-  
-  # Add column to denote during waste release or after
-  # During: dates prior to 1 April 2018
-  # After: dates post 1 April 2018
-  Uptake_Eqn2$ReleaseStatus <- "During"
-  Uptake_Eqn2$ReleaseStatus[Uptake_Eqn2$Date >= ymd("2018-04-01")] <- "After"
-  
-  # Save dataframe
-  write.csv(Uptake_Eqn2, file = "./Outputs/NitrateUptakeResults_Eqn2.csv", 
-            row.names = FALSE)
-  saveRDS(Uptake_Eqn2, file = "./Outputs/NitrateUptakeResults_Eqn2.rds")
-}
 ```
 
