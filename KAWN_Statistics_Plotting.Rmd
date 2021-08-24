@@ -19,6 +19,7 @@ library(maps)
 library(mapdata)
 library(ggpubr)
 library(gridExtra)
+library(StreamPULSE)
 ```
 
 ```{r Load data}
@@ -32,12 +33,18 @@ coords$SiteNickname[coords$SiteNickname == "Steve"] <- "S2"
 coords$SiteNickname[coords$SiteNickname == "Desoto"] <- "S3"
 
 # Sensor data ----------------------------------------------------------------
-sensor_eric <- 
-  read.csv("./Data/StreamPULSE_Downloaded/KS_KANSASREASTLAWRENCE_sensorData.csv")
-sensor_steve <- 
-  read.csv("./Data/StreamPULSE_Downloaded/KS_KANSASRFALLLEAF_sensorData.csv")
-sensor_desoto <- 
-  read.csv("./Data/StreamPULSE_Downloaded/KS_KANSASR_sensorData.csv")
+# Request from streampulse
+vars <- c('DO_mgL', 'DOsat_pct','satDO_mgL','WaterPres_kPa', 'WaterTemp_C',
+          'Light_PAR','AirPres_kPa','Discharge_m3s', 'Depth_m', 'Nitrate_mgL')
+
+eric <- StreamPULSE::request_data("KS_KANSASREASTLAWRENCE", variables = vars)
+steve <- StreamPULSE::request_data("KS_KANSASRFALLLEAF", variables = vars)
+desoto <- StreamPULSE::request_data("KS_KANSASR", variables = vars)
+
+sensor_eric <- eric$data
+sensor_steve <- steve$data
+sensor_desoto <- desoto$data
+
 # Count total percent of "Bad Data" points out of all data points
 sum(sensor_eric$flagtype %in% c("Bad Data"))/nrow(sensor_eric)*100 +
   sum(sensor_steve$flagtype %in% c("Bad Data"))/nrow(sensor_steve)*100 +
@@ -88,7 +95,8 @@ massbal$Nitrate.steve_mgNL[massbal$date >= ymd("2018-03-10") &
 
 # Metabolism results ---------------------------------------------------------
 metab_S1S2 <- readRDS("./Outputs/MetabResults_TwoStation.RData")
-metab_desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")$predictions
+metab_desoto <- readRDS("./Outputs/MetabResults_Desoto.RData")
+metab_desoto <- metab_desoto@fit[["daily"]]
 
 # Create date sequence of everyday during sampling period, this is so that 
 # geom_ribbon will correctly plot NA dates in Figure 3
@@ -96,6 +104,16 @@ dates <- data.frame(date = seq(as.Date("2018-02-01"), as.Date("2018-05-01"),
                                by = "days"))
 metab_desoto <- full_join(metab_desoto, dates)
 rm(dates)
+metab_desoto <- metab_desoto[c("date", "GPP_50pct", "GPP_2.5pct", "GPP_97.5pct",
+                               "ER_50pct", "ER_2.5pct", "ER_97.5pct",
+                               "K600_daily_50pct", "K600_daily_2.5pct", 
+                               "K600_daily_97.5pct")]
+metab_desoto <- metab_desoto %>% 
+  dplyr::rename("GPP" = "GPP_50pct", "GPP.lower" = "GPP_2.5pct",
+                "GPP.upper" = "GPP_97.5pct", "ER" = "ER_50pct",
+                "ER.lower" = "ER_2.5pct", "ER.upper" = "ER_97.5pct",
+                "K" = "K600_daily_50pct", "K.lower" = "K600_daily_2.5pct",
+                "K.upper" = "K600_daily_97.5pct")
 
 # Two station model: For days when ER is modeled as positive, remove day from
 # dataframe - this is the approach used in Hall et al 2016
@@ -109,6 +127,10 @@ metab <- dplyr::full_join(metab_S1S2, metab_desoto, by = "date",
                           suffix = c(".S1S2", ".S3")) %>%
   filter(date >= as.Date("2018-02-01") & date < as.Date("2018-05-01"))
 metab <- metab[order(metab$date),]
+metab$s <- NULL
+metab$s.lower <- NULL
+metab$s.upper <- NULL
+metab$accept <- NULL
 rm(metab_S1S2)
 rm(metab_desoto)
 
@@ -144,14 +166,6 @@ metab.long$site <- factor(metab.long$site, levels = c("S1S2", "S3"))
 metab$PR.S1S2 <- metab$GPP.S1S2/abs(metab$ER.S1S2)
 metab$PR.S3 <- metab$GPP.S3/abs(metab$ER.S3)
 
-# Predicted uptake from metabolism results
-stoich.S1S2 <- readRDS(file = "./Outputs/StoichUptake_S1S2.RData")
-stoich.S1S2 <- stoich.S1S2[stoich.S1S2$date >= ymd("2018-02-01") & 
-                   stoich.S1S2$date < ymd("2018-05-01"),]
-stoich.desoto <- readRDS(file = "./Outputs/StoichUptake_Desoto.RData")
-stoich.desoto <- stoich.desoto[stoich.desoto$date >= ymd("2018-02-01") & 
-                   stoich.desoto$date < ymd("2018-05-01"),]
-
 #### Stoichiometric scaling ##################################################
 
 # Predict areal N uptake rate based on metabolism
@@ -180,12 +194,12 @@ stoich.desoto <- stoich.desoto[stoich.desoto$date >= ymd("2018-02-01") &
 # Ua [g N / m2 day ] = GPP * 1 * 0.5 * 1/20 or 1/12
 
 # Heterotrophic respiration = ER - ra * GPP
-# HR [g O2 / m2 day] = ER - 0.5 or 0.2 * GPP
+# HR [g O2 / m2 day] = ER - 0.5 * GPP
 
 # Heterotrophic N assimilation = HR [g O2 / m2 day] 
 #                                * Respiratory quotient [g C / g O2]
 #                                * C:N scaling ratio [g N / g C]
-# Heterotrophic N assimilation = HR * 1 * 1/20
+# Heterotrophic N assimilation = (HR*0.2) / (1 - 0.2) * 1/20
 
 # Assumed constants ----------------------------------------------------------
 
@@ -203,29 +217,14 @@ stoich20 <-
   mutate(# S1S2
          ER.S1S2 = abs(ER.S1S2),
          Uaut_gNm2day.S1S2 = GPP.S1S2 * RespQuot * AutoRespCoeff / CNscaleAut,
-         HR = ER.S1S2 - ra.low * GPP.S1S2,
-         Uhet_gNm2day.S1S2 = HR / CNscaleHet,
+         HR = ER.S1S2 - 0.5 * GPP.S1S2,
+         Uhet_gNm2day.S1S2 = ((0.2*HR) / (1-0.2)) / CNscaleHet,
          Upred_gNm2day.S1S2 = Uaut_gNm2day.S1S2 + Uhet_gNm2day.S1S2,
          # S3
          ER.S3 = abs(ER.S3),
          Uaut_gNm2day.S3 = GPP.S3 * RespQuot * AutoRespCoeff / CNscaleAut,
-         HR = ER.S3 - ra.low * GPP.S3,
-         Uhet_gNm2day.S3 = HR / CNscaleHet,
-         Upred_gNm2day.S3 = Uaut_gNm2day.S3 + Uhet_gNm2day.S3)
-
-stoich16 <-
-  metab %>%
-  mutate(# S1S2
-         ER.S1S2 = abs(ER.S1S2),
-         Uaut_gNm2day.S1S2 = GPP.S1S2 * RespQuot * AutoRespCoeff / 16,
-         HR = ER.S1S2 - ra.low * GPP.S1S2,
-         Uhet_gNm2day.S1S2 = HR / 16,
-         Upred_gNm2day.S1S2 = Uaut_gNm2day.S1S2 + Uhet_gNm2day.S1S2,
-         # S3
-         ER.S3 = abs(ER.S3),
-         Uaut_gNm2day.S3 = GPP.S3 * RespQuot * AutoRespCoeff / 16,
-         HR = ER.S3 - ra.low * GPP.S3,
-         Uhet_gNm2day.S3 = HR / 16,
+         HR = ER.S3 - 0.5 * GPP.S3,
+         Uhet_gNm2day.S3 = ((0.2*HR) / (1-0.2)) / CNscaleHet,
          Upred_gNm2day.S3 = Uaut_gNm2day.S3 + Uhet_gNm2day.S3)
 
 # Nitrate uptake results -----------------------------------------------------
@@ -278,8 +277,6 @@ uptake.long$site <- factor(uptake.long$site)
 # Merge stoich with uptake
 stoich20 <- uptake %>%
   dplyr::full_join(stoich20, by = c("Date" = "date", "ReleaseStatus"))
-stoich16 <- uptake %>%
-  dplyr::full_join(stoich16, by = c("Date" = "date", "ReleaseStatus"))
 
 # DOC data -------------------------------------------------------------------
 DOC <- read.csv("./Data/KAW_RAPID_DOC.csv", header = TRUE, 
@@ -299,28 +296,9 @@ hall <- read.csv("./Data/Meta-analysis/Hall_2016_metabolismdata.csv",
 hall$q_m3s <- hall$q_Ls/1000
 ```
 
-```{r pull together flow and width data for admin}
-channel_S1 <- diel_eric %>% select(DateTime_UTC, Discharge_m3s)
-channel_S1 <- na.omit(channel_S1)
-channel_S1$Width_m <- 210.9
-channel_S1$EstimatedDepth_m <- 0.409*channel_S1$Discharge_m3s^0.294 # As in MS
-
-channel_S2 <- diel_steve %>% select(DateTime_UTC, Discharge_m3s)
-channel_S2 <- na.omit(channel_S2)
-channel_S2$Width_m <- 113.4
-channel_S2$EstimatedDepth_m <- 0.409*channel_S2$Discharge_m3s^0.294
-
-channel_S3 <- diel_desoto %>% select(DateTime_UTC, Discharge_m3s)
-channel_S3 <- na.omit(channel_S3)
-channel_S3$Width_m <- 138.07
-channel_S3$EstimatedDepth_m <- 0.409*channel_S3$Discharge_m3s^0.294
-
-write.csv(channel_S1, file = "SiteS1_QWidth_4Aug21.csv", row.names = FALSE)
-write.csv(channel_S2, file = "SiteS2_QWidth_4Aug21.csv", row.names = FALSE)
-write.csv(channel_S3, file = "SiteS3_QWidth_4Aug21.csv", row.names = FALSE)
-```
-
 ```{r Stats}
+
+
 #metab.long$Month <- lubridate::month(metab.long$Date)
 # Correct date spans
 #metab.long <- 
@@ -337,9 +315,6 @@ uptake.long$ReleaseStatus <- factor(uptake.long$ReleaseStatus,
 ## Metabolism ##################################################################
 # Test whether GPP was different between S1-S2 and S3
 # Need to compare the means of paired samples: Paired sample T-test
-mean(metab$GPP.S1S2, na.rm = T) # Mean of GPP at S1S2
-mean(metab[na.omit(metab$GPP.S1S2),]$GPP.S3, na.rm = T) # Mean of GPP at S3 during S1S2 data
-mean(metab$GPP.S3, na.rm = T)
 t.test(metab$GPP.S1S2, metab$GPP.S3, paired = TRUE, alternative = "two.sided")
 
 # Test whether ER was different between S1-S2 and S3
@@ -368,6 +343,7 @@ summary(UANOVA)
 # Posthoc testing
 TukeyHSD(UANOVA)
 
+### Figure 4 ######################
 # Linear model
 forecast::tslm(UaNO3_gNm2day.eric ~ Date, data = uptake) # We can use regular lm even though this is time series data because the data does not have seasonality
 cor.test(x = zoo::as.zoo(uptake$Date), y = uptake$UaNO3_gNm2day.eric, 
@@ -429,14 +405,8 @@ stoich20 %>%
          !is.na(Upred_gNm2day.S3)) %>%
   summarise(mean(UaNO3_gNm2day.desoto, na.rm = T),
             mean(Upred_gNm2day.S3, na.rm = T))
-# Revisions: compare C:N = 20 with C:N = 16
-(mean(stoich16$Upred_gNm2day.S1S2, na.rm = T) - 
-    mean(stoich20$Upred_gNm2day.S1S2, na.rm = T)) / 
-  mean(stoich20$Upred_gNm2day.S1S2, na.rm = T) # Percent change
-(mean(stoich16$Upred_gNm2day.S3, na.rm = T) - 
-  mean(stoich20$Upred_gNm2day.S3, na.rm = T)) / 
-  mean(stoich20$Upred_gNm2day.S3, na.rm = T)
 
+###### Figure 5 ########################
 # Linear model
 lmmodel <- lm(stoich20$Upred_gNm2day.S1S2 ~ stoich20$UaNO3_gNm2day.eric) # S1S2 vs S1
 summary(lmmodel) # S1S2 vs S1
@@ -444,6 +414,13 @@ lmmodel <- lm(stoich20$Upred_gNm2day.S1S2 ~ stoich20$UaNO3_gNm2day.steve) # S1S2
 summary(lmmodel) # S1S2 vs S2
 lmmodel <- lm(stoich20$Upred_gNm2day.S3 ~ stoich20$UaNO3_gNm2day.desoto) # S3
 summary(lmmodel) # S3
+
+mean(subset(stoich20, ReleaseStatus == "During")$UaNO3_gNm2day.desoto, na.rm = T)
+mean(subset(stoich20, ReleaseStatus == "During")$Upred_gNm2day.S3, na.rm = T)
+
+mean(subset(stoich20, ReleaseStatus == "After")$UaNO3_gNm2day.desoto, na.rm = T)
+mean(subset(stoich20, ReleaseStatus == "After")$Upred_gNm2day.S3, na.rm = T)
+
 # During waste release
 lmmodel <- lm(Upred_gNm2day.S3 ~ UaNO3_gNm2day.desoto,
               data = subset(stoich20, ReleaseStatus == "During")) # S3
@@ -453,21 +430,24 @@ lmmodel <- lm(Upred_gNm2day.S3 ~ UaNO3_gNm2day.desoto,
 summary(lmmodel) # S3
 
 ## Udiel & Vf vs GPP ################################################
+#### Figure 6 ########################
 # Linear model
 # Udiel 
-lmmodel <- lm(UaNO3_gNm2day.steve ~ GPP.S1S2, data = stoich) # S1S2
+lmmodel <- lm(UaNO3_gNm2day.steve ~ GPP.S1S2, data = stoich20) # S1S2
 summary(lmmodel) # S1S2
-lmmodel <- lm(UaNO3_gNm2day.desoto ~ GPP.S3, data = stoich) # S3
+lmmodel <- lm(UaNO3_gNm2day.desoto ~ GPP.S3, data = stoich20) # S3
 summary(lmmodel) # S3
+
+##### Supplemental figure ############
 # Vf
-lmmodel <- lm(vf_mmmin.steve ~ GPP.S1S2, data = stoich) # S1S2
+lmmodel <- lm(vf_mmmin.steve ~ GPP.S1S2, data = stoich20) # S1S2
 summary(lmmodel) # S1S2
-lmmodel <- lm(vf_mmmin.desoto ~ GPP.S3, data = stoich) # S3
+lmmodel <- lm(vf_mmmin.desoto ~ GPP.S3, data = stoich20) # S3
 summary(lmmodel) # S3
 
 # During waste release
 lmmodel <- lm(UaNO3_gNm2day.desoto ~ GPP.S3,
-              data = subset(stoich, ReleaseStatus == "During")) # S3
+              data = subset(stoich20, ReleaseStatus == "During")) # S3
 summary(lmmodel) # S3
 lmmodel <- lm(UaNO3_gNm2day.desoto ~ GPP.S3,
               data = subset(stoich, ReleaseStatus == "After")) # S3
@@ -480,17 +460,18 @@ cor.test(x = stoich$UaNO3_gNm2day.desoto,
     y = stoich$GPP.S3)
 
 ## Udiel & Vf vs ER ################################################
+##### Figure 6 #######################
 # Linear model
 # Udiel 
-lmmodel <- lm(UaNO3_gNm2day.steve ~ ER.S1S2, data = stoich) # S1S2
+lmmodel <- lm(UaNO3_gNm2day.steve ~ ER.S1S2, data = stoich20) # S1S2
 summary(lmmodel) # S1S2
-lmmodel <- lm(UaNO3_gNm2day.desoto ~ ER.S3, data = stoich) # S3
+lmmodel <- lm(UaNO3_gNm2day.desoto ~ ER.S3, data = stoich20) # S3
 summary(lmmodel) # S3
 
 # Vf
-lmmodel <- lm(vf_mmmin.steve ~ ER.S1S2, data = stoich) # S1S2
+lmmodel <- lm(vf_mmmin.steve ~ ER.S1S2, data = stoich20) # S1S2
 summary(lmmodel) # S1S2
-lmmodel <- lm(vf_mmmin.desoto ~ ER.S3, data = stoich) # S3
+lmmodel <- lm(vf_mmmin.desoto ~ ER.S3, data = stoich20) # S3
 summary(lmmodel) # S3
 
 # Udiel vs PR
@@ -502,8 +483,32 @@ lmmodel <- lm(vf_mmmin.desoto ~ GPP.S3/ER.S3, data = stoich) # S3
 summary(lmmodel) # S3
 ```
 
-```{r Calculation: Mean data}
-### Ammonium ####
+```{r Table 1}
+##### Discharge ########################################
+# S0
+mean(massbal$Q.lawrence_Ls[massbal$date >= "2018-02-01" &
+                                      massbal$date <= "2018-05-01"], 
+     na.rm = TRUE)/1000
+sd(massbal$Q.lawrence_Ls[massbal$date >= "2018-02-01" &
+                                      massbal$date <= "2018-05-01"], 
+     na.rm = TRUE)/1000
+# S1
+mean(sensor_eric$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
+sd(sensor_eric$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
+# S2
+mean(sensor_steve$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
+sd(sensor_steve$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
+# S3
+mean(sensor_desoto$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
+sd(sensor_desoto$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
+
+##### Ammonium ########################################
 ## S0
 mean(massbal$Ammonium.bowersock_mgNL[massbal$date >= "2018-02-01" &
                                       massbal$date <= "2018-05-01"], 
@@ -533,7 +538,7 @@ sd(massbal$Ammonium.desoto_mgNL[massbal$date >= "2018-02-01" &
                                       massbal$date <= "2018-05-01"], 
    na.rm = TRUE)
 
-### Nitrate and Discharge ####
+##### Nitrate, Discharge ########################################
 sensorData <- full_join(sensor_eric, sensor_steve, by = "date", 
                suffix =c(".S1", ".S2")) %>%
   full_join(., sensor_desoto, by = "date") %>%
@@ -550,28 +555,16 @@ a <- sensorData %>%
   tidyr::drop_na() %>%
   summarise_if(is.numeric, mean, na.rm = T)
 
-# Discharge
-## S0
-mean(massbal$Q.lawrence_Ls[massbal$date >= "2018-02-01" &
-                             massbal$date <= "2018-05-01"], na.rm = TRUE)/1000
-sd(massbal$Q.lawrence_Ls[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], 
-   na.rm = TRUE)/1000
+##### DOC ########################################
+DOC %>%
+  filter(SamplingDate >= "2018-02-01" & SamplingDate <= "2018-05-01") %>%
+  arrange(SamplingDate) %>%
+  group_by(Site) %>%
+  filter(Site == "Dam" | Site == "Disch" | Site == "Steve" | Site == "Desoto") %>%
+  summarise(mean_NPOC_mgL = mean(Result_NPOC_mg.L), sd = sd(Result_NPOC_mg.L), 
+            n = length(Result_NPOC_mg.L))
 
-# Discharge at S1 and S2 is the same, calculated as S0 + farmland pump
-ggplot() +
-  geom_line(data = sensor_eric, aes(x = date, y = Discharge_m3s)) +
-  geom_point(data = sensor_steve, aes(x = date, y = Discharge_m3s))
-
-sensor_eric$date[1]
-sensor_steve$date[1]
-
-mean(sensor_steve$Discharge_m3s[sensor_steve$date>= "2018-02-01" &
-                            sensor_steve$date<= "2018-05-01"])
-sd(sensor_steve$Discharge_m3s[sensor_steve$date>= "2018-02-01" &
-                            sensor_steve$date<= "2018-05-01"])
-
-# Uptake ####
+##### Nitrate uptake ########################################
 ## S1
 mean(uptake$UaNO3_gNm2day.eric[uptake$Date >= "2018-02-01" & 
                                    uptake$Date < "2018-05-01"], na.rm = TRUE)
@@ -588,7 +581,7 @@ mean(uptake$UaNO3_gNm2day.desoto[uptake$Date >= "2018-02-01" &
 sd(uptake$UaNO3_gNm2day.desoto[uptake$Date >= "2018-02-01" & 
                                      uptake$Date < "2018-05-01"], na.rm = TRUE)
 
-# Vf ####
+##### Uptake velocity ########################################
 ## S1
 mean(vf$vf_mmmin[vf$site == "S1"], na.rm = TRUE)
 sd(vf$vf_mmmin[vf$site == "S1"], na.rm = TRUE)
@@ -599,80 +592,52 @@ sd(vf$vf_mmmin[vf$site == "S2"], na.rm = TRUE)
 mean(vf$vf_mmmin[vf$site == "S3"], na.rm = TRUE)
 sd(vf$vf_mmmin[vf$site == "S3"], na.rm = TRUE)
 
-# GPP ####
+##### Temp ########################################
+mean(sensor_desoto$WaterTemp_C[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
+max(sensor_desoto$WaterTemp_C[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
+```
+
+```{r Table 2}
+###### GPP ###############################################
 ## S1S2
 mean(metab$GPP.S1S2, na.rm = TRUE)
 sd(metab$GPP.S1S2, na.rm = TRUE)
 ## S3
 mean(metab$GPP.S3, na.rm = TRUE)
 sd(metab$GPP.S3, na.rm = TRUE)
+### Mean values during the duration of S1S2 data
+mean(metab[!is.na(metab$GPP.S1S2),]$GPP.S3, na.rm = TRUE)
 
-# ER ####
+###### |ER| ###############################################
 ## S1S2
-mean(stoich$ER.S1S2, na.rm = TRUE) #check
+mean(stoich20$ER.S1S2, na.rm = TRUE) #check
 mean(metab$ER.S1S2, na.rm = TRUE) #check
 sd(metab$ER.S1S2, na.rm = TRUE)
 ## S3
 mean(metab$ER.S3, na.rm = TRUE)
 sd(metab$ER.S3, na.rm = TRUE)
+### Mean values during the duration of S1S2 data
+mean(metab[!is.na(metab$ER.S1S2),]$ER.S3, na.rm = TRUE)
 
-# K ####
-## S1S2
-mean(metab$K, na.rm = TRUE)
-sd(metab$K, na.rm = TRUE)
-## S3
-d <- readRDS("./Outputs/MetabResults_Desoto.RData")$fit@fit$daily %>%
-  filter(date >= "2018-02-01" & date <= "2018-05-01")
-mean(d$K600_daily_mean, na.rm = TRUE)
-sd(d$K600_daily_mean, na.rm = TRUE)
-
-# P/R ####
+###### P/R ###############################################
 ## S1S2
 mean(metab$PR.S1S2, na.rm = TRUE)
 sd(metab$PR.S1S2, na.rm = TRUE)
 ## S3
 mean(metab$PR.S3, na.rm = TRUE)
-mean(metab[na.omit(metab$PR.S1S2),]$PR.S3, na.rm = T) # Mean of ER at S3 during S1S2 data
 sd(metab$PR.S3, na.rm = TRUE)
+### Mean values during the duration of S1S2 data
+mean(metab[!is.na(metab$PR.S1S2),]$PR.S3, na.rm = TRUE)
 
-# DOC ####
-DOC %>%
-  filter(SamplingDate >= "2018-02-01" & SamplingDate <= "2018-05-01") %>%
-  arrange(SamplingDate) %>%
-  group_by(Site) %>%
-  filter(Site == "Dam" | Site == "Disch" | Site == "Steve" | Site == "Desoto") %>%
-  summarise(mean_NPOC_mgL = mean(Result_NPOC_mg.L), sd = sd(Result_NPOC_mg.L), 
-            n = length(Result_NPOC_mg.L))
-
-# T ####
-mean(sensor_desoto$WaterTemp_C[sensor_desoto$date >= "2018-02-01" & 
-                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
-max(sensor_desoto$WaterTemp_C[sensor_desoto$date >= "2018-02-01" & 
-                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
-
-# Q
-# S0
-mean(massbal$Q.lawrence_Ls[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], 
-     na.rm = TRUE)/1000
-sd(massbal$Q.lawrence_Ls[massbal$date >= "2018-02-01" &
-                                      massbal$date <= "2018-05-01"], 
-     na.rm = TRUE)/1000
-# S1
-mean(sensor_eric$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
-                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
-sd(sensor_eric$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
-                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
-# S2
-mean(sensor_steve$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
-                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
-sd(sensor_steve$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
-                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
-# S3
-mean(sensor_desoto$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
-                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
-sd(sensor_desoto$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
-                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
+###### K ###############################################
+## S1S2
+mean(metab$K.S1S2, na.rm = TRUE)
+sd(metab$K.S1S2, na.rm = TRUE)
+## S3
+mean(metab$K.S3, na.rm = TRUE)
+sd(metab$K.S3, na.rm = TRUE)
 ```
 
 ```{r Fig 1. Map}
@@ -992,7 +957,7 @@ a <-
         axis.text = element_text(color = "black"),
         text = element_text(size = 8))
 
-# DeSoto (S3)
+ # DeSoto (S3)
 b <- 
   ggplot(data = metab, aes(x = date)) +
   # Horizontal line at Y = 0
@@ -1025,12 +990,6 @@ b <-
 grob <- grid.arrange(a,b, ncol = 1)
 ggsave("./Plots/Fig3_MetabPlot.png", grob, height = 95, width = 115, units = "mm", 
        dpi = 600)
-
-# Average stats
-mean(metab$GPP.S1S2, na.rm = T) # mean GPP at S1-S2
-sd(metab$GPP.S1S2, na.rm = T) # sd of GPP at S1-S2
-mean(metab$GPP.S3[metab$GPP.S1S2], na.rm = T) # mean GPP at S3 (during the same period as S1-S2)
-sd(metab$GPP.S3[metab$GPP.S1S2], na.rm = T)  # sd of GPP at S3 (during the same period as S1-S2)
 ```
 
 ```{r Fig 4: Uptake and Vf}
@@ -1077,6 +1036,9 @@ b <-
   geom_vline(xintercept = ymd("2018-04-01"), linetype = 2) +
   # Add points
   geom_point(shape = 21) +
+  # Add regression line to S3
+  geom_smooth(data = subset(vf, site == "S3"), method = lm, 
+              color = "black", fill = "grey") +
   # Labels
   labs(tag = "b") +
   xlab(NULL) +
@@ -1100,107 +1062,6 @@ ggsave("./Plots/Fig4_U_Vf.png", grob, height = 57.5*2, width = 127, units = "mm"
 ```
 
 ```{r Fig 5: Predicted uptake fig}
-# Revisions: compare autotrophic C:N of 16 to autotrophic C:N of 20
-a <- ggplot(data = stoich16, aes(x = Upred_gNm2day.S1S2, y = UaNO3_gNm2day.steve)) +
-  # 1:1 line
-  geom_abline(slope = 1, intercept = 0, linetype = 2) +
-  # Data points
-  geom_point(data = subset(stoich16, ReleaseStatus == "During"), fill = "white", 
-             size = 2, shape = 21) +
-  geom_point(data = subset(stoich16, ReleaseStatus == "After"), fill = "#23baaf", 
-             size = 2, shape = 21) +
-  # Axis labels
-  xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  labs(tag = "a", title = "Upred calculated using autotrophic C:N = 16") +
-  # Adjust limits using coord_cartesian to prevent cutoff of trend line ribbon
-  coord_cartesian(xlim = c(0, 0.55), ylim = c(-0.1, 4)) +
-  scale_x_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5)) +
-  scale_y_continuous(breaks = c(0,1,2,3,4)) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"),
-        text = element_text(size = 8))
-b <- ggplot(data = stoich20, aes(x = Upred_gNm2day.S1S2, y = UaNO3_gNm2day.steve)) +
-  # 1:1 line
-  geom_abline(slope = 1, intercept = 0, linetype = 2) +
-  # Data points
-  geom_point(data = subset(stoich20, ReleaseStatus == "During"), fill = "white", 
-             size = 2, shape = 21) +
-  geom_point(data = subset(stoich20, ReleaseStatus == "After"), fill = "#23baaf", 
-             size = 2, shape = 21) +
-  # Axis labels
-  xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  labs(tag = "b", title = "Upred calculated using autotrophic C:N = 20 (Original)") +
-  # Adjust limits using coord_cartesian to prevent cutoff of trend line ribbon
-  coord_cartesian(xlim = c(0, 0.55), ylim = c(-0.1, 4)) +
-  scale_x_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5)) +
-  scale_y_continuous(breaks = c(0,1,2,3,4)) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"),
-        text = element_text(size = 8))
-c <- 
-  ggplot(data = stoich16, aes(x = Upred_gNm2day.S3, y = UaNO3_gNm2day.desoto)) +
-  # 1:1 line
-  geom_abline(slope = 1, intercept = 0, linetype = 2) +
-  # Add regression line
-  geom_smooth(method = lm, 
-              color = "black", fill = "grey") +
-  # Data points
-  geom_point(data = subset(stoich16, ReleaseStatus == "During"), fill = "white", 
-             size = 2, shape = 21) +
-  geom_point(data = subset(stoich16, ReleaseStatus == "After"), fill = "#F2AD00", 
-             size = 2, shape = 21) +
-  # Axis labels
-  xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  labs(tag = "c", title = "Upred calculated using autotrophic C:N = 16") +
-  # Adjust limits using coord_cartesian to prevent cutoff of trend line ribbon
-  coord_cartesian(xlim = c(0, 0.55), ylim = c(-0.1, 4)) +
-  scale_x_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5)) +
-  scale_y_continuous(breaks = c(0,1,2,3,4)) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"),
-        text = element_text(size = 8))
-d <- 
-  ggplot(data = stoich20, aes(x = Upred_gNm2day.S3, y = UaNO3_gNm2day.desoto)) +
-  # 1:1 line
-  geom_abline(slope = 1, intercept = 0, linetype = 2) +
-  # Add regression line
-  geom_smooth(method = lm, 
-              color = "black", fill = "grey") +
-  # Data points
-  geom_point(data = subset(stoich20, ReleaseStatus == "During"), fill = "white", 
-             size = 2, shape = 21) +
-  geom_point(data = subset(stoich20, ReleaseStatus == "After"), fill = "#F2AD00", 
-             size = 2, shape = 21) +
-  # Axis labels
-  xlab(expression(U[Pred] ~ "(g-N" ~ m^-2 ~ d^-1 ~ ")")) + 
-  ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
-  labs(tag = "d", title = "Upred calculated using autotrophic C:N = 20 (Original)") +
-  # Adjust limits using coord_cartesian to prevent cutoff of trend line ribbon
-  coord_cartesian(xlim = c(0, 0.55), ylim = c(-0.1, 4)) +
-  scale_x_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5)) +
-  scale_y_continuous(breaks = c(0,1,2,3,4)) +
-  # Plot theme
-  theme_classic() +
-  theme(legend.position = "none", legend.title = element_blank(),
-        panel.border = element_rect(fill = NA), 
-        axis.text = element_text(color = "black"),
-        text = element_text(size = 8))
-grob <- grid.arrange(a, b, c, d, ncol = 2, nrow = 2)
-ggsave(grob, file = "./Plots/Revisions_UpredStoichiometry.png", width = 8, height = 8, 
-       units = "in", dpi = 600)
-
 # Black points: After (April), White points: during (Feb, March)
 # S2
 a <- 
@@ -1217,7 +1078,7 @@ a <-
   ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
   labs(tag = "a") +
   # Adjust limits using coord_cartesian to prevent cutoff of trend line ribbon
-  coord_cartesian(xlim = c(0, 0.55), ylim = c(-0.1, 4)) +
+  coord_cartesian(xlim = c(0, 0.25), ylim = c(-0.1, 3)) +
   scale_x_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5)) +
   scale_y_continuous(breaks = c(0,1,2,3,4)) +
   # Plot theme
@@ -1244,7 +1105,7 @@ b <-
   ylab(expression(U[Diel] ~ "(g-N" ~~ m^{-2} ~ day^{-1} * ")")) +
   labs(tag = "b") +
   # Adjust limits using coord_cartesian to prevent cutoff of trend line ribbon
-  coord_cartesian(xlim = c(0, 0.55), ylim = c(-0.1, 4)) +
+  coord_cartesian(xlim = c(0, 0.25), ylim = c(-0.1, 3)) +
   scale_x_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5)) +
   scale_y_continuous(breaks = c(0,1,2,3,4)) +
   # Plot theme
@@ -1269,7 +1130,7 @@ a <-
   geom_point(data = subset(stoich20, ReleaseStatus == "After"),
              fill = "#23baaf", size = 2, shape = 21) +
   # Axis limits
-  coord_cartesian(xlim = c(-0.5, 15.5), ylim = c(-1, 4.5)) +
+  coord_cartesian(xlim = c(-0.5, 12), ylim = c(-1, 3)) +
   scale_x_continuous(breaks = c(0, 5, 10, 15)) +
   scale_y_continuous(breaks = c(0, 2, 4)) +
   # Axis labels
@@ -1294,7 +1155,7 @@ b <-
   geom_point(data = subset(stoich20, ReleaseStatus == "After"), 
              fill = "#F2AD00", size = 2, shape = 21) +
   # Axis limits
-  coord_cartesian(xlim = c(-0.5, 15.5), ylim = c(-1, 4.5)) +
+  coord_cartesian(xlim = c(-0.5, 12), ylim = c(-1, 3)) +
   scale_x_continuous(breaks = c(0, 5, 10, 15)) +
   scale_y_continuous(breaks = c(0, 2, 4)) +
   # Axis labels
@@ -1315,6 +1176,7 @@ c <- ggplot(data = NULL, aes(x = ER.S1S2, y = UaNO3_gNm2day.steve)) +
   geom_point(data = subset(stoich20, ReleaseStatus == "After"),
              fill = "#23baaf", size = 2, shape = 21) +
   # Axis limits
+  coord_cartesian(xlim = c(-0.5, 6), ylim = c(-1, 3)) +
   scale_x_continuous(limits = c(-0.5, 8.5), breaks = c(0,2,4,6,8,10)) +
   scale_y_continuous(limits = c(-1, 4.5), breaks = c(0, 2, 4)) +
   # Axis labels
@@ -1339,7 +1201,7 @@ d <-
   geom_point(data = subset(stoich20, ReleaseStatus == "After"), 
              fill = "#F2AD00", size = 2, shape = 21) +
   # Axis limits
-  coord_cartesian(xlim = c(-0.5, 8.5), ylim = c(-0.5, 4.5)) +
+  coord_cartesian(xlim = c(-0.5, 6), ylim = c(-1, 3)) +
   scale_x_continuous(breaks = c(0,2,4,6,8,10)) +
   scale_y_continuous(breaks = c(0, 2, 4)) +
   # Axis labels
@@ -1364,9 +1226,9 @@ ggsave("./Plots/Fig6_GPP_ER_Udiel.png", grob, height = 95, width = 115,
 a <- 
   ggplot(data = NULL, aes(x = GPP.S1S2, y = vf_mmmin.steve)) +
   # Data points
-  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(stoich, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "After"), 
              fill = "#23baaf", size = 2, shape = 21) +
   # Axis limits
   scale_x_continuous(limits = c(-0.5, 15.5), breaks = c(0, 5, 10, 15)) +
@@ -1385,9 +1247,9 @@ a <-
 b <-
   ggplot(data = NULL, aes(x = GPP.S3, y = vf_mmmin.desoto)) +
   # Data points
-  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(stoich, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "After"), 
              fill = "#F2AD00", size = 2, shape = 21) +
   # Axis limits
   scale_x_continuous(limits = c(-0.5, 15.5), breaks = c(0, 5, 10, 15)) +
@@ -1407,9 +1269,9 @@ b <-
 
 c <- ggplot(data = NULL, aes(x = ER.S1S2, y = vf_mmmin.steve)) +
   # Data points
-  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(stoich, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "After"), 
              fill = "#23baaf", size = 2, shape = 21) +
   # Axis limits
   scale_x_continuous(limits = c(-0.5, 8.5), breaks = c(0,2,4,6,8,10)) +
@@ -1428,9 +1290,9 @@ c <- ggplot(data = NULL, aes(x = ER.S1S2, y = vf_mmmin.steve)) +
 d <-
   ggplot(data = NULL, aes(x = ER.S3, y = vf_mmmin.desoto)) +
   # Data points
-  geom_point(data = subset(stoich, ReleaseStatus == "During"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "During"), 
              fill = "white", size = 2, shape = 21) +
-  geom_point(data = subset(stoich, ReleaseStatus == "After"), 
+  geom_point(data = subset(stoich20, ReleaseStatus == "After"), 
              fill = "#F2AD00", size = 2, shape = 21) +
   # Axis limits
   scale_x_continuous(limits = c(-0.5, 8.5), breaks = c(0,2,4,6,8,10)) +
@@ -1459,9 +1321,9 @@ meanData <- data.frame(GPP.mean = c(NA,
            ER.mean = c(NA,
                        abs(mean(metab$ER.S1S2, na.rm = TRUE)),
                        abs(mean(metab$ER.S3, na.rm = TRUE))),
-           Q.mean = c(mean(massbal$Q.lawrence_Ls)/1000,
-                      mean(massbal$Q.lawrence_Ls)/1000,
-                      mean(massbal$Q.desoto_Ls)/1000), 
+           Q.mean = c(mean(uptake$Mean.Discharge_m3s.eric, na.rm = TRUE),
+                      mean(uptake$Mean.Discharge_m3s.steve, na.rm = TRUE),
+                      mean(uptake$Mean.Discharge_m3s.desoto, na.rm = TRUE)), 
            U.mean = c(mean(uptake$UaNO3_gNm2day.eric, na.rm = TRUE),
                       mean(uptake$UaNO3_gNm2day.steve, na.rm = TRUE),
                       mean(uptake$UaNO3_gNm2day.desoto, na.rm = TRUE)),
@@ -1602,26 +1464,4 @@ d <-
 arrange <- grid.arrange(a,b,c,d, nrow = 2, ncol = 2)
 ggsave("./Plots/Fig7_Meta_Q.png", arrange, height = 95, width = 115, units = "mm", 
        dpi = 600)
-```
-
-```{r AddressingReviewerComments_JGRB1}
-## Check if ER an K covary within a site #####################################
-cov(metab$ER.S1S2, metab$K, use = "complete.obs") # S2 covariance
-cor(metab$ER.S1S2, metab$K, use = "complete.obs") # S2 correlation coefficient
-
-# Load K estimates for Desoto
-## S3
-d <- readRDS("./Outputs/MetabResults_Desoto.RData")$fit@fit$daily %>%
-  filter(date >= "2018-02-01" & date <= "2018-05-01")
-cov(d$ER_daily_mean, d$K600_daily_mean, use = "complete.obs") # S3 covariance
-cor(d$ER_daily_mean, d$K600_daily_mean, use = "complete.obs") # S3 covariance
-
-## Check standard deviation of ln(GPP) for estimation of autotrophic ##########
-#  respiration, needs to be < 1 to use Hall & Beaulieu 2013
-sd(log(metab$GPP.S1S2), na.rm = TRUE) # S2
-sd(log(metab$GPP.S3), na.rm = TRUE) # S3
-
-cov(metab$GPP.S3, metab$ER.S3, use = "complete.obs") # S3 covariance
-cor(metab$GPP.S3, metab$ER.S3, use = "complete.obs") # S3 covariance
-plot(metab$GPP.S3, metab$ER.S3)
 ```
