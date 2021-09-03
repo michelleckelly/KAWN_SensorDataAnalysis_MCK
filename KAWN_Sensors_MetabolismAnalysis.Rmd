@@ -144,7 +144,7 @@ write.csv(modelfit.desoto@fit[["daily"]], file = "./Outputs/MetabResults_Desoto.
 #modelfit.desoto <- readRDS(file = "./Outputs/MetabResults_Desoto.RData")
 
 K600.desoto <- 
-  modelfit.desoto[["fit"]]@fit[["daily"]] %>%
+  modelfit.desoto@fit[["daily"]] %>%
   select(date, K600_daily_50pct) %>%
   filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) 
 
@@ -173,7 +173,7 @@ v.S2 <-
             A_m2 = w.Steve*depth_m, v_ms = Q_m3s/A_m2,
             v_mday = v_ms*86400)
 v.desoto <- 
-  modelfit.desoto[["fit"]]@data %>%
+  modelfit.desoto@data %>%
   select(date, solar.time, depth, discharge) %>%
   group_by(date) %>%
   filter(date < ymd("2018-05-01") & date >= ymd("2018-02-01")) %>%
@@ -638,6 +638,9 @@ z_S1S2 <-
 # Compute the mean z of S1 and S2 on each date
 z_S1S2$z.mean <- apply(z_S1S2[c("depth_m.S1","depth_m.S2")], 
                        MARGIN = 1, FUN = mean)
+
+v_S1S2 %>% 
+  summarise_all(sd, na.rm = TRUE)
 
 ########### Run Function ######################################################
 ### Create S1S2model function to reduce amt of temporary data saved to environment ##

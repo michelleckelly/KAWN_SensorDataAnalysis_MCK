@@ -68,7 +68,8 @@ dailyavg <- function(sensor_data, avgs){
                        Discharge_m3s = mean(Discharge_m3s, na.rm = TRUE),
                        DO_mgL = mean(DO_mgL, na.rm = TRUE),
                        Light_PAR = mean(Light_PAR, na.rm = TRUE),
-                       WaterTemp_C = mean(WaterTemp_C, na.rm = TRUE))
+                       WaterTemp_C = mean(WaterTemp_C, na.rm = TRUE),
+                       Depth_m = mean(Depth_m, na.rm = TRUE))
   }
   # Factorize release status
   sensor_data$ReleaseStatus <- NA
@@ -297,21 +298,6 @@ hall$q_m3s <- hall$q_Ls/1000
 ```
 
 ```{r Stats}
-
-
-#metab.long$Month <- lubridate::month(metab.long$Date)
-# Correct date spans
-#metab.long <- 
- # metab.long[metab.long$Date < "2018-05-01" & metab.long$Date >= "2018-02-01",]
-#PR <- PR[PR$date < "2018-05-01" & PR$date >= "2018-02-01",]
-vf.metab <- vf.metab[vf.metab$Date < "2018-05-01" & vf.metab$Date >="2018-02-01",]
-# Factorize release status
-uptake.long$ReleaseStatus <- NA
-uptake.long$ReleaseStatus[uptake.long$Date < ymd("2018-04-01")] <- "During"
-uptake.long$ReleaseStatus[uptake.long$Date >= ymd("2018-04-01")] <- "After"
-uptake.long$ReleaseStatus <- factor(uptake.long$ReleaseStatus, 
-                              levels = c("During", "After"))
-
 ## Metabolism ##################################################################
 # Test whether GPP was different between S1-S2 and S3
 # Need to compare the means of paired samples: Paired sample T-test
@@ -507,6 +493,13 @@ mean(sensor_desoto$Discharge_m3s[sensor_desoto$date >= "2018-02-01" &
                             sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
 sd(sensor_desoto$Discharge_m3s[sensor_desoto$date >= "2018-02-01" & 
                             sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
+
+## Depth
+mean(sensor_eric$[sensor_desoto$date >= "2018-02-01" & 
+                            sensor_desoto$date <= "2018-05-01"], na.rm = TRUE)
+
+
+## Velocity
 
 ##### Ammonium ########################################
 ## S0
@@ -1087,6 +1080,7 @@ a <-
         panel.border = element_rect(fill = NA), 
         axis.text = element_text(color = "black"),
         text = element_text(size = 8))
+
 # S3
 b <- 
   ggplot(data = stoich20, aes(x = Upred_gNm2day.S3, y = UaNO3_gNm2day.desoto)) +
