@@ -930,13 +930,17 @@ a <-
   # Plot GPP
   geom_ribbon(aes(ymin = GPP.lower.S1S2, ymax = GPP.upper.S1S2), 
               fill = "lightgrey", alpha = 0.7) +
-  geom_point(aes(y = GPP.S1S2, fill = "S2"), size = 2, shape = 21) +
+  geom_pointrange(aes(y = GPP.S1S2, ymin = GPP.lower.S1S2, ymax = GPP.upper.S1S2), 
+              color = "lightgrey") +
+  geom_point(aes(y = GPP.S1S2, fill = "S2"), size = 1.8, shape = 21) +
   # Plot ER
   geom_ribbon(aes(ymin = ER.lower.S1S2, ymax = ER.upper.S1S2), 
               fill = "lightgrey", alpha = 0.7) +
-  geom_point(aes(y = ER.S1S2), size = 2, shape = 21, fill = "white") +
+  geom_pointrange(aes(y = ER.S1S2, ymin = ER.lower.S1S2, ymax = ER.upper.S1S2), 
+              color = "lightgrey") +
+  geom_point(aes(y = ER.S1S2), size = 1.8, shape = 21, fill = "white") +
   # y-axis limits
-  scale_y_continuous(limits = c(-12, 17), breaks = c(-10, -5, 0, 5, 10, 15)) +
+  scale_y_continuous(limits = c(-8, 10), breaks = c(-10, -5, 0, 5, 10, 15)) +
   # Axis labels
   labs(x = NULL, tag = "a",
        y = bquote("GPP or ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
@@ -960,13 +964,17 @@ b <-
   # ER
   geom_ribbon(aes(ymin = ER.lower.S3, ymax = ER.upper.S3), 
               fill = "lightgrey", alpha = 0.7) +
-  geom_point(aes(y = ER.S3), size = 2, shape = 21, fill = "white") +
+  geom_pointrange(aes(y = ER.S3, ymin = ER.lower.S3, ymax = ER.upper.S3), 
+              color = "lightgrey") +
+  geom_point(aes(y = ER.S3), size = 1.8, shape = 21, fill = "white") +
   # GPP
   geom_ribbon(aes(ymin = GPP.lower.S3, ymax = GPP.upper.S3), 
               fill = "lightgrey", alpha = 0.7) +
-  geom_point(aes(y = GPP.S3, fill = "S3"), size = 2, shape = 21) +
+  geom_pointrange(aes(y = GPP.S3, ymin = GPP.lower.S3, ymax = GPP.upper.S3), 
+              color = "lightgrey") +
+  geom_point(aes(y = GPP.S3, fill = "S3"), size = 1.8, shape = 21) +
   # y-axis limits
-  scale_y_continuous(limits = c(-12, 17), breaks = c(-10, -5, 0, 5, 10, 15)) +
+  scale_y_continuous(limits = c(-8, 10), breaks = c(-10, -5, 0, 5, 10, 15)) +
   # Axis labels
   labs(x = NULL, tag = "b",
        y = bquote("GPP or ER (g" ~~ O[2] ~ m^-2 ~ d^-1 ~ ")")) +
@@ -1086,9 +1094,6 @@ b <-
   ggplot(data = stoich20, aes(x = Upred_gNm2day.S3, y = UaNO3_gNm2day.desoto)) +
   # 1:1 line
   geom_abline(slope = 1, intercept = 0, linetype = 2) +
-  # Add regression line
-  geom_smooth(method = lm, 
-              color = "black", fill = "grey") +
   # Data points
   geom_point(data = subset(stoich20, ReleaseStatus == "During"), fill = "white", 
              size = 2, shape = 21) +
@@ -1340,8 +1345,10 @@ a <-
              aes(x = Q.mean, y = GPP.mean, 
                  fill = c("S1", "S2", "S3")), size = 3, shape = 21) +
   # Axis scales
-  scale_x_log10(labels = scales::number_format(accuracy=1, scale=1)) +
-  scale_y_log10(labels = scales::number_format(accuracy=0.1, scale=1)) +
+  scale_x_log10(labels = scales::number_format(accuracy=0.01, scale=1, 
+                                               big.mark = "")) +
+  scale_y_log10(labels = scales::number_format(accuracy=0.01, scale=1,
+                                               big.mark="")) +
   # Axis labels
   xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
   ylab(expression("GPP (g" ~ O[2] ~ m^{-2} ~ d^{-1}*")")) +
@@ -1373,9 +1380,11 @@ b <-
              aes(x = Q.mean, y = U.mean, 
                  fill = c("S1", "S2", "S3")), size = 3, shape = 21) +
   # Axis scales
-  scale_x_log10(labels = scales::number_format(accuracy=1, scale=1), 
+  scale_x_log10(labels = scales::number_format(accuracy=0.01, scale=1, 
+                                               big.mark = ""), 
                 limits = c(NA, 105)) +
-  scale_y_log10(labels = scales::number_format(accuracy=1, scale=1)) +
+  scale_y_log10(labels = scales::number_format(accuracy=0.01, scale=1, 
+                                               big.mark = "")) +
   # Axis labels
   labs(tag = "b") +
   xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
@@ -1404,8 +1413,10 @@ c <-
   # Add correlation coeff
   #ggpubr::stat_cor(color = "black", method = "spearman") +
   # Axis scales
-  scale_x_log10(labels = scales::number_format(accuracy=1, scale=1)) +
-  scale_y_log10(labels = scales::number_format(accuracy=1, scale=1)) +
+  scale_x_log10(labels = scales::number_format(accuracy=0.01, scale=1, 
+                                               big.mark = "")) +
+  scale_y_log10(labels = scales::number_format(accuracy=0.01, scale=1, 
+                                               big.mark = "")) +
   labs(tag = "c") +
   # Axis labels
   xlab(expression("Discharge ("*m^{3} ~ s^{-1}*")")) + 
@@ -1436,9 +1447,10 @@ d <-
              aes(x = Q.mean, y = Vf.mean, 
                  fill = c("S1", "S2", "S3")), size = 3, shape = 21, alpha = 0.8) +
   # Axis scales
-  scale_x_log10(labels = scales::number_format(accuracy=1, scale=1), 
+  scale_x_log10(labels = scales::number_format(accuracy=0.01, scale=1, 
+                                               big.mark = ""), 
                 limits = c(NA, 105)) +
-  scale_y_log10(labels = scales::number_format(accuracy=1, scale=1, 
+  scale_y_log10(labels = scales::number_format(accuracy=0.01, scale=1, 
                                                big.mark = "")) +
   # Axis labels
   labs(tag = "d") +
